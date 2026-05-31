@@ -2,14 +2,42 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, Search } from "lucide-react";
-import { useState } from "react";
+import { LogOut, Menu, Search, UserCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { navItems } from "@/lib/data";
+import { supabase } from "@/lib/supabase";
 
 export function AppShell({ title, eyebrow, children }: { title: string; eyebrow: string; children: React.ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [userEmail, setUserEmail] = useState("");
+  const [userName, setUserName] = useState("");
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getUser().then(({ data }) => {
+      const user = data.user;
+      setUserEmail(user?.email ?? "");
+      setUserName(String(user?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "User"));
+    });
+  }, []);
+
+  const initials = useMemo(() => {
+    return userName
+      .split(" ")
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "U";
+  }, [userName]);
+
+  async function signOut() {
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    window.location.href = "/";
+  }
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -46,6 +74,12 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
               );
             })}
           </nav>
+
+          <div className="mt-6 hidden rounded border border-slate-200 bg-slate-50 p-3 lg:block">
+            <p className="text-xs font-semibold uppercase text-slate-400">Signed in</p>
+            <p className="mt-1 truncate text-sm font-semibold text-ink">{userName || "Guest user"}</p>
+            <p className="truncate text-xs text-slate-500">{userEmail || "No active session"}</p>
+          </div>
         </aside>
 
         <div className="flex-1">
@@ -55,18 +89,29 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                 <p className="text-sm font-medium text-gumleaf">{eyebrow}</p>
                 <h1 className="text-2xl font-semibold text-ink sm:text-3xl">{title}</h1>
               </div>
-              <form
-                className="flex min-w-0 items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 shadow-sm sm:w-80"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  if (search.trim()) {
-                    window.location.href = `/participants?search=${encodeURIComponent(search.trim())}`;
-                  }
-                }}
-              >
-                <Search className="h-4 w-4 shrink-0 text-slate-400" />
-                <input className="w-full bg-transparent text-sm outline-none" placeholder="Search records" value={search} onChange={(event) => setSearch(event.target.value)} />
-              </form>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <form
+                  className="flex min-w-0 items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 shadow-sm sm:w-80"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (search.trim()) {
+                      window.location.href = `/participants?search=${encodeURIComponent(search.trim())}`;
+                    }
+                  }}
+                >
+                  <Search className="h-4 w-4 shrink-0 text-slate-400" />
+                  <input className="w-full bg-transparent text-sm outline-none" placeholder="Search records" value={search} onChange={(event) => setSearch(event.target.value)} />
+                </form>
+                <Link href="/profile" className="inline-flex items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gumleaf text-xs font-bold text-white">{initials}</span>
+                  <span className="hidden max-w-32 truncate md:inline">{userName || "Profile"}</span>
+                  <UserCircle className="h-4 w-4 text-slate-400" />
+                </Link>
+                <button onClick={signOut} className="inline-flex items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </button>
+              </div>
             </div>
           </header>
 
