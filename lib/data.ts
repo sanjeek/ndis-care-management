@@ -37,9 +37,10 @@ export const metrics = [
 ];
 
 export const todayShifts = [
-  { time: "07:00 - 11:00", participant: "Mia H.", worker: "Asha Patel", location: "Parramatta NSW", status: "Confirmed" },
-  { time: "09:30 - 15:30", participant: "Noah B.", worker: "Liam Nguyen", location: "Geelong VIC", status: "In progress" },
-  { time: "16:00 - 20:00", participant: "Grace T.", worker: "Sophie Clarke", location: "Brisbane QLD", status: "Unfilled" }
+  { time: "07:00 - 11:00", participant: "Mia H.", participantName: "Mia Harrison", worker: "Asha Patel", workerEmail: "asha.patel@example.com", location: "Parramatta NSW", status: "Confirmed" },
+  { time: "09:30 - 15:30", participant: "Noah B.", participantName: "Noah Bennett", worker: "Liam Nguyen", workerEmail: "liam.nguyen@example.com", location: "Geelong VIC", status: "In progress" },
+  { time: "16:00 - 20:00", participant: "Grace T.", participantName: "Grace Thompson", worker: "Sophie Clarke", workerEmail: "sophie.clarke@example.com", location: "Brisbane QLD", status: "Unfilled" },
+  { time: "13:00 - 17:00", participant: "Mia H.", participantName: "Mia Harrison", worker: "Asha Patel", workerEmail: "asha.patel@example.com", location: "Blacktown NSW", status: "Confirmed" }
 ];
 
 export const participants = [

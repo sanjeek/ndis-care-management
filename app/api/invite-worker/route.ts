@@ -5,7 +5,8 @@ export async function POST(request: Request) {
   const { email, name, token } = await request.json();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://127.0.0.1:3000";
+  const origin = request.headers.get("origin");
+  const siteUrl = origin || process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://127.0.0.1:3000");
 
   if (!url || !serviceRole) {
     return NextResponse.json({

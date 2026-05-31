@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, CalendarPlus, CheckCircle2, ClipboardPlus, Eye, EyeOff, FilePlus2, KeyRound, LockKeyhole, Plus, ShieldCheck, Upload } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -156,29 +156,47 @@ export function WorkersPage() {
 }
 
 export function WorkerPortalPage() {
+  const [workerEmail, setWorkerEmail] = useState("");
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getUser().then(({ data }) => {
+      setWorkerEmail(data.user?.email ?? "");
+    });
+  }, []);
+
+  const visibleShifts = useMemo(() => {
+    if (!workerEmail) return todayShifts.filter((shift) => shift.workerEmail === "asha.patel@example.com");
+    return todayShifts.filter((shift) => shift.workerEmail?.toLowerCase() === workerEmail.toLowerCase());
+  }, [workerEmail]);
+  const visibleParticipants = seedParticipants.filter((participant) =>
+    visibleShifts.some((shift) => shift.participantName === participant.name)
+  );
+  const workerName = visibleShifts[0]?.worker ?? "Support worker";
+
   return (
-    <AppShell title="Worker Portal" eyebrow="Shift details, participant information, progress notes, and incidents.">
+    <AppShell title="Worker Portal" eyebrow={`${workerName} schedule, client information, progress notes, and incidents.`}>
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
           <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="font-semibold text-ink">My assigned shifts</h2>
-                <p className="mt-1 text-sm text-slate-500">Workers see date, time, client, location, and shift status.</p>
+                <p className="mt-1 text-sm text-slate-500">Workers only see their own assigned activity schedule and linked client information.</p>
               </div>
               <Link href="/worker-portal/create-login" className="rounded border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                 Create login
               </Link>
             </div>
             <div className="mt-4">
-              <ShiftTable shifts={todayShifts.filter((shift) => shift.worker !== "Unfilled")} />
+              <ShiftTable shifts={visibleShifts} />
             </div>
           </section>
 
           <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="font-semibold text-ink">Client information</h2>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              {seedParticipants.slice(0, 2).map((participant) => (
+              {visibleParticipants.map((participant) => (
                 <article key={participant.ndis} className="rounded border border-slate-200 bg-slate-50 p-4">
                   <p className="font-semibold text-ink">{participant.name}</p>
                   <Info label="NDIS" value={participant.ndis} />
@@ -191,8 +209,8 @@ export function WorkerPortalPage() {
         </div>
 
         <div className="space-y-6">
-          <WorkerProgressNoteForm />
-          <WorkerIncidentForm />
+          <WorkerProgressNoteForm workerName={workerName} participants={visibleParticipants} />
+          <WorkerIncidentForm workerName={workerName} participants={visibleParticipants} />
           <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="font-semibold text-ink">Important worker reminders</h2>
             <div className="mt-4 grid gap-3">
@@ -215,23 +233,20 @@ export function WorkerCreateLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   async function submit(form: FormData) {
-    if (!isSupabaseConfigured || !supabase) {
-      setNotice("Demo login created on screen. Add Supabase keys to create a real auth user.");
-      return;
-    }
-
-    const { error } = await supabase.auth.signUp({
-      email: get(form, "email"),
-      password: get(form, "password"),
-      options: {
-        data: {
-          full_name: get(form, "name"),
-          role: "support_worker",
-          invite_token: get(form, "invite")
-        }
-      }
+    const response = await fetch("/api/register-provider", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: get(form, "email"),
+        password: get(form, "password"),
+        name: get(form, "name"),
+        organisation: "Worker portal",
+        role: "support_worker",
+        invite: get(form, "invite")
+      })
     });
-    setNotice(error ? error.message : "Login created. Check your email confirmation settings.");
+    const result = await response.json();
+    setNotice(result.message ?? (response.ok ? "Login created. You can now sign in." : "Could not create login."));
   }
 
   return (
@@ -261,31 +276,45 @@ export function RosteringPage() {
   async function submit(form: FormData) {
     const start = get(form, "start");
     const end = get(form, "end");
+    const workerName = get(form, "worker");
+    const participantName = get(form, "participant");
+    const worker = seedWorkers.find((item) => item.name === workerName);
     const next = {
-      participant: shortName(get(form, "participant")),
-      worker: get(form, "worker"),
+      participant: shortName(participantName),
+      participantName,
+      worker: workerName,
+      workerEmail: worker?.email ?? "",
       location: get(form, "location"),
       status: get(form, "status"),
       time: `${timeOnly(start)} - ${timeOnly(end)}`
     };
     setShifts([next, ...shifts]);
-    await persist("shifts", { participant_name: get(form, "participant"), support_worker_name: next.worker, location: next.location, starts_at: start, ends_at: end, status: next.status }, setNotice);
+    await persist("shifts", { participant_name: participantName, support_worker_name: next.worker, location: next.location, starts_at: start, ends_at: end, status: next.status }, setNotice);
   }
 
   return (
     <AppShell title="Rostering / Shifts" eyebrow={notice}>
-      <RecordForm submitLabel="Save shift" onSubmit={submit}>
-        <Select name="participant" label="Participant" options={seedParticipants.map((participant) => participant.name)} />
-        <Select name="worker" label="Assign support worker" options={seedWorkers.map((worker) => worker.name)} />
-        <Field name="location" label="Location" defaultValue="Parramatta NSW" />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field name="start" label="Start time" type="datetime-local" defaultValue="2026-05-31T07:00" />
-          <Field name="end" label="End time" type="datetime-local" defaultValue="2026-05-31T11:00" />
+      <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
+        <div className="space-y-4">
+          <div className="rounded border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-semibold text-ink">Create shift</h2>
+              <span className="rounded bg-gumleaf/10 px-2 py-1 text-xs font-semibold text-gumleaf">Weekly</span>
+            </div>
+            <RecordForm submitLabel="Save shift" onSubmit={submit}>
+              <Select name="participant" label="Participant" options={seedParticipants.map((participant) => participant.name)} />
+              <Select name="worker" label="Assign support worker" options={seedWorkers.map((item) => item.name)} />
+              <Field name="location" label="Location" defaultValue="Parramatta NSW" />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field name="start" label="Start time" type="datetime-local" defaultValue="2026-06-08T09:00" />
+                <Field name="end" label="End time" type="datetime-local" defaultValue="2026-06-08T12:00" />
+              </div>
+              <Select name="status" label="Shift status" options={statuses} />
+            </RecordForm>
+          </div>
+          <StaffRosterList shifts={shifts} />
         </div>
-        <Select name="status" label="Shift status" options={statuses} />
-      </RecordForm>
-      <div className="mt-6">
-        <ShiftTable shifts={shifts} />
+        <SchedulerGrid shifts={shifts} />
       </div>
     </AppShell>
   );
@@ -347,7 +376,15 @@ export function SimpleModulePage({ kind }: { kind: "timesheets" | "notes" | "inc
   return (
     <AppShell title={content.title} eyebrow={`${content.eyebrow} ${notice}`}>
       <RecordForm submitLabel={submitLabelForKind(kind)} onSubmit={submit}>
-        <Field name="title" label={titleLabelForKind(kind)} defaultValue={defaultTitleForKind(kind)} />
+        {kind === "notes" ? (
+          <Select
+            name="title"
+            label="Progress note title"
+            options={["Self care", "Community access progress", "Medication prompt", "Meal preparation", "Behaviour support", "Transport assistance", "Domestic assistance"]}
+          />
+        ) : (
+          <Field name="title" label={titleLabelForKind(kind)} defaultValue={defaultTitleForKind(kind)} />
+        )}
         <Area name="details" label="Details" defaultValue={defaultDetailsForKind(kind)} />
       </RecordForm>
       <div className="grid gap-4 lg:grid-cols-3">
@@ -362,7 +399,7 @@ export function SimpleModulePage({ kind }: { kind: "timesheets" | "notes" | "inc
   );
 }
 
-function WorkerProgressNoteForm() {
+function WorkerProgressNoteForm({ workerName, participants }: { workerName: string; participants: typeof seedParticipants }) {
   const [notes, setNotes] = useState(["Noah achieved community access goal with verbal prompting."]);
   const [notice, setNotice] = useState("Add an important progress note.");
 
@@ -373,7 +410,8 @@ function WorkerProgressNoteForm() {
       "progress_notes",
       {
         participant_name: get(form, "participant"),
-        worker_name: get(form, "worker"),
+        worker_name: workerName,
+        category: get(form, "category"),
         note,
         is_important: get(form, "important") === "Important"
       },
@@ -385,8 +423,9 @@ function WorkerProgressNoteForm() {
     <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="font-semibold text-ink">Progress note</h2>
       <RecordForm submitLabel="Add progress note" onSubmit={submit}>
-        <Select name="participant" label="Client" options={seedParticipants.map((participant) => participant.name)} />
-        <Select name="worker" label="Worker" options={seedWorkers.map((worker) => worker.name)} />
+        <Select name="participant" label="Client" options={participants.map((participant) => participant.name)} />
+        <ReadOnlyField label="Worker" value={workerName} />
+        <Select name="category" label="Support category" options={["Self care", "Community access", "Medication prompt", "Meal preparation", "Behaviour support", "Transport assistance"]} />
         <Select name="important" label="Priority" options={["Important", "Standard"]} />
         <Area name="note" label="Progress note details" defaultValue="Client completed personal care routine and attended community activity." />
       </RecordForm>
@@ -400,7 +439,7 @@ function WorkerProgressNoteForm() {
   );
 }
 
-function WorkerIncidentForm() {
+function WorkerIncidentForm({ workerName, participants }: { workerName: string; participants: typeof seedParticipants }) {
   const [reports, setReports] = useState(["Medication variance ready for coordinator review."]);
   const [notice, setNotice] = useState("Submit incidents for immediate review.");
 
@@ -411,7 +450,7 @@ function WorkerIncidentForm() {
       "incident_reports",
       {
         participant_name: get(form, "participant"),
-        worker_name: get(form, "worker"),
+        worker_name: workerName,
         priority: get(form, "priority"),
         summary
       },
@@ -423,8 +462,8 @@ function WorkerIncidentForm() {
     <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="font-semibold text-ink">Incident report</h2>
       <RecordForm submitLabel="Submit incident" onSubmit={submit}>
-        <Select name="participant" label="Client" options={seedParticipants.map((participant) => participant.name)} />
-        <Select name="worker" label="Worker" options={seedWorkers.map((worker) => worker.name)} />
+        <Select name="participant" label="Client" options={participants.map((participant) => participant.name)} />
+        <ReadOnlyField label="Worker" value={workerName} />
         <Select name="priority" label="Priority" options={["High", "Medium", "Low"]} />
         <Area name="summary" label="Incident details" defaultValue="Describe what happened, actions taken, witnesses, and follow-up required." />
       </RecordForm>
@@ -495,6 +534,99 @@ function ShiftTable({ shifts }: { shifts: Shift[] }) {
         </table>
       </div>
     </div>
+  );
+}
+
+function StaffRosterList({ shifts }: { shifts: Shift[] }) {
+  return (
+    <section className="rounded border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-200 px-4 py-3">
+        <h2 className="font-semibold text-ink">Staff availability</h2>
+      </div>
+      <div className="divide-y divide-slate-100">
+        {seedWorkers.map((worker) => {
+          const workerHours = shifts.filter((shift) => shift.worker === worker.name).length * 4;
+          return (
+            <div key={worker.email} className="flex items-center gap-3 px-4 py-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-harbour text-sm font-semibold text-white">
+                {worker.name.split(" ").map((part) => part[0]).join("")}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium text-ink">{worker.name}</p>
+                <p className="text-sm text-gumleaf">View availability</p>
+                <p className="text-xs text-slate-500">{workerHours.toFixed(2)} hours scheduled</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function SchedulerGrid({ shifts }: { shifts: Shift[] }) {
+  const days = [
+    { label: "Mon", date: "8" },
+    { label: "Tue", date: "9" },
+    { label: "Wed", date: "10" },
+    { label: "Thu", date: "11" },
+    { label: "Fri", date: "12" },
+    { label: "Sat", date: "13" },
+    { label: "Sun", date: "14" }
+  ];
+
+  return (
+    <section className="overflow-hidden rounded border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-sm font-medium text-gumleaf">June 2026</p>
+          <h2 className="text-xl font-semibold text-ink">Weekly schedule</h2>
+        </div>
+        <div className="flex gap-2">
+          <button className="rounded border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">Today</button>
+          <button className="rounded bg-ink px-3 py-2 text-sm font-semibold text-white">Add shift</button>
+        </div>
+      </div>
+      <div className="grid min-w-[860px] grid-cols-[180px_repeat(7,1fr)]">
+        <div className="border-b border-r border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-500">Staff</div>
+        {days.map((day, index) => (
+          <div key={day.label} className={`border-b border-r border-slate-200 p-3 text-center ${index === 0 ? "bg-banksia/10" : "bg-slate-50"}`}>
+            <p className="text-xs font-semibold uppercase text-slate-400">{day.label}</p>
+            <p className="font-semibold text-ink">{day.date}</p>
+          </div>
+        ))}
+        {seedWorkers.map((worker, workerIndex) => (
+          <ScheduleRow key={worker.email} worker={worker} workerIndex={workerIndex} shifts={shifts} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ScheduleRow({ worker, workerIndex, shifts }: { worker: (typeof seedWorkers)[number]; workerIndex: number; shifts: Shift[] }) {
+  const workerShifts = shifts.filter((shift) => shift.worker === worker.name);
+  return (
+    <>
+      <div className="min-h-24 border-b border-r border-slate-200 bg-white p-3">
+        <p className="font-semibold text-ink">{worker.name}</p>
+        <p className="mt-1 text-xs text-slate-500">{worker.availability}</p>
+      </div>
+      {Array.from({ length: 7 }).map((_, dayIndex) => {
+        const shift = workerShifts[(dayIndex + workerIndex) % Math.max(workerShifts.length, 1)];
+        const show = workerShifts.length > 0 && (dayIndex === workerIndex || dayIndex === workerIndex + 2 || dayIndex === workerIndex + 4);
+        return (
+          <div key={`${worker.email}-${dayIndex}`} className={`min-h-24 border-b border-r border-slate-200 p-2 ${dayIndex === 0 ? "bg-banksia/10" : "bg-white"}`}>
+            {show && shift ? (
+              <div className="rounded border-l-4 border-gumleaf bg-slate-50 p-2 text-xs shadow-sm">
+                <p className="font-semibold text-ink">{shift.time}</p>
+                <p className="mt-1 text-slate-600">{shift.participantName ?? shift.participant}</p>
+                <p className="mt-1 text-slate-500">{shift.location}</p>
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </>
   );
 }
 
@@ -570,6 +702,15 @@ function Select({ name, label, options }: { name: string; label: string; options
         ))}
       </select>
     </label>
+  );
+}
+
+function ReadOnlyField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+      <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-700">{value}</div>
+    </div>
   );
 }
 

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { Building2, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserRound } from "lucide-react";
-import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 export function RegisterCard() {
   const [message, setMessage] = useState("Create a provider account for your team.");
@@ -15,24 +14,19 @@ export function RegisterCard() {
     const form = new FormData(event.currentTarget);
     setLoading(true);
 
-    if (!isSupabaseConfigured || !supabase) {
-      setMessage("Supabase credentials are not configured yet. Add them to .env.local.");
-      setLoading(false);
-      return;
-    }
-
-    const { error } = await supabase.auth.signUp({
-      email: String(form.get("email")),
-      password: String(form.get("password")),
-      options: {
-        data: {
-          full_name: String(form.get("name")),
-          organisation: String(form.get("organisation"))
-        }
-      }
+    const response = await fetch("/api/register-provider", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: String(form.get("name")),
+        organisation: String(form.get("organisation")),
+        email: String(form.get("email")),
+        password: String(form.get("password"))
+      })
     });
+    const result = await response.json();
 
-    setMessage(error ? error.message : "Account created. Check email confirmation settings in Supabase.");
+    setMessage(result.message ?? (response.ok ? "Account created. You can now sign in." : "Registration failed."));
     setLoading(false);
   }
 

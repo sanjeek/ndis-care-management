@@ -13,6 +13,7 @@ export function LoginCard() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
+  const [resetLockedUntil, setResetLockedUntil] = useState(0);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -25,12 +26,29 @@ export function LoginCard() {
     }
 
     if (forgotMode) {
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+      if (Date.now() < resetLockedUntil) {
+        const seconds = Math.ceil((resetLockedUntil - Date.now()) / 1000);
+        setMessage(`Please wait ${seconds} seconds before requesting another reset email.`);
+        setLoading(false);
+        return;
+      }
+
+      const siteUrl = window.location.origin;
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${siteUrl}/reset-password`
       });
       setLoading(false);
-      setMessage(error ? error.message : "Password reset email sent. Check your inbox.");
+      if (error) {
+        if (error.message.toLowerCase().includes("rate")) {
+          setResetLockedUntil(Date.now() + 60000);
+          setMessage("Supabase has temporarily rate-limited reset emails. Please wait 60 seconds, then try again.");
+          return;
+        }
+        setMessage(error.message);
+        return;
+      }
+      setResetLockedUntil(Date.now() + 60000);
+      setMessage("Password reset email sent. Check your inbox.");
       return;
     }
 

@@ -19,6 +19,9 @@ create table if not exists public.support_workers (
   created_at timestamptz not null default now()
 );
 
+alter table public.support_workers
+add column if not exists email text;
+
 create table if not exists public.worker_invitations (
   id uuid primary key default gen_random_uuid(),
   worker_name text not null,
@@ -48,6 +51,9 @@ create table if not exists public.progress_notes (
   is_important boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+alter table public.progress_notes
+add column if not exists category text;
 
 create table if not exists public.incident_reports (
   id uuid primary key default gen_random_uuid(),

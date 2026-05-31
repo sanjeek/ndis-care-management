@@ -125,9 +125,14 @@ export function CareApp() {
   async function addShift(form: FormData) {
     const start = value(form, "start");
     const end = value(form, "end");
+    const participantName = value(form, "participant");
+    const workerName = value(form, "worker");
+    const worker = workers.find((item) => item.name === workerName);
     const next: Shift = {
-      participant: shortName(value(form, "participant")),
-      worker: value(form, "worker"),
+      participant: shortName(participantName),
+      participantName,
+      worker: workerName,
+      workerEmail: worker?.email ?? "",
       location: value(form, "location"),
       status: value(form, "status"),
       time: `${timeOnly(start)} - ${timeOnly(end)}`
@@ -135,7 +140,7 @@ export function CareApp() {
     setShifts((current) => [next, ...current]);
     setModal(null);
     await persist("shifts", {
-      participant_name: value(form, "participant"),
+      participant_name: participantName,
       support_worker_name: next.worker,
       location: next.location,
       starts_at: start,
