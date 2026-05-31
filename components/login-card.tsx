@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { CopyrightFooter } from "@/components/copyright-footer";
 
 export function LoginCard() {
   const [email, setEmail] = useState("");
@@ -172,6 +173,7 @@ export function LoginCard() {
               View dashboard
             </Link>
           </div>
+          <CopyrightFooter />
         </form>
       </div>
     </section>

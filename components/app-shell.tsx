@@ -6,6 +6,7 @@ import { LogOut, Menu, Search, UserCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { navItems } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
+import { CopyrightFooter } from "@/components/copyright-footer";
 
 export function AppShell({ title, eyebrow, children }: { title: string; eyebrow: string; children: React.ReactNode }) {
   const pathname = usePathname();
@@ -116,6 +117,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
           </header>
 
           <div className="px-4 py-6 lg:px-8">{children}</div>
+          <CopyrightFooter />
         </div>
       </section>
     </main>

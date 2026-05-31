@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { Eye, EyeOff, LockKeyhole, ShieldCheck } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { CopyrightFooter } from "@/components/copyright-footer";
 
 export function ResetPasswordCard() {
   const [message, setMessage] = useState("Enter a new password for your account.");
@@ -59,6 +60,7 @@ export function ResetPasswordCard() {
           <Link className="mt-5 inline-flex font-semibold text-gumleaf hover:text-ink" href="/">
             Back to sign in
           </Link>
+          <CopyrightFooter />
         </form>
       </section>
     </main>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { Building2, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserRound } from "lucide-react";
+import { CopyrightFooter } from "@/components/copyright-footer";
 
 export function RegisterCard() {
   const [message, setMessage] = useState("Create a provider account for your team.");
@@ -66,6 +67,7 @@ export function RegisterCard() {
               Dashboard
             </Link>
           </div>
+          <CopyrightFooter />
         </form>
       </section>
     </main>
