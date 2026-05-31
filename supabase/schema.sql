@@ -59,12 +59,22 @@ create table if not exists public.incident_reports (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.module_records (
+  id uuid primary key default gen_random_uuid(),
+  module text not null,
+  title text not null,
+  details text not null,
+  status text not null default 'active',
+  created_at timestamptz not null default now()
+);
+
 alter table public.participants enable row level security;
 alter table public.support_workers enable row level security;
 alter table public.worker_invitations enable row level security;
 alter table public.shifts enable row level security;
 alter table public.progress_notes enable row level security;
 alter table public.incident_reports enable row level security;
+alter table public.module_records enable row level security;
 
 create policy "Authenticated users can manage participants"
 on public.participants for all
@@ -98,6 +108,12 @@ with check (true);
 
 create policy "Authenticated users can manage incident reports"
 on public.incident_reports for all
+to authenticated
+using (true)
+with check (true);
+
+create policy "Authenticated users can manage module records"
+on public.module_records for all
 to authenticated
 using (true)
 with check (true);

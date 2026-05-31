@@ -9,6 +9,7 @@ import { navItems } from "@/lib/data";
 export function AppShell({ title, eyebrow, children }: { title: string; eyebrow: string; children: React.ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -54,10 +55,18 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                 <p className="text-sm font-medium text-gumleaf">{eyebrow}</p>
                 <h1 className="text-2xl font-semibold text-ink sm:text-3xl">{title}</h1>
               </div>
-              <label className="flex min-w-0 items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 shadow-sm sm:w-80">
+              <form
+                className="flex min-w-0 items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 shadow-sm sm:w-80"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (search.trim()) {
+                    window.location.href = `/participants?search=${encodeURIComponent(search.trim())}`;
+                  }
+                }}
+              >
                 <Search className="h-4 w-4 shrink-0 text-slate-400" />
-                <input className="w-full bg-transparent text-sm outline-none" placeholder="Search records" />
-              </label>
+                <input className="w-full bg-transparent text-sm outline-none" placeholder="Search records" value={search} onChange={(event) => setSearch(event.target.value)} />
+              </form>
             </div>
           </header>
 

@@ -292,6 +292,7 @@ export function RosteringPage() {
 }
 
 export function SimpleModulePage({ kind }: { kind: "timesheets" | "notes" | "incidents" | "invoices" | "documents" | "settings" }) {
+  const [notice, setNotice] = useState("Ready.");
   const content = {
     timesheets: {
       title: "Timesheets",
@@ -324,11 +325,33 @@ export function SimpleModulePage({ kind }: { kind: "timesheets" | "notes" | "inc
       items: ["Organisation branches and ABN", "NDIS catalogue and line items", "Supabase authentication and staff roles"]
     }
   }[kind];
+  const [items, setItems] = useState(content.items);
+
+  async function submit(form: FormData) {
+    const title = get(form, "title");
+    const details = get(form, "details");
+    const display = details ? `${title}: ${details}` : title;
+    setItems([display, ...items]);
+    await persist(
+      moduleRecordTable(),
+      {
+        module: kind,
+        title,
+        details,
+        status: kind === "incidents" ? "submitted" : "active"
+      },
+      setNotice
+    );
+  }
 
   return (
-    <AppShell title={content.title} eyebrow={content.eyebrow}>
+    <AppShell title={content.title} eyebrow={`${content.eyebrow} ${notice}`}>
+      <RecordForm submitLabel={submitLabelForKind(kind)} onSubmit={submit}>
+        <Field name="title" label={titleLabelForKind(kind)} defaultValue={defaultTitleForKind(kind)} />
+        <Area name="details" label="Details" defaultValue={defaultDetailsForKind(kind)} />
+      </RecordForm>
       <div className="grid gap-4 lg:grid-cols-3">
-        {content.items.map((item) => (
+        {items.map((item) => (
           <article key={item} className="rounded border border-slate-200 bg-white p-5 shadow-sm">
             <ClipboardPlus className="h-5 w-5 text-gumleaf" />
             <p className="mt-4 font-medium text-ink">{item}</p>
@@ -557,6 +580,54 @@ function Info({ label, value }: { label: string; value: string }) {
       <p className="mt-1 leading-6 text-slate-700">{value}</p>
     </div>
   );
+}
+
+function moduleRecordTable() {
+  return "module_records";
+}
+
+function submitLabelForKind(kind: "timesheets" | "notes" | "incidents" | "invoices" | "documents" | "settings") {
+  return {
+    timesheets: "Add timesheet item",
+    notes: "Add progress note",
+    incidents: "Submit incident",
+    invoices: "Add invoice item",
+    documents: "Add document record",
+    settings: "Save setting"
+  }[kind];
+}
+
+function titleLabelForKind(kind: "timesheets" | "notes" | "incidents" | "invoices" | "documents" | "settings") {
+  return {
+    timesheets: "Timesheet item",
+    notes: "Progress note title",
+    incidents: "Incident title",
+    invoices: "Invoice title",
+    documents: "Document title",
+    settings: "Setting name"
+  }[kind];
+}
+
+function defaultTitleForKind(kind: "timesheets" | "notes" | "incidents" | "invoices" | "documents" | "settings") {
+  return {
+    timesheets: "Kilometre claim review",
+    notes: "Community access progress",
+    incidents: "Medication variance",
+    invoices: "Plan manager invoice",
+    documents: "Updated service agreement",
+    settings: "Branch billing default"
+  }[kind];
+}
+
+function defaultDetailsForKind(kind: "timesheets" | "notes" | "incidents" | "invoices" | "documents" | "settings") {
+  return {
+    timesheets: "Review worker shift time, break, allowance, and travel claim.",
+    notes: "Participant achieved agreed support goal with prompting and supervision.",
+    incidents: "Describe incident, immediate action, people notified, and follow-up required.",
+    invoices: "Prepare NDIS line items for plan manager review.",
+    documents: "Attach or record document details for coordinator follow-up.",
+    settings: "Update organisation setting for operations team review."
+  }[kind];
 }
 
 async function persist(table: string, payload: Record<string, unknown>, setNotice: (message: string) => void) {
