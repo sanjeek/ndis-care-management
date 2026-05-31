@@ -2,7 +2,27 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, CalendarPlus, CheckCircle2, ClipboardPlus, Eye, EyeOff, FilePlus2, KeyRound, LockKeyhole, Plus, ShieldCheck, Upload } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarDays,
+  CalendarPlus,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardPlus,
+  Eye,
+  EyeOff,
+  FilePlus2,
+  Filter,
+  KeyRound,
+  LockKeyhole,
+  MoreVertical,
+  Plus,
+  Search,
+  ShieldCheck,
+  Upload,
+  X
+} from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { StatCard } from "@/components/stat-card";
 import { documents, incidents, metrics, participants as seedParticipants, todayShifts, workers as seedWorkers } from "@/lib/data";
@@ -271,7 +291,8 @@ export function WorkerCreateLoginPage() {
 
 export function RosteringPage() {
   const [shifts, setShifts] = useState(todayShifts);
-  const [notice, setNotice] = useState("Create and assign shifts.");
+  const [notice, setNotice] = useState("Weekly staff scheduler.");
+  const [createOpen, setCreateOpen] = useState(false);
 
   async function submit(form: FormData) {
     const start = get(form, "start");
@@ -290,32 +311,13 @@ export function RosteringPage() {
     };
     setShifts([next, ...shifts]);
     await persist("shifts", { participant_name: participantName, support_worker_name: next.worker, location: next.location, starts_at: start, ends_at: end, status: next.status }, setNotice);
+    setCreateOpen(false);
   }
 
   return (
     <AppShell title="Rostering / Shifts" eyebrow={notice}>
-      <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
-        <div className="space-y-4">
-          <div className="rounded border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-semibold text-ink">Create shift</h2>
-              <span className="rounded bg-gumleaf/10 px-2 py-1 text-xs font-semibold text-gumleaf">Weekly</span>
-            </div>
-            <RecordForm submitLabel="Save shift" onSubmit={submit}>
-              <Select name="participant" label="Participant" options={seedParticipants.map((participant) => participant.name)} />
-              <Select name="worker" label="Assign support worker" options={seedWorkers.map((item) => item.name)} />
-              <Field name="location" label="Location" defaultValue="Parramatta NSW" />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field name="start" label="Start time" type="datetime-local" defaultValue="2026-06-08T09:00" />
-                <Field name="end" label="End time" type="datetime-local" defaultValue="2026-06-08T12:00" />
-              </div>
-              <Select name="status" label="Shift status" options={statuses} />
-            </RecordForm>
-          </div>
-          <StaffRosterList shifts={shifts} />
-        </div>
-        <SchedulerGrid shifts={shifts} />
-      </div>
+      <SchedulerGrid shifts={shifts} onAddShift={() => setCreateOpen(true)} />
+      {createOpen ? <ShiftCreateModal onClose={() => setCreateOpen(false)} onSubmit={submit} /> : null}
     </AppShell>
   );
 }
@@ -537,34 +539,7 @@ function ShiftTable({ shifts }: { shifts: Shift[] }) {
   );
 }
 
-function StaffRosterList({ shifts }: { shifts: Shift[] }) {
-  return (
-    <section className="rounded border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 px-4 py-3">
-        <h2 className="font-semibold text-ink">Staff availability</h2>
-      </div>
-      <div className="divide-y divide-slate-100">
-        {seedWorkers.map((worker) => {
-          const workerHours = shifts.filter((shift) => shift.worker === worker.name).length * 4;
-          return (
-            <div key={worker.email} className="flex items-center gap-3 px-4 py-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-harbour text-sm font-semibold text-white">
-                {worker.name.split(" ").map((part) => part[0]).join("")}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-ink">{worker.name}</p>
-                <p className="text-sm text-gumleaf">View availability</p>
-                <p className="text-xs text-slate-500">{workerHours.toFixed(2)} hours scheduled</p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-function SchedulerGrid({ shifts }: { shifts: Shift[] }) {
+function SchedulerGrid({ shifts, onAddShift }: { shifts: Shift[]; onAddShift: () => void }) {
   const days = [
     { label: "Mon", date: "8" },
     { label: "Tue", date: "9" },
@@ -577,27 +552,64 @@ function SchedulerGrid({ shifts }: { shifts: Shift[] }) {
 
   return (
     <section className="overflow-hidden rounded border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-gumleaf">June 2026</p>
-          <h2 className="text-xl font-semibold text-ink">Weekly schedule</h2>
+      <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
+          <button className="inline-flex items-center gap-2 rounded border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+            <CalendarDays className="h-4 w-4 text-gumleaf" />
+            Staff
+          </button>
+          <button className="rounded border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50" aria-label="Filter scheduler">
+            <Filter className="h-4 w-4" />
+          </button>
+          <button className="rounded border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Today</button>
+          <button className="rounded border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50" aria-label="Previous week">
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button className="rounded border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50" aria-label="Next week">
+            <ChevronRight className="h-4 w-4" />
+          </button>
+          <h2 className="ml-1 text-xl font-semibold text-ink">June 2026</h2>
         </div>
-        <div className="flex gap-2">
-          <button className="rounded border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">Today</button>
-          <button className="rounded bg-ink px-3 py-2 text-sm font-semibold text-white">Add shift</button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button className="rounded border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Weekly</button>
+          <button onClick={onAddShift} className="inline-flex items-center gap-2 rounded bg-[#354aa3] px-4 py-2 text-sm font-semibold text-white hover:bg-[#283a82]">
+            <Plus className="h-4 w-4" />
+            Add Shift
+          </button>
+          <button className="rounded border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50" aria-label="More scheduler actions">
+            <MoreVertical className="h-4 w-4" />
+          </button>
         </div>
       </div>
-      <div className="grid min-w-[860px] grid-cols-[180px_repeat(7,1fr)]">
-        <div className="border-b border-r border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-500">Staff</div>
-        {days.map((day, index) => (
-          <div key={day.label} className={`border-b border-r border-slate-200 p-3 text-center ${index === 0 ? "bg-banksia/10" : "bg-slate-50"}`}>
-            <p className="text-xs font-semibold uppercase text-slate-400">{day.label}</p>
-            <p className="font-semibold text-ink">{day.date}</p>
+
+      <div className="grid border-b border-slate-200 md:grid-cols-[310px_1fr]">
+        <div className="border-r border-slate-200 bg-white">
+          <div className="border-b border-slate-200 p-3">
+            <label className="flex items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
+              <Search className="h-4 w-4 text-slate-400" />
+              <input className="w-full bg-transparent outline-none placeholder:text-slate-400" placeholder="Search by team, staff or client ..." />
+            </label>
           </div>
-        ))}
-        {seedWorkers.map((worker, workerIndex) => (
-          <ScheduleRow key={worker.email} worker={worker} workerIndex={workerIndex} shifts={shifts} />
-        ))}
+          <VacantShiftRow />
+          {seedWorkers.map((worker) => {
+            const workerHours = shifts.filter((shift) => shift.worker === worker.name).length * 4;
+            return <StaffScheduleRow key={worker.email} worker={worker} hours={workerHours} />;
+          })}
+        </div>
+
+        <div className="overflow-x-auto scrollbar-subtle">
+          <div className="grid min-w-[980px] grid-cols-7">
+            {days.map((day, index) => (
+              <div key={day.label} className={`border-b border-r border-slate-200 p-3 text-center ${index === 0 ? "bg-banksia/15" : "bg-slate-50"}`}>
+                <p className="text-xs font-semibold uppercase text-slate-400">{day.label}</p>
+                <p className="font-semibold text-ink">{day.date}</p>
+              </div>
+            ))}
+            {seedWorkers.map((worker, workerIndex) => (
+              <ScheduleRow key={worker.email} worker={worker} workerIndex={workerIndex} shifts={shifts} />
+            ))}
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -607,26 +619,81 @@ function ScheduleRow({ worker, workerIndex, shifts }: { worker: (typeof seedWork
   const workerShifts = shifts.filter((shift) => shift.worker === worker.name);
   return (
     <>
-      <div className="min-h-24 border-b border-r border-slate-200 bg-white p-3">
-        <p className="font-semibold text-ink">{worker.name}</p>
-        <p className="mt-1 text-xs text-slate-500">{worker.availability}</p>
-      </div>
       {Array.from({ length: 7 }).map((_, dayIndex) => {
         const shift = workerShifts[(dayIndex + workerIndex) % Math.max(workerShifts.length, 1)];
         const show = workerShifts.length > 0 && (dayIndex === workerIndex || dayIndex === workerIndex + 2 || dayIndex === workerIndex + 4);
         return (
-          <div key={`${worker.email}-${dayIndex}`} className={`min-h-24 border-b border-r border-slate-200 p-2 ${dayIndex === 0 ? "bg-banksia/10" : "bg-white"}`}>
+          <div key={`${worker.email}-${dayIndex}`} className={`min-h-[102px] border-b border-r border-slate-200 p-2 ${dayIndex === 0 ? "bg-banksia/15" : "bg-white"}`}>
             {show && shift ? (
-              <div className="rounded border-l-4 border-gumleaf bg-slate-50 p-2 text-xs shadow-sm">
-                <p className="font-semibold text-ink">{shift.time}</p>
-                <p className="mt-1 text-slate-600">{shift.participantName ?? shift.participant}</p>
-                <p className="mt-1 text-slate-500">{shift.location}</p>
+              <div className="border-l-4 border-gumleaf bg-slate-50 px-2 py-2 text-xs shadow-sm">
+                <div className="mb-1 h-1 rounded-full bg-slate-400" />
+                <p className="font-semibold text-slate-600">{shift.time}</p>
+                <p className="mt-1 truncate font-semibold text-ink">{shift.participantName ?? shift.participant}</p>
+                <p className="mt-1 truncate text-slate-500">{shift.location}</p>
               </div>
             ) : null}
           </div>
         );
       })}
     </>
+  );
+}
+
+function VacantShiftRow() {
+  return (
+    <div className="flex min-h-[102px] items-center gap-3 border-b border-slate-200 px-3 py-4">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-coral text-sm font-semibold text-white">VS</span>
+      <div className="min-w-0">
+        <p className="font-semibold text-coral">Vacant Shift</p>
+        <p className="text-xs text-slate-500">No vacant shift at the moment</p>
+      </div>
+    </div>
+  );
+}
+
+function StaffScheduleRow({ worker, hours }: { worker: (typeof seedWorkers)[number]; hours: number }) {
+  return (
+    <div className="flex min-h-[102px] items-center gap-3 border-b border-slate-200 px-3 py-4">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-harbour text-sm font-semibold text-white">
+        {worker.name.split(" ").map((part) => part[0]).join("")}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-semibold text-ink">{worker.name}</p>
+        <p className="text-sm text-gumleaf">View Availability</p>
+        <p className="text-xs text-slate-500">{hours.toFixed(2)} Hours</p>
+      </div>
+      <MoreVertical className="h-4 w-4 shrink-0 text-slate-400" />
+    </div>
+  );
+}
+
+function ShiftCreateModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (form: FormData) => Promise<void> }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-ink/45 px-4 py-6 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" aria-labelledby="create-shift-title">
+      <div className="w-full max-w-xl rounded border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gumleaf">Weekly scheduler</p>
+            <h2 id="create-shift-title" className="text-xl font-semibold text-ink">Create shift</h2>
+          </div>
+          <button onClick={onClose} className="rounded border border-slate-200 p-2 text-slate-500 hover:bg-slate-50" aria-label="Close create shift">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="p-5">
+          <RecordForm submitLabel="Save shift" onSubmit={onSubmit}>
+            <Select name="participant" label="Participant" options={seedParticipants.map((participant) => participant.name)} />
+            <Select name="worker" label="Assign support worker" options={seedWorkers.map((item) => item.name)} />
+            <Field name="location" label="Location" defaultValue="Parramatta NSW" />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field name="start" label="Start time" type="datetime-local" defaultValue="2026-06-08T09:00" />
+              <Field name="end" label="End time" type="datetime-local" defaultValue="2026-06-08T12:00" />
+            </div>
+            <Select name="status" label="Shift status" options={statuses} />
+          </RecordForm>
+        </div>
+      </div>
+    </div>
   );
 }
 
