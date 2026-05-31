@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { Building2, LockKeyhole, Mail, ShieldCheck, UserRound } from "lucide-react";
+import { Building2, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserRound } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 export function RegisterCard() {
   const [message, setMessage] = useState("Create a provider account for your team.");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -56,7 +57,7 @@ export function RegisterCard() {
             <Input icon={UserRound} name="name" label="Full name" placeholder="Priya Coordinator" />
             <Input icon={Building2} name="organisation" label="Provider name" placeholder="Bright Path Supports" />
             <Input icon={Mail} name="email" label="Email address" type="email" placeholder="admin@provider.com.au" />
-            <Input icon={LockKeyhole} name="password" label="Password" type="password" placeholder="Create password" />
+            <PasswordInput show={showPassword} setShow={setShowPassword} />
           </div>
 
           <button className="mt-6 w-full rounded bg-gumleaf px-4 py-3 font-semibold text-white hover:bg-[#1d625d]" disabled={loading}>
@@ -74,6 +75,21 @@ export function RegisterCard() {
         </form>
       </section>
     </main>
+  );
+}
+
+function PasswordInput({ show, setShow }: { show: boolean; setShow: (show: boolean) => void }) {
+  return (
+    <label>
+      <span className="mb-2 block text-sm font-medium text-slate-700">Password</span>
+      <span className="flex items-center gap-3 rounded border border-slate-200 bg-white px-3 py-3 shadow-sm focus-within:border-gumleaf focus-within:ring-2 focus-within:ring-gumleaf/15">
+        <LockKeyhole className="h-5 w-5 text-slate-400" />
+        <input name="password" type={show ? "text" : "password"} required placeholder="Create password" className="w-full border-0 bg-transparent text-ink outline-none placeholder:text-slate-400" />
+        <button type="button" className="text-slate-400 hover:text-gumleaf" onClick={() => setShow(!show)} aria-label={show ? "Hide password" : "Show password"}>
+          {show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+        </button>
+      </span>
+    </label>
   );
 }
 

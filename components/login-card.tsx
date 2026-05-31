@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { Eye, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 export function LoginCard() {
@@ -11,6 +11,8 @@ export function LoginCard() {
   const [remember, setRemember] = useState(true);
   const [message, setMessage] = useState("Use your provider account to continue.");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -22,9 +24,24 @@ export function LoginCard() {
       return;
     }
 
+    if (forgotMode) {
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${siteUrl}/reset-password`
+      });
+      setLoading(false);
+      setMessage(error ? error.message : "Password reset email sent. Check your inbox.");
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
-    setMessage(error ? error.message : remember ? "Signed in and session saved." : "Signed in for this session.");
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    setMessage(remember ? "Signed in and session saved." : "Signed in for this session.");
+    window.location.href = "/dashboard";
   }
 
   return (
@@ -52,7 +69,7 @@ export function LoginCard() {
         <form onSubmit={handleSubmit} className="w-full max-w-md">
           <div className="mb-8">
             <p className="text-sm font-semibold text-gumleaf">CareOS</p>
-            <h2 className="mt-2 text-3xl font-semibold text-ink">Sign in</h2>
+            <h2 className="mt-2 text-3xl font-semibold text-ink">{forgotMode ? "Reset password" : "Sign in"}</h2>
             <p className="mt-3 text-sm text-slate-600">{message}</p>
           </div>
 
@@ -71,24 +88,28 @@ export function LoginCard() {
             </span>
           </label>
 
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-700">Password</span>
-            <span className="flex items-center gap-3 rounded border border-slate-200 bg-white px-3 py-3 shadow-sm focus-within:border-gumleaf focus-within:ring-2 focus-within:ring-gumleaf/15">
-              <LockKeyhole className="h-5 w-5 text-slate-400" />
-              <input
-                className="w-full border-0 bg-transparent text-ink outline-none placeholder:text-slate-400"
-                type="password"
-                placeholder="Enter password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-              />
-              <Eye className="h-5 w-5 text-slate-400" />
-            </span>
-          </label>
+          {!forgotMode && (
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-slate-700">Password</span>
+              <span className="flex items-center gap-3 rounded border border-slate-200 bg-white px-3 py-3 shadow-sm focus-within:border-gumleaf focus-within:ring-2 focus-within:ring-gumleaf/15">
+                <LockKeyhole className="h-5 w-5 text-slate-400" />
+                <input
+                  className="w-full border-0 bg-transparent text-ink outline-none placeholder:text-slate-400"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                />
+                <button type="button" className="text-slate-400 hover:text-gumleaf" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? "Hide password" : "Show password"}>
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </span>
+            </label>
+          )}
 
           <div className="my-5 flex items-center justify-between gap-4 text-sm">
-            <label className="flex items-center gap-2 text-slate-700">
+            {!forgotMode && <label className="flex items-center gap-2 text-slate-700">
               <input
                 type="checkbox"
                 checked={remember}
@@ -96,10 +117,17 @@ export function LoginCard() {
                 className="h-4 w-4 rounded border-slate-300 text-gumleaf focus:ring-gumleaf"
               />
               Remember me
-            </label>
-            <a className="font-medium text-gumleaf hover:text-ink" href="#forgot-password">
-              Forgot password
-            </a>
+            </label>}
+            <button
+              className="ml-auto font-medium text-gumleaf hover:text-ink"
+              type="button"
+              onClick={() => {
+                setForgotMode((current) => !current);
+                setMessage(forgotMode ? "Use your provider account to continue." : "Enter your email and we will send a reset link.");
+              }}
+            >
+              {forgotMode ? "Back to sign in" : "Forgot password"}
+            </button>
           </div>
 
           <button
@@ -107,7 +135,7 @@ export function LoginCard() {
             type="submit"
             disabled={loading}
           >
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? "Please wait..." : forgotMode ? "Send reset email" : "Sign in"}
           </button>
           <div className="mt-5 grid gap-3 text-center text-sm">
             <Link className="font-semibold text-gumleaf hover:text-ink" href="/register">

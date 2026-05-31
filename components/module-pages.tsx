@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, CalendarPlus, CheckCircle2, ClipboardPlus, FilePlus2, KeyRound, Plus, ShieldCheck, Upload } from "lucide-react";
+import { AlertTriangle, CalendarPlus, CheckCircle2, ClipboardPlus, Eye, EyeOff, FilePlus2, KeyRound, LockKeyhole, Plus, ShieldCheck, Upload } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { StatCard } from "@/components/stat-card";
 import { documents, incidents, metrics, participants as seedParticipants, todayShifts, workers as seedWorkers } from "@/lib/data";
@@ -212,6 +212,7 @@ export function WorkerPortalPage() {
 
 export function WorkerCreateLoginPage() {
   const [notice, setNotice] = useState("Create login details from your invite email.");
+  const [showPassword, setShowPassword] = useState(false);
 
   async function submit(form: FormData) {
     if (!isSupabaseConfigured || !supabase) {
@@ -243,7 +244,7 @@ export function WorkerCreateLoginPage() {
           <Field name="invite" label="Invite code" defaultValue="demo-invite" />
           <Field name="name" label="Full name" defaultValue="Asha Patel" />
           <Field name="email" label="Email address" type="email" defaultValue="asha.patel@example.com" />
-          <Field name="password" label="Password" type="password" defaultValue="CareOS-demo-123" />
+          <PasswordField name="password" label="Password" defaultValue="CareOS-demo-123" show={showPassword} setShow={setShowPassword} />
         </RecordForm>
         <Link href="/worker-portal" className="mt-5 inline-flex font-semibold text-gumleaf hover:text-ink">
           Open worker portal
@@ -416,23 +417,23 @@ function WorkerIncidentForm() {
 
 function QuickActions() {
   const actions = [
-    { label: "New progress note", icon: FilePlus2 },
-    { label: "Log incident report", icon: AlertTriangle },
-    { label: "Approve timesheet", icon: CheckCircle2 },
-    { label: "Upload document", icon: Upload }
+    { label: "New progress note", icon: FilePlus2, href: "/progress-notes" },
+    { label: "Log incident report", icon: AlertTriangle, href: "/incident-reports" },
+    { label: "Approve timesheet", icon: CheckCircle2, href: "/timesheets" },
+    { label: "Upload document", icon: Upload, href: "/documents" }
   ];
   return (
     <div className="rounded border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="font-semibold text-ink">Quick actions</h2>
       <div className="mt-4 grid gap-3">
         {actions.map((action) => (
-          <button key={action.label} className="flex items-center justify-between rounded border border-slate-200 px-3 py-3 text-left text-sm font-medium text-slate-700 hover:border-gumleaf/40 hover:bg-gumleaf/5">
+          <Link key={action.label} href={action.href} className="flex items-center justify-between rounded border border-slate-200 px-3 py-3 text-left text-sm font-medium text-slate-700 hover:border-gumleaf/40 hover:bg-gumleaf/5">
             <span className="flex items-center gap-3">
               <action.icon className="h-4 w-4 text-gumleaf" />
               {action.label}
             </span>
             <Plus className="h-4 w-4 text-slate-400" />
-          </button>
+          </Link>
         ))}
       </div>
     </div>
@@ -496,6 +497,33 @@ function Field({ name, label, defaultValue, type = "text" }: { name: string; lab
     <label>
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
       <input name={name} type={type} required defaultValue={defaultValue} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
+    </label>
+  );
+}
+
+function PasswordField({
+  name,
+  label,
+  defaultValue,
+  show,
+  setShow
+}: {
+  name: string;
+  label: string;
+  defaultValue: string;
+  show: boolean;
+  setShow: (show: boolean) => void;
+}) {
+  return (
+    <label>
+      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+      <span className="flex items-center gap-3 rounded border border-slate-200 bg-white px-3 py-2.5 shadow-sm focus-within:border-gumleaf focus-within:ring-2 focus-within:ring-gumleaf/15">
+        <LockKeyhole className="h-5 w-5 text-slate-400" />
+        <input name={name} type={show ? "text" : "password"} required minLength={6} defaultValue={defaultValue} className="w-full border-0 bg-transparent text-sm text-ink outline-none" />
+        <button type="button" className="text-slate-400 hover:text-gumleaf" onClick={() => setShow(!show)} aria-label={show ? "Hide password" : "Show password"}>
+          {show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+        </button>
+      </span>
     </label>
   );
 }
