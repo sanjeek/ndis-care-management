@@ -1,0 +1,124 @@
+"use client";
+
+import { FormEvent, useState } from "react";
+import Link from "next/link";
+import { Eye, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+
+export function LoginCard() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
+  const [message, setMessage] = useState("Use your provider account to continue.");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoading(true);
+
+    if (!isSupabaseConfigured || !supabase) {
+      setMessage("Supabase credentials are not configured yet. Add them to .env.local.");
+      setLoading(false);
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setLoading(false);
+    setMessage(error ? error.message : remember ? "Signed in and session saved." : "Signed in for this session.");
+  }
+
+  return (
+    <section className="grid min-h-screen grid-cols-1 bg-white lg:grid-cols-[1.05fr_0.95fr]">
+      <div className="relative flex min-h-[44vh] items-end overflow-hidden bg-ink px-6 py-8 text-white sm:px-10 lg:min-h-screen lg:px-14">
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(35,117,111,0.88),rgba(23,32,51,0.82)),url('https://images.unsplash.com/photo-1576765608866-5b51046452be?auto=format&fit=crop&w=1600&q=80')] bg-cover bg-center" />
+        <div className="relative max-w-2xl">
+          <div className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded bg-white/14 ring-1 ring-white/25">
+            <ShieldCheck className="h-6 w-6" />
+          </div>
+          <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-white/75">Australian NDIS provider platform</p>
+          <h1 className="max-w-xl text-4xl font-semibold leading-tight sm:text-5xl">CareOS NDIS</h1>
+          <p className="mt-4 max-w-xl text-lg leading-8 text-white/86">
+            Coordinate participant care, staff compliance, shifts, and billing from one calm workspace.
+          </p>
+          <div className="mt-8 grid gap-3 text-sm text-white/82 sm:grid-cols-3">
+            <span>Rostering</span>
+            <span>Progress notes</span>
+            <span>Incident reporting</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-center px-6 py-10 sm:px-10">
+        <form onSubmit={handleSubmit} className="w-full max-w-md">
+          <div className="mb-8">
+            <p className="text-sm font-semibold text-gumleaf">CareOS</p>
+            <h2 className="mt-2 text-3xl font-semibold text-ink">Sign in</h2>
+            <p className="mt-3 text-sm text-slate-600">{message}</p>
+          </div>
+
+          <label className="mb-4 block">
+            <span className="mb-2 block text-sm font-medium text-slate-700">Email address</span>
+            <span className="flex items-center gap-3 rounded border border-slate-200 bg-white px-3 py-3 shadow-sm focus-within:border-gumleaf focus-within:ring-2 focus-within:ring-gumleaf/15">
+              <Mail className="h-5 w-5 text-slate-400" />
+              <input
+                className="w-full border-0 bg-transparent text-ink outline-none placeholder:text-slate-400"
+                type="email"
+                placeholder="coordinator@provider.com.au"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+              />
+            </span>
+          </label>
+
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium text-slate-700">Password</span>
+            <span className="flex items-center gap-3 rounded border border-slate-200 bg-white px-3 py-3 shadow-sm focus-within:border-gumleaf focus-within:ring-2 focus-within:ring-gumleaf/15">
+              <LockKeyhole className="h-5 w-5 text-slate-400" />
+              <input
+                className="w-full border-0 bg-transparent text-ink outline-none placeholder:text-slate-400"
+                type="password"
+                placeholder="Enter password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+              />
+              <Eye className="h-5 w-5 text-slate-400" />
+            </span>
+          </label>
+
+          <div className="my-5 flex items-center justify-between gap-4 text-sm">
+            <label className="flex items-center gap-2 text-slate-700">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(event) => setRemember(event.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-gumleaf focus:ring-gumleaf"
+              />
+              Remember me
+            </label>
+            <a className="font-medium text-gumleaf hover:text-ink" href="#forgot-password">
+              Forgot password
+            </a>
+          </div>
+
+          <button
+            className="flex w-full items-center justify-center rounded bg-gumleaf px-4 py-3 font-semibold text-white shadow-sm transition hover:bg-[#1d625d] disabled:cursor-not-allowed disabled:opacity-70"
+            type="submit"
+            disabled={loading}
+          >
+            {loading ? "Signing in..." : "Sign in"}
+          </button>
+          <div className="mt-5 grid gap-3 text-center text-sm">
+            <Link className="font-semibold text-gumleaf hover:text-ink" href="/register">
+              Register a new provider account
+            </Link>
+            <Link className="font-semibold text-ink hover:text-gumleaf" href="/dashboard">
+              View dashboard
+            </Link>
+          </div>
+        </form>
+      </div>
+    </section>
+  );
+}
