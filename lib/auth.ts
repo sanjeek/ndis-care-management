@@ -1,6 +1,6 @@
 export type UserRole = "admin" | "support_worker";
 
-const workerRoutes = ["/worker-portal", "/my-shifts", "/progress-notes", "/incident-reports", "/profile"];
+const workerRoutes = ["/worker-portal", "/my-shifts", "/progress-notes", "/incident-reports", "/profile", "/unauthorised"];
 const workerNavOrder = ["/worker-portal", "/my-shifts", "/progress-notes", "/incident-reports", "/profile"];
 
 export function normalizeRole(role: unknown): UserRole {

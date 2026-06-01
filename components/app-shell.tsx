@@ -44,7 +44,8 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
       }
 
       if (!canAccessRoute(role, window.location.pathname)) {
-        window.location.replace(defaultRouteForRole(role));
+        const requestedPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        window.location.replace(`/unauthorised?from=${encodeURIComponent(requestedPath)}`);
         return;
       }
 
