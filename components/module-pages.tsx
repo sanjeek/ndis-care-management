@@ -1410,7 +1410,7 @@ async function persist(table: string, payload: Record<string, unknown>, setNotic
     return false;
   }
   const { data, error } = await supabase.from(table).insert(payload).select("id").maybeSingle();
-  setNotice(error ? `Database save failed: ${error.message}` : `Saved to ${table}.`);
+  setNotice(error ? friendlyDatabaseError(error.message, table) : `Saved to ${table}.`);
   if (!error && audit) {
     await recordAudit({
       ...audit,
@@ -1423,6 +1423,20 @@ async function persist(table: string, payload: Record<string, unknown>, setNotic
     });
   }
   return !error;
+}
+
+function friendlyDatabaseError(message: string, table: string) {
+  const lower = message.toLowerCase();
+  if (lower.includes("could not find the table") || lower.includes("schema cache")) {
+    return `Database setup required: the "${table}" table is missing in Supabase. Run supabase/schema.sql in the Supabase SQL Editor, then try again.`;
+  }
+  if (lower.includes("row-level security") || lower.includes("violates row-level security")) {
+    return `Permission denied by database security rules for "${table}". Check your role or assigned participant access.`;
+  }
+  if (lower.includes("permission denied")) {
+    return `Database permission denied for "${table}". Check Supabase RLS policies and user role.`;
+  }
+  return `Database save failed: ${message}`;
 }
 
 function moduleContent(kind: ModuleKind) {
