@@ -1,6 +1,7 @@
 export type UserRole = "admin" | "support_worker";
 
-const workerRoutes = ["/worker-portal", "/profile", "/progress-notes", "/incident-reports"];
+const workerRoutes = ["/worker-portal", "/my-shifts", "/progress-notes", "/incident-reports", "/profile"];
+const workerNavOrder = ["/worker-portal", "/my-shifts", "/progress-notes", "/incident-reports", "/profile"];
 
 export function normalizeRole(role: unknown): UserRole {
   if (role === "admin" || role === "provider_admin") return "admin";
@@ -18,7 +19,7 @@ export function defaultRouteForRole(role: UserRole) {
 
 export function visibleNavForRole<T extends { href: string }>(role: UserRole, items: T[]) {
   if (role === "admin") return items;
-  return items.filter((item) => canAccessRoute(role, item.href));
+  return workerNavOrder.map((href) => items.find((item) => item.href === href)).filter((item): item is T => Boolean(item));
 }
 
 export function friendlyRole(role: UserRole | string) {

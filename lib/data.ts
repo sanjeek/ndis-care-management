@@ -6,6 +6,7 @@ import {
   HeartHandshake,
   Home,
   LayoutDashboard,
+  ListChecks,
   UserCircle,
   ReceiptText,
   Smartphone,
@@ -28,6 +29,7 @@ export const navItems = [
   { label: "Invoices", href: "/invoices", icon: ReceiptText },
   { label: "Documents", href: "/documents", icon: WalletCards },
   { label: "Worker Portal", href: "/worker-portal", icon: Smartphone },
+  { label: "My Shifts", href: "/my-shifts", icon: ListChecks },
   { label: "User Management", href: "/admin/users", icon: UserCog },
   { label: "Profile", href: "/profile", icon: UserCircle },
   { label: "Settings", href: "/settings", icon: Settings }

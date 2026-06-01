@@ -253,6 +253,37 @@ export function WorkerPortalPage() {
   );
 }
 
+export function MyShiftsPage() {
+  const [workerEmail, setWorkerEmail] = useState("");
+  const [workerName, setWorkerName] = useState("Support worker");
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getUser().then(({ data }) => {
+      const user = data.user;
+      setWorkerEmail(user?.email ?? "");
+      setWorkerName(String(user?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "Support worker"));
+    });
+  }, []);
+
+  const visibleShifts = useMemo(() => {
+    if (!workerEmail) return [];
+    return todayShifts.filter((shift) => shift.workerEmail?.toLowerCase() === workerEmail.toLowerCase());
+  }, [workerEmail]);
+
+  return (
+    <AppShell title="My Shifts" eyebrow={`${workerName} assigned schedule only.`}>
+      <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-4">
+          <h2 className="font-semibold text-ink">Assigned shifts</h2>
+          <p className="mt-1 text-sm text-slate-500">Only shifts assigned to your login email are shown here.</p>
+        </div>
+        {visibleShifts.length > 0 ? <ShiftTable shifts={visibleShifts} /> : <EmptyWorkerState title="No assigned shifts" message="You do not currently have any assigned shifts under this login." />}
+      </section>
+    </AppShell>
+  );
+}
+
 export function WorkerCreateLoginPage() {
   const [notice, setNotice] = useState("Create login details from your invite email.");
   const [showPassword, setShowPassword] = useState(false);
