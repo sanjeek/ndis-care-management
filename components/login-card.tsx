@@ -6,6 +6,7 @@ import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { canAccessRoute, defaultRouteForRole, roleForUser, type UserRole } from "@/lib/auth";
 import { CopyrightFooter } from "@/components/copyright-footer";
+import { recordAudit } from "@/lib/audit";
 
 export function LoginCard() {
   const [email, setEmail] = useState("");
@@ -82,6 +83,13 @@ export function LoginCard() {
       role = roleForUser(profile?.role, data.user.email);
     }
     setMessage("Login successful. Redirecting...");
+    await recordAudit({
+      action: "login",
+      tableName: "auth.users",
+      recordId: data.user?.id,
+      recordLabel: data.user?.email ?? email,
+      metadata: { next: getSafeNextPath(role) }
+    });
     window.location.href = getSafeNextPath(role);
   }
 

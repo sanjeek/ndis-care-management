@@ -99,6 +99,20 @@ create table if not exists public.module_records (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  user_id uuid references auth.users(id) on delete set null,
+  user_email text,
+  user_name text,
+  user_role text,
+  action text not null,
+  table_name text,
+  record_id text,
+  record_label text,
+  metadata jsonb not null default '{}'::jsonb
+);
+
 alter table public.participants enable row level security;
 alter table public.profiles enable row level security;
 alter table public.support_workers enable row level security;
@@ -107,6 +121,7 @@ alter table public.shifts enable row level security;
 alter table public.progress_notes enable row level security;
 alter table public.incident_reports enable row level security;
 alter table public.module_records enable row level security;
+alter table public.audit_logs enable row level security;
 
 alter table public.participants force row level security;
 alter table public.profiles force row level security;
@@ -116,6 +131,7 @@ alter table public.shifts force row level security;
 alter table public.progress_notes force row level security;
 alter table public.incident_reports force row level security;
 alter table public.module_records force row level security;
+alter table public.audit_logs force row level security;
 
 drop policy if exists "Authenticated users can manage participants" on public.participants;
 drop policy if exists "Authenticated users can manage support workers" on public.support_workers;
@@ -145,6 +161,8 @@ drop policy if exists "Workers can create own assigned incident reports" on publ
 drop policy if exists "Workers can update own incident reports" on public.incident_reports;
 drop policy if exists "Role based module records" on public.module_records;
 drop policy if exists "Admins can manage module records" on public.module_records;
+drop policy if exists "Admins can read audit logs" on public.audit_logs;
+drop policy if exists "Users can create own audit logs" on public.audit_logs;
 
 create or replace function public.current_app_role()
 returns text
@@ -379,3 +397,17 @@ on public.module_records for all
 to authenticated
 using (public.is_admin())
 with check (public.is_admin());
+
+create policy "Admins can read audit logs"
+on public.audit_logs for select
+to authenticated
+using (public.is_admin());
+
+create policy "Users can create own audit logs"
+on public.audit_logs for insert
+to authenticated
+with check (
+  public.current_user_is_active()
+  and user_id = auth.uid()
+  and lower(coalesce(user_email, '')) = public.current_app_email()
+);

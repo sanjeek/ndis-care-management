@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { StatCard } from "@/components/stat-card";
+import { recordAudit, type AuditPayload } from "@/lib/audit";
 import { roleForUser, type UserRole } from "@/lib/auth";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
@@ -157,7 +158,11 @@ export function ParticipantsPage() {
       emergency_contact: get(form, "emergency"),
       support_needs: get(form, "needs")
     };
-    const ok = await persist("participants", payload, setNotice);
+    const ok = await persist("participants", payload, setNotice, {
+      action: "participant_update",
+      recordLabel: payload.name,
+      metadata: { operation: "create" }
+    });
     if (ok) await refresh();
   }
 
@@ -219,7 +224,11 @@ export function WorkersPage() {
       qualifications: get(form, "qualifications"),
       compliance_status: get(form, "compliance")
     };
-    const workerSaved = await persist("support_workers", next, setNotice);
+    const workerSaved = await persist("support_workers", next, setNotice, {
+      action: "create",
+      recordLabel: next.email,
+      metadata: { recordType: "support_worker", name: next.name }
+    });
     const portalUrl = `/worker-portal/create-login?invite=${token}`;
     setInviteLink(portalUrl);
     if (workerSaved) await refresh();
@@ -232,7 +241,12 @@ export function WorkersPage() {
         portal_url: portalUrl,
         status: "sent"
       },
-      setNotice
+      setNotice,
+      {
+        action: "create",
+        recordLabel: next.email,
+        metadata: { recordType: "worker_invitation", workerName: next.name }
+      }
     );
     const invite = await fetch("/api/invite-worker", {
       method: "POST",
@@ -482,7 +496,12 @@ export function RosteringPage() {
         ends_at: end,
         status: get(form, "status")
       },
-      setNotice
+      setNotice,
+      {
+        action: "create",
+        recordLabel: `${participantName} shift`,
+        metadata: { recordType: "shift", participantName, workerName }
+      }
     );
     if (ok) await refresh();
     setCreateOpen(false);
@@ -547,7 +566,12 @@ export function SimpleModulePage({ kind }: { kind: ModuleKind }) {
         details,
         status: kind === "incidents" ? "submitted" : "active"
       },
-      setNotice
+      setNotice,
+      {
+        action: kind === "invoices" ? "invoice_action" : "create",
+        recordLabel: title,
+        metadata: { module: kind, operation: "create" }
+      }
     );
     if (ok) await refresh();
   }
@@ -612,7 +636,12 @@ function WorkerProgressNoteForm({ workerName, workerEmail, participants }: { wor
         note,
         is_important: get(form, "important") === "Important"
       },
-      setNotice
+      setNotice,
+      {
+        action: "progress_note",
+        recordLabel: get(form, "participant"),
+        metadata: { category: get(form, "category"), operation: "create" }
+      }
     );
     if (ok) setNotes([note, ...notes]);
   }
@@ -656,7 +685,12 @@ function WorkerIncidentForm({ workerName, workerEmail, participants }: { workerN
         priority: get(form, "priority"),
         summary
       },
-      setNotice
+      setNotice,
+      {
+        action: "incident_report",
+        recordLabel: get(form, "participant"),
+        metadata: { priority: get(form, "priority"), operation: "create" }
+      }
     );
     if (ok) setReports([summary, ...reports]);
   }
@@ -1142,13 +1176,24 @@ async function loadModuleItems(kind: ModuleKind): Promise<ModuleItem[]> {
   }));
 }
 
-async function persist(table: string, payload: Record<string, unknown>, setNotice: (message: string) => void) {
+async function persist(table: string, payload: Record<string, unknown>, setNotice: (message: string) => void, audit?: Omit<AuditPayload, "tableName">) {
   if (!isSupabaseConfigured || !supabase) {
     setNotice("Supabase is not connected, so the record was not saved.");
     return false;
   }
-  const { error } = await supabase.from(table).insert(payload);
+  const { data, error } = await supabase.from(table).insert(payload).select("id").maybeSingle();
   setNotice(error ? `Database save failed: ${error.message}` : `Saved to ${table}.`);
+  if (!error && audit) {
+    await recordAudit({
+      ...audit,
+      tableName: table,
+      recordId: String(data?.id ?? audit.recordId ?? ""),
+      metadata: {
+        ...audit.metadata,
+        table
+      }
+    });
+  }
   return !error;
 }
 

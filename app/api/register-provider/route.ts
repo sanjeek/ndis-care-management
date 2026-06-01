@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { recordServerAudit } from "@/lib/server-audit";
 
 export async function POST(request: Request) {
   const { email, password, name, organisation, role = "admin", invite } = await request.json();
@@ -72,6 +73,17 @@ export async function POST(request: Request) {
       full_name: name,
       organisation,
       role: accountRole
+    });
+    await recordServerAudit(admin, {
+      userId: data.user.id,
+      userEmail: email,
+      userName: name,
+      userRole: accountRole,
+      action: "create",
+      tableName: "auth.users",
+      recordId: data.user.id,
+      recordLabel: email,
+      metadata: { source: invite ? "worker_invite" : "provider_registration", invite: Boolean(invite) }
     });
   }
 

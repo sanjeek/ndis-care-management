@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { normalizeRole, roleForUser } from "@/lib/auth";
+import { recordServerAudit } from "@/lib/server-audit";
 
 type AdminAction = "create" | "status" | "password" | "role";
 
@@ -64,7 +65,12 @@ async function requireAdmin(request: Request) {
     return { error: "Only admin users can manage accounts.", status: 403 };
   }
 
-  return { userId: data.user.id };
+  return {
+    userId: data.user.id,
+    userEmail: data.user.email ?? "",
+    userName: String(data.user.user_metadata?.full_name || data.user.email || data.user.id),
+    userRole: role
+  };
 }
 
 export async function GET(request: Request) {
@@ -147,6 +153,17 @@ export async function POST(request: Request) {
         role,
         active: true
       });
+      await recordServerAudit(admin.client, {
+        userId: adminCheck.userId,
+        userEmail: adminCheck.userEmail,
+        userName: adminCheck.userName,
+        userRole: adminCheck.userRole,
+        action: "create",
+        tableName: "auth.users",
+        recordId: data.user.id,
+        recordLabel: email,
+        metadata: { recordType: "support_worker_login", role }
+      });
     }
 
     return NextResponse.json({ message: "User account created.", userId: data.user?.id });
@@ -182,6 +199,17 @@ export async function PATCH(request: Request) {
     if (error) return NextResponse.json({ message: error.message }, { status: 400 });
 
     await admin.client.from("profiles").update({ active, updated_at: new Date().toISOString() }).eq("id", userId);
+    await recordServerAudit(admin.client, {
+      userId: adminCheck.userId,
+      userEmail: adminCheck.userEmail,
+      userName: adminCheck.userName,
+      userRole: adminCheck.userRole,
+      action: "update",
+      tableName: "profiles",
+      recordId: userId,
+      recordLabel: userId,
+      metadata: { field: "active", active }
+    });
     return NextResponse.json({ message: active ? "User activated." : "User deactivated." });
   }
 
@@ -192,6 +220,17 @@ export async function PATCH(request: Request) {
     }
     const { error } = await admin.client.auth.admin.updateUserById(userId, { password });
     if (error) return NextResponse.json({ message: error.message }, { status: 400 });
+    await recordServerAudit(admin.client, {
+      userId: adminCheck.userId,
+      userEmail: adminCheck.userEmail,
+      userName: adminCheck.userName,
+      userRole: adminCheck.userRole,
+      action: "update",
+      tableName: "auth.users",
+      recordId: userId,
+      recordLabel: userId,
+      metadata: { field: "password", operation: "temporary_password_reset" }
+    });
     return NextResponse.json({ message: "Temporary password reset." });
   }
 
@@ -211,6 +250,17 @@ export async function PATCH(request: Request) {
     if (error) return NextResponse.json({ message: error.message }, { status: 400 });
 
     await admin.client.from("profiles").update({ role, updated_at: new Date().toISOString() }).eq("id", userId);
+    await recordServerAudit(admin.client, {
+      userId: adminCheck.userId,
+      userEmail: adminCheck.userEmail,
+      userName: adminCheck.userName,
+      userRole: adminCheck.userRole,
+      action: "update",
+      tableName: "profiles",
+      recordId: userId,
+      recordLabel: existing.user.email ?? userId,
+      metadata: { field: "role", role }
+    });
     return NextResponse.json({ message: "User role updated." });
   }
 

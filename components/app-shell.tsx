@@ -8,6 +8,7 @@ import { navItems } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
 import { canAccessRoute, defaultRouteForRole, friendlyRole, roleForUser, type UserRole, visibleNavForRole } from "@/lib/auth";
 import { CopyrightFooter } from "@/components/copyright-footer";
+import { recordAudit } from "@/lib/audit";
 
 export function AppShell({ title, eyebrow, children }: { title: string; eyebrow: string; children: React.ReactNode }) {
   const pathname = usePathname();
@@ -90,6 +91,12 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
 
   async function signOut() {
     if (supabase) {
+      await recordAudit({
+        action: "logout",
+        tableName: "auth.users",
+        recordLabel: userEmail,
+        metadata: { pathname: window.location.pathname }
+      });
       await supabase.auth.signOut();
     }
     window.location.href = "/login";
