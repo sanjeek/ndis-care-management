@@ -19,6 +19,9 @@ export function LoginCard() {
   const [resetLockedUntil, setResetLockedUntil] = useState(0);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("reason") === "session-expired") {
+      setMessage("Your session expired after 30 minutes of inactivity. Please sign in again.");
+    }
     if (!isSupabaseConfigured || !supabase) return;
     const client = supabase;
     client.auth.getSession().then(async ({ data }) => {

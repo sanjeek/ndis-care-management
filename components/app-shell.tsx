@@ -10,6 +10,10 @@ import { canAccessRoute, defaultRouteForRole, friendlyRole, roleForUser, type Us
 import { CopyrightFooter } from "@/components/copyright-footer";
 import { recordAudit } from "@/lib/audit";
 
+const inactivityLimitMs = 30 * 60 * 1000;
+const warningBeforeLogoutMs = 5 * 60 * 1000;
+const lastActivityKey = "careos:last-activity";
+
 export function AppShell({ title, eyebrow, children }: { title: string; eyebrow: string; children: React.ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -18,6 +22,8 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
   const [userName, setUserName] = useState("");
   const [userRole, setUserRole] = useState<UserRole>("admin");
   const [authChecked, setAuthChecked] = useState(false);
+  const [showIdleWarning, setShowIdleWarning] = useState(false);
+  const [secondsUntilLogout, setSecondsUntilLogout] = useState(warningBeforeLogoutMs / 1000);
 
   useEffect(() => {
     let active = true;
@@ -78,6 +84,88 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
     };
   }, []);
 
+  useEffect(() => {
+    if (!authChecked || !supabase) return;
+
+    let warningTimer: number | undefined;
+    let logoutTimer: number | undefined;
+    let countdownTimer: number | undefined;
+
+    function clearTimers() {
+      if (warningTimer) window.clearTimeout(warningTimer);
+      if (logoutTimer) window.clearTimeout(logoutTimer);
+      if (countdownTimer) window.clearInterval(countdownTimer);
+    }
+
+    function lastActivity() {
+      return Number(window.localStorage.getItem(lastActivityKey) || Date.now());
+    }
+
+    function updateCountdown() {
+      const expiresAt = lastActivity() + inactivityLimitMs;
+      setSecondsUntilLogout(Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)));
+    }
+
+    async function expireSession() {
+      clearTimers();
+      setShowIdleWarning(false);
+      await recordAudit({
+        action: "logout",
+        tableName: "auth.users",
+        recordLabel: userEmail,
+        metadata: { reason: "inactivity_timeout", inactivityMinutes: 30, pathname: window.location.pathname }
+      });
+      await supabase?.auth.signOut();
+      window.location.replace("/login?reason=session-expired");
+    }
+
+    function scheduleTimers() {
+      clearTimers();
+      const elapsed = Date.now() - lastActivity();
+      const warningDelay = Math.max(0, inactivityLimitMs - warningBeforeLogoutMs - elapsed);
+      const logoutDelay = Math.max(0, inactivityLimitMs - elapsed);
+
+      warningTimer = window.setTimeout(() => {
+        setShowIdleWarning(true);
+        updateCountdown();
+        countdownTimer = window.setInterval(updateCountdown, 1000);
+      }, warningDelay);
+
+      logoutTimer = window.setTimeout(() => {
+        void expireSession();
+      }, logoutDelay);
+    }
+
+    function markActivity() {
+      window.localStorage.setItem(lastActivityKey, String(Date.now()));
+      setShowIdleWarning(false);
+      setSecondsUntilLogout(warningBeforeLogoutMs / 1000);
+      scheduleTimers();
+    }
+
+    function handleStorage(event: StorageEvent) {
+      if (event.key === lastActivityKey) {
+        scheduleTimers();
+        setShowIdleWarning(false);
+      }
+    }
+
+    if (!window.localStorage.getItem(lastActivityKey)) {
+      window.localStorage.setItem(lastActivityKey, String(Date.now()));
+    }
+
+    const events: Array<keyof WindowEventMap> = ["click", "keydown", "mousemove", "scroll", "touchstart"];
+    events.forEach((eventName) => window.addEventListener(eventName, markActivity, { passive: true }));
+    window.addEventListener("storage", handleStorage);
+    scheduleTimers();
+
+    return () => {
+      clearTimers();
+      events.forEach((eventName) => window.removeEventListener(eventName, markActivity));
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [authChecked, userEmail]);
+
   const visibleNavItems = useMemo(() => visibleNavForRole(userRole, navItems), [userRole]);
 
   const initials = useMemo(() => {
@@ -100,6 +188,12 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
       await supabase.auth.signOut();
     }
     window.location.href = "/login";
+  }
+
+  function staySignedIn() {
+    window.localStorage.setItem(lastActivityKey, String(Date.now()));
+    setShowIdleWarning(false);
+    setSecondsUntilLogout(warningBeforeLogoutMs / 1000);
   }
 
   if (!authChecked) {
@@ -196,6 +290,30 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
           <CopyrightFooter />
         </div>
       </section>
+      {showIdleWarning ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/45 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="idle-warning-title">
+          <section className="w-full max-w-md rounded border border-slate-200 bg-white p-5 shadow-2xl">
+            <h2 id="idle-warning-title" className="text-xl font-semibold text-ink">Session expiring soon</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              You have been inactive. For security, CareOS will sign you out in {formatCountdown(secondsUntilLogout)}.
+            </p>
+            <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button onClick={signOut} className="rounded border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                Sign out now
+              </button>
+              <button onClick={staySignedIn} className="rounded bg-gumleaf px-4 py-2 text-sm font-semibold text-white hover:bg-[#1d625d]">
+                Stay signed in
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
+}
+
+function formatCountdown(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
