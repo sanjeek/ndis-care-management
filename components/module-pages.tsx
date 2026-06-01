@@ -139,11 +139,24 @@ export function DashboardPage() {
 export function ParticipantsPage() {
   const [participants, setParticipants] = useState<ParticipantRecord[]>([]);
   const [notice, setNotice] = useState("Loading participant records from Supabase.");
+  const [canManageParticipants, setCanManageParticipants] = useState(false);
 
   const refresh = useCallback(async () => {
-    const rows = await loadParticipants();
+    const context = await getCurrentUserContext();
+    setCanManageParticipants(context.role === "admin");
+    const rows = context.role === "support_worker" && context.email
+      ? await loadParticipantsForShifts(await loadShifts(context.email))
+      : await loadParticipants();
     setParticipants(rows);
-    setNotice(rows.length ? "Showing participant records from the database." : "No participants yet. Add a participant to get started.");
+    setNotice(
+      context.role === "support_worker"
+        ? rows.length
+          ? "Showing only participants assigned to your shifts."
+          : "No participants are assigned to your shifts."
+        : rows.length
+          ? "Showing all participant records from the database."
+          : "No participants yet. Add a participant to get started."
+    );
   }, []);
 
   useEffect(() => {
@@ -168,13 +181,19 @@ export function ParticipantsPage() {
 
   return (
     <AppShell title="Participants" eyebrow={notice}>
-      <RecordForm submitLabel="Add participant" onSubmit={submit}>
-        <Field name="name" label="Participant profile" placeholder="Full name" />
-        <Field name="ndis" label="NDIS number" placeholder="NDIS participant number" />
-        <Field name="plan" label="Plan type" placeholder="NDIS managed, plan managed, or self managed" />
-        <Field name="emergency" label="Emergency contact" placeholder="Name and phone number" />
-        <Area name="needs" label="Support needs" placeholder="Support needs, routines, risks, and goals" />
-      </RecordForm>
+      {canManageParticipants ? (
+        <RecordForm submitLabel="Add participant" onSubmit={submit}>
+          <Field name="name" label="Participant profile" placeholder="Full name" />
+          <Field name="ndis" label="NDIS number" placeholder="NDIS participant number" />
+          <Field name="plan" label="Plan type" placeholder="NDIS managed, plan managed, or self managed" />
+          <Field name="emergency" label="Emergency contact" placeholder="Name and phone number" />
+          <Area name="needs" label="Support needs" placeholder="Support needs, routines, risks, and goals" />
+        </RecordForm>
+      ) : (
+        <section className="mb-6 rounded border border-gumleaf/25 bg-gumleaf/5 p-4 text-sm text-slate-700">
+          Support worker access is restricted to participants linked to your assigned shifts. Add and edit controls are available to admin users only.
+        </section>
+      )}
       {participants.length ? (
         <div className="mt-6 grid gap-4 lg:grid-cols-3">
           {participants.map((participant) => (
@@ -193,7 +212,10 @@ export function ParticipantsPage() {
           ))}
         </div>
       ) : (
-        <EmptyState title="No participants yet" message="Participant records will appear here after they are added to the database." />
+        <EmptyState
+          title={canManageParticipants ? "No participants yet" : "No assigned participants"}
+          message={canManageParticipants ? "Participant records will appear here after they are added to the database." : "Participant records appear here only when you are assigned to their shifts."}
+        />
       )}
     </AppShell>
   );
@@ -1084,6 +1106,19 @@ async function loadParticipants(): Promise<ParticipantRecord[]> {
     docs: Number(row.document_count ?? 0),
     notes: Number(row.note_count ?? 0)
   }));
+}
+
+async function getCurrentUserContext(): Promise<{ role: UserRole; email: string }> {
+  if (!supabase) return { role: "support_worker", email: "" };
+  const { data } = await supabase.auth.getUser();
+  const user = data.user;
+  if (!user) return { role: "support_worker", email: "" };
+  let role = roleForUser(user.user_metadata?.role, user.email);
+  if (!user.user_metadata?.role) {
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    role = roleForUser(profile?.role, user.email);
+  }
+  return { role, email: user.email ?? "" };
 }
 
 async function loadWorkers(): Promise<WorkerRecord[]> {

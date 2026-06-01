@@ -1,6 +1,6 @@
 export type UserRole = "admin" | "support_worker";
 
-const workerRoutes = ["/worker-portal", "/my-shifts", "/progress-notes", "/incident-reports", "/profile", "/unauthorised"];
+const workerRoutes = ["/worker-portal", "/my-shifts", "/participants", "/progress-notes", "/incident-reports", "/profile", "/unauthorised"];
 const workerNavOrder = ["/worker-portal", "/my-shifts", "/progress-notes", "/incident-reports", "/profile"];
 const adminEmails = ["sanjee@live.com"];
 
