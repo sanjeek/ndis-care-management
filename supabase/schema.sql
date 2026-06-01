@@ -60,6 +60,7 @@ create table if not exists public.progress_notes (
   id uuid primary key default gen_random_uuid(),
   participant_name text not null,
   worker_name text not null,
+  worker_email text,
   note text not null,
   is_important boolean not null default false,
   created_at timestamptz not null default now()
@@ -68,15 +69,22 @@ create table if not exists public.progress_notes (
 alter table public.progress_notes
 add column if not exists category text;
 
+alter table public.progress_notes
+add column if not exists worker_email text;
+
 create table if not exists public.incident_reports (
   id uuid primary key default gen_random_uuid(),
   participant_name text not null,
   worker_name text not null,
+  worker_email text,
   priority text not null,
   summary text not null,
   status text not null default 'submitted',
   created_at timestamptz not null default now()
 );
+
+alter table public.incident_reports
+add column if not exists worker_email text;
 
 create table if not exists public.module_records (
   id uuid primary key default gen_random_uuid(),
@@ -177,14 +185,14 @@ using (public.is_admin() or lower(support_worker_email) = lower(coalesce(auth.jw
 create policy "Role based progress notes"
 on public.progress_notes for all
 to authenticated
-using (public.is_admin() or public.current_app_role() = 'support_worker')
-with check (public.is_admin() or public.current_app_role() = 'support_worker');
+using (public.is_admin() or lower(worker_email) = lower(coalesce(auth.jwt() ->> 'email', '')))
+with check (public.is_admin() or lower(worker_email) = lower(coalesce(auth.jwt() ->> 'email', '')));
 
 create policy "Role based incident reports"
 on public.incident_reports for all
 to authenticated
-using (public.is_admin() or public.current_app_role() = 'support_worker')
-with check (public.is_admin() or public.current_app_role() = 'support_worker');
+using (public.is_admin() or lower(worker_email) = lower(coalesce(auth.jwt() ->> 'email', '')))
+with check (public.is_admin() or lower(worker_email) = lower(coalesce(auth.jwt() ->> 'email', '')));
 
 create policy "Role based module records"
 on public.module_records for all

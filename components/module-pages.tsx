@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { StatCard } from "@/components/stat-card";
+import { normalizeRole, type UserRole } from "@/lib/auth";
 import { documents, incidents, metrics, participants as seedParticipants, todayShifts, workers as seedWorkers } from "@/lib/data";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
@@ -177,22 +178,25 @@ export function WorkersPage() {
 
 export function WorkerPortalPage() {
   const [workerEmail, setWorkerEmail] = useState("");
+  const [workerNameFromSession, setWorkerNameFromSession] = useState("Support worker");
 
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getUser().then(({ data }) => {
-      setWorkerEmail(data.user?.email ?? "");
+      const user = data.user;
+      setWorkerEmail(user?.email ?? "");
+      setWorkerNameFromSession(String(user?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "Support worker"));
     });
   }, []);
 
   const visibleShifts = useMemo(() => {
-    if (!workerEmail) return todayShifts.filter((shift) => shift.workerEmail === "asha.patel@example.com");
+    if (!workerEmail) return [];
     return todayShifts.filter((shift) => shift.workerEmail?.toLowerCase() === workerEmail.toLowerCase());
   }, [workerEmail]);
   const visibleParticipants = seedParticipants.filter((participant) =>
     visibleShifts.some((shift) => shift.participantName === participant.name)
   );
-  const workerName = visibleShifts[0]?.worker ?? "Support worker";
+  const workerName = visibleShifts[0]?.worker ?? workerNameFromSession;
 
   return (
     <AppShell title="Worker Portal" eyebrow={`${workerName} schedule, client information, progress notes, and incidents.`}>
@@ -204,33 +208,34 @@ export function WorkerPortalPage() {
                 <h2 className="font-semibold text-ink">My assigned shifts</h2>
                 <p className="mt-1 text-sm text-slate-500">Workers only see their own assigned activity schedule and linked client information.</p>
               </div>
-              <Link href="/worker-portal/create-login" className="rounded border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                Create login
-              </Link>
             </div>
             <div className="mt-4">
-              <ShiftTable shifts={visibleShifts} />
+              {visibleShifts.length > 0 ? <ShiftTable shifts={visibleShifts} /> : <EmptyWorkerState title="No assigned shifts" message="You do not currently have any assigned shifts under this login." />}
             </div>
           </section>
 
           <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="font-semibold text-ink">Client information</h2>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              {visibleParticipants.map((participant) => (
-                <article key={participant.ndis} className="rounded border border-slate-200 bg-slate-50 p-4">
-                  <p className="font-semibold text-ink">{participant.name}</p>
-                  <Info label="NDIS" value={participant.ndis} />
-                  <Info label="Support needs" value={participant.needs} />
-                  <Info label="Emergency contact" value={participant.emergency} />
-                </article>
-              ))}
-            </div>
+            {visibleParticipants.length > 0 ? (
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                {visibleParticipants.map((participant) => (
+                  <article key={participant.ndis} className="rounded border border-slate-200 bg-slate-50 p-4">
+                    <p className="font-semibold text-ink">{participant.name}</p>
+                    <Info label="NDIS" value={participant.ndis} />
+                    <Info label="Support needs" value={participant.needs} />
+                    <Info label="Emergency contact" value={participant.emergency} />
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <EmptyWorkerState title="No linked participant information" message="Participant details only appear when you are assigned to that participant's shift." />
+            )}
           </section>
         </div>
 
         <div className="space-y-6">
-          <WorkerProgressNoteForm workerName={workerName} participants={visibleParticipants} />
-          <WorkerIncidentForm workerName={workerName} participants={visibleParticipants} />
+          <WorkerProgressNoteForm workerName={workerName} workerEmail={workerEmail} participants={visibleParticipants} />
+          <WorkerIncidentForm workerName={workerName} workerEmail={workerEmail} participants={visibleParticipants} />
           <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="font-semibold text-ink">Important worker reminders</h2>
             <div className="mt-4 grid gap-3">
@@ -328,6 +333,7 @@ export function RosteringPage() {
 
 export function SimpleModulePage({ kind }: { kind: "timesheets" | "notes" | "incidents" | "invoices" | "documents" | "settings" }) {
   const [notice, setNotice] = useState("Ready.");
+  const [workerContext, setWorkerContext] = useState({ role: "support_worker" as UserRole, email: "", name: "Support worker" });
   const content = {
     timesheets: {
       title: "Timesheets",
@@ -362,6 +368,26 @@ export function SimpleModulePage({ kind }: { kind: "timesheets" | "notes" | "inc
   }[kind];
   const [items, setItems] = useState(content.items);
 
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getUser().then(({ data }) => {
+      const user = data.user;
+      setWorkerContext({
+        role: normalizeRole(user?.user_metadata?.role),
+        email: user?.email ?? "",
+        name: String(user?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "Support worker")
+      });
+    });
+  }, []);
+
+  const workerShifts = useMemo(() => {
+    if (!workerContext.email) return [];
+    return todayShifts.filter((shift) => shift.workerEmail?.toLowerCase() === workerContext.email.toLowerCase());
+  }, [workerContext.email]);
+  const workerParticipants = seedParticipants.filter((participant) =>
+    workerShifts.some((shift) => shift.participantName === participant.name)
+  );
+
   async function submit(form: FormData) {
     const title = get(form, "title");
     const details = get(form, "details");
@@ -381,6 +407,16 @@ export function SimpleModulePage({ kind }: { kind: "timesheets" | "notes" | "inc
 
   return (
     <AppShell title={content.title} eyebrow={`${content.eyebrow} ${notice}`}>
+      {workerContext.role === "support_worker" && kind === "notes" ? (
+        <WorkerPrivacyLayout>
+          <WorkerProgressNoteForm workerName={workerShifts[0]?.worker ?? workerContext.name} workerEmail={workerContext.email} participants={workerParticipants} />
+        </WorkerPrivacyLayout>
+      ) : workerContext.role === "support_worker" && kind === "incidents" ? (
+        <WorkerPrivacyLayout>
+          <WorkerIncidentForm workerName={workerShifts[0]?.worker ?? workerContext.name} workerEmail={workerContext.email} participants={workerParticipants} />
+        </WorkerPrivacyLayout>
+      ) : (
+        <>
       <RecordForm submitLabel={submitLabelForKind(kind)} onSubmit={submit}>
         {kind === "notes" ? (
           <Select
@@ -401,12 +437,14 @@ export function SimpleModulePage({ kind }: { kind: "timesheets" | "notes" | "inc
           </article>
         ))}
       </div>
+        </>
+      )}
     </AppShell>
   );
 }
 
-function WorkerProgressNoteForm({ workerName, participants }: { workerName: string; participants: typeof seedParticipants }) {
-  const [notes, setNotes] = useState(["Noah achieved community access goal with verbal prompting."]);
+function WorkerProgressNoteForm({ workerName, workerEmail, participants }: { workerName: string; workerEmail: string; participants: typeof seedParticipants }) {
+  const [notes, setNotes] = useState<string[]>([]);
   const [notice, setNotice] = useState("Add an important progress note.");
 
   async function submit(form: FormData) {
@@ -417,6 +455,7 @@ function WorkerProgressNoteForm({ workerName, participants }: { workerName: stri
       {
         participant_name: get(form, "participant"),
         worker_name: workerName,
+        worker_email: workerEmail,
         category: get(form, "category"),
         note,
         is_important: get(form, "important") === "Important"
@@ -428,6 +467,9 @@ function WorkerProgressNoteForm({ workerName, participants }: { workerName: stri
   return (
     <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="font-semibold text-ink">Progress note</h2>
+      {participants.length === 0 ? (
+        <EmptyWorkerState title="No assigned participant" message="You can add progress notes only for participants linked to your assigned shifts." />
+      ) : (
       <RecordForm submitLabel="Add progress note" onSubmit={submit}>
         <Select name="participant" label="Client" options={participants.map((participant) => participant.name)} />
         <ReadOnlyField label="Worker" value={workerName} />
@@ -435,6 +477,7 @@ function WorkerProgressNoteForm({ workerName, participants }: { workerName: stri
         <Select name="important" label="Priority" options={["Important", "Standard"]} />
         <Area name="note" label="Progress note details" defaultValue="Client completed personal care routine and attended community activity." />
       </RecordForm>
+      )}
       <p className="mt-3 text-sm text-slate-500">{notice}</p>
       <div className="mt-3 grid gap-2">
         {notes.map((note) => (
@@ -445,8 +488,8 @@ function WorkerProgressNoteForm({ workerName, participants }: { workerName: stri
   );
 }
 
-function WorkerIncidentForm({ workerName, participants }: { workerName: string; participants: typeof seedParticipants }) {
-  const [reports, setReports] = useState(["Medication variance ready for coordinator review."]);
+function WorkerIncidentForm({ workerName, workerEmail, participants }: { workerName: string; workerEmail: string; participants: typeof seedParticipants }) {
+  const [reports, setReports] = useState<string[]>([]);
   const [notice, setNotice] = useState("Submit incidents for immediate review.");
 
   async function submit(form: FormData) {
@@ -457,6 +500,7 @@ function WorkerIncidentForm({ workerName, participants }: { workerName: string; 
       {
         participant_name: get(form, "participant"),
         worker_name: workerName,
+        worker_email: workerEmail,
         priority: get(form, "priority"),
         summary
       },
@@ -467,12 +511,16 @@ function WorkerIncidentForm({ workerName, participants }: { workerName: string; 
   return (
     <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="font-semibold text-ink">Incident report</h2>
+      {participants.length === 0 ? (
+        <EmptyWorkerState title="No assigned participant" message="You can submit incidents only for participants linked to your assigned shifts." />
+      ) : (
       <RecordForm submitLabel="Submit incident" onSubmit={submit}>
         <Select name="participant" label="Client" options={participants.map((participant) => participant.name)} />
         <ReadOnlyField label="Worker" value={workerName} />
         <Select name="priority" label="Priority" options={["High", "Medium", "Low"]} />
         <Area name="summary" label="Incident details" defaultValue="Describe what happened, actions taken, witnesses, and follow-up required." />
       </RecordForm>
+      )}
       <p className="mt-3 text-sm text-slate-500">{notice}</p>
       <div className="mt-3 grid gap-2">
         {reports.map((report) => (
@@ -480,6 +528,29 @@ function WorkerIncidentForm({ workerName, participants }: { workerName: string; 
         ))}
       </div>
     </section>
+  );
+}
+
+function WorkerPrivacyLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="grid gap-6 xl:grid-cols-[0.75fr_0.25fr]">
+      <div>{children}</div>
+      <section className="rounded border border-gumleaf/25 bg-gumleaf/5 p-4">
+        <h2 className="font-semibold text-ink">Worker privacy</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          This page only uses your login, your assigned shifts, and participants linked to those shifts. Admin records are hidden from support worker accounts.
+        </p>
+      </section>
+    </div>
+  );
+}
+
+function EmptyWorkerState({ title, message }: { title: string; message: string }) {
+  return (
+    <div className="mt-4 rounded border border-dashed border-slate-300 bg-slate-50 p-4 text-sm">
+      <p className="font-semibold text-ink">{title}</p>
+      <p className="mt-1 leading-6 text-slate-600">{message}</p>
+    </div>
   );
 }
 
