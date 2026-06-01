@@ -172,9 +172,6 @@ export function LoginCard() {
             <Link className="font-semibold text-gumleaf hover:text-ink" href="/register">
               Register a new provider account
             </Link>
-            <Link className="font-semibold text-ink hover:text-gumleaf" href="/dashboard">
-              View dashboard
-            </Link>
           </div>
           <CopyrightFooter />
         </form>
