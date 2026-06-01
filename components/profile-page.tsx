@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Mail, ShieldCheck, UserCircle } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { friendlyRole, normalizeRole } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 
 type Profile = {
@@ -30,7 +31,7 @@ export function ProfilePage() {
         email: user?.email ?? "No active session",
         name: String(user?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "Guest user"),
         organisation: String(user?.user_metadata?.organisation ?? "Not set"),
-        role: String(user?.user_metadata?.role ?? "provider_admin"),
+        role: normalizeRole(user?.user_metadata?.role),
         id: user?.id ?? "Not signed in"
       });
     });
@@ -66,7 +67,7 @@ export function ProfilePage() {
           <h2 className="text-lg font-semibold text-ink">Provider details</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <InfoCard title="Organisation" value={profile.organisation} />
-            <InfoCard title="Portal access" value={profile.role === "support_worker" ? "Worker portal" : "Provider admin workspace"} />
+            <InfoCard title="Portal access" value={profile.role === "support_worker" ? "Worker portal, assigned shifts, notes, and incidents" : "All provider pages"} />
             <InfoCard title="Authentication" value="Supabase Auth" />
             <InfoCard title="Session" value={profile.email === "No active session" ? "Not signed in" : "Active"} />
           </div>
@@ -95,10 +96,4 @@ function InfoCard({ title, value }: { title: string; value: string }) {
       <p className="mt-2 text-sm text-slate-600">{value}</p>
     </article>
   );
-}
-
-function friendlyRole(role: string) {
-  if (role === "support_worker") return "Support worker";
-  if (role === "provider_admin") return "Provider administrator";
-  return role;
 }

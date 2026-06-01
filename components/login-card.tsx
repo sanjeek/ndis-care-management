@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { canAccessRoute, defaultRouteForRole, normalizeRole, type UserRole } from "@/lib/auth";
 import { CopyrightFooter } from "@/components/copyright-footer";
 
 export function LoginCard() {
@@ -20,7 +21,8 @@ export function LoginCard() {
     if (!isSupabaseConfigured || !supabase) return;
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
-        window.location.replace(getSafeNextPath());
+        const role = normalizeRole(data.session.user.user_metadata?.role);
+        window.location.replace(getSafeNextPath(role));
       }
     });
   }, []);
@@ -62,14 +64,15 @@ export function LoginCard() {
       return;
     }
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) {
       setMessage(error.message);
       return;
     }
+    const role = normalizeRole(data.user?.user_metadata?.role);
     setMessage(remember ? "Signed in and session saved." : "Signed in for this session.");
-    window.location.href = getSafeNextPath();
+    window.location.href = getSafeNextPath(role);
   }
 
   return (
@@ -180,11 +183,12 @@ export function LoginCard() {
   );
 }
 
-function getSafeNextPath() {
+function getSafeNextPath(role: UserRole = "admin") {
   if (typeof window === "undefined") return "/dashboard";
   const next = new URLSearchParams(window.location.search).get("next");
   if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/login")) {
-    return "/dashboard";
+    return defaultRouteForRole(role);
   }
-  return next;
+  const pathname = next.split(/[?#]/)[0] || "/";
+  return canAccessRoute(role, pathname) ? next : defaultRouteForRole(role);
 }

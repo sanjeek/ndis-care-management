@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 export async function POST(request: Request) {
-  const { email, password, name, organisation, role = "provider_admin", invite } = await request.json();
+  const { email, password, name, organisation, role = "admin", invite } = await request.json();
+  const accountRole = role === "support_worker" ? "support_worker" : "admin";
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
         data: {
           full_name: name,
           organisation,
-          role,
+          role: accountRole,
           invite_token: invite
         }
       }
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
     user_metadata: {
       full_name: name,
       organisation,
-      role,
+      role: accountRole,
       invite_token: invite
     }
   });
@@ -62,6 +63,16 @@ export async function POST(request: Request) {
       { message: alreadyExists ? "This email already has an account. Please sign in or use forgot password." : error.message },
       { status: alreadyExists ? 409 : 400 }
     );
+  }
+
+  if (data.user) {
+    await admin.from("profiles").upsert({
+      id: data.user.id,
+      email,
+      full_name: name,
+      organisation,
+      role: accountRole
+    });
   }
 
   return NextResponse.json({

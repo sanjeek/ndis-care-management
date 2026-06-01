@@ -310,7 +310,11 @@ export function RosteringPage() {
       time: `${timeOnly(start)} - ${timeOnly(end)}`
     };
     setShifts([next, ...shifts]);
-    await persist("shifts", { participant_name: participantName, support_worker_name: next.worker, location: next.location, starts_at: start, ends_at: end, status: next.status }, setNotice);
+    await persist(
+      "shifts",
+      { participant_name: participantName, support_worker_name: next.worker, support_worker_email: next.workerEmail, location: next.location, starts_at: start, ends_at: end, status: next.status },
+      setNotice
+    );
     setCreateOpen(false);
   }
 

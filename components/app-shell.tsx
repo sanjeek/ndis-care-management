@@ -6,6 +6,7 @@ import { LogOut, Menu, Search, UserCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { navItems } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
+import { canAccessRoute, defaultRouteForRole, friendlyRole, normalizeRole, type UserRole, visibleNavForRole } from "@/lib/auth";
 import { CopyrightFooter } from "@/components/copyright-footer";
 
 export function AppShell({ title, eyebrow, children }: { title: string; eyebrow: string; children: React.ReactNode }) {
@@ -14,6 +15,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
   const [search, setSearch] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
+  const [userRole, setUserRole] = useState<UserRole>("admin");
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
@@ -35,8 +37,16 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
 
       if (!active) return;
       const user = session.user;
+      const role = normalizeRole(user.user_metadata?.role);
+
+      if (!canAccessRoute(role, window.location.pathname)) {
+        window.location.replace(defaultRouteForRole(role));
+        return;
+      }
+
       setUserEmail(user.email ?? "");
       setUserName(String(user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "User"));
+      setUserRole(role);
       setAuthChecked(true);
     }
 
@@ -59,6 +69,8 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
       authListener?.subscription.unsubscribe();
     };
   }, []);
+
+  const visibleNavItems = useMemo(() => visibleNavForRole(userRole, navItems), [userRole]);
 
   const initials = useMemo(() => {
     return userName
@@ -105,7 +117,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
           </div>
 
           <nav className={`${open ? "grid" : "hidden"} mt-5 gap-1 lg:grid`}>
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const active = pathname === item.href;
               return (
                 <Link
@@ -127,6 +139,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
             <p className="text-xs font-semibold uppercase text-slate-400">Signed in</p>
             <p className="mt-1 truncate text-sm font-semibold text-ink">{userName || "Guest user"}</p>
             <p className="truncate text-xs text-slate-500">{userEmail || "No active session"}</p>
+            <p className="mt-2 inline-flex rounded bg-gumleaf/10 px-2 py-1 text-xs font-semibold text-gumleaf">{friendlyRole(userRole)}</p>
           </div>
         </aside>
 
@@ -138,18 +151,20 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                 <h1 className="text-2xl font-semibold text-ink sm:text-3xl">{title}</h1>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <form
-                  className="flex min-w-0 items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 shadow-sm sm:w-80"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    if (search.trim()) {
-                      window.location.href = `/participants?search=${encodeURIComponent(search.trim())}`;
-                    }
-                  }}
-                >
-                  <Search className="h-4 w-4 shrink-0 text-slate-400" />
-                  <input className="w-full bg-transparent text-sm outline-none" placeholder="Search records" value={search} onChange={(event) => setSearch(event.target.value)} />
-                </form>
+                {userRole === "admin" ? (
+                  <form
+                    className="flex min-w-0 items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 shadow-sm sm:w-80"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      if (search.trim()) {
+                        window.location.href = `/participants?search=${encodeURIComponent(search.trim())}`;
+                      }
+                    }}
+                  >
+                    <Search className="h-4 w-4 shrink-0 text-slate-400" />
+                    <input className="w-full bg-transparent text-sm outline-none" placeholder="Search records" value={search} onChange={(event) => setSearch(event.target.value)} />
+                  </form>
+                ) : null}
                 <Link href="/profile" className="inline-flex items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gumleaf text-xs font-bold text-white">{initials}</span>
                   <span className="hidden max-w-32 truncate md:inline">{userName || "Profile"}</span>
