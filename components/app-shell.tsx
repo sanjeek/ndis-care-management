@@ -37,7 +37,11 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
 
       if (!active) return;
       const user = session.user;
-      const role = normalizeRole(user.user_metadata?.role);
+      let role = normalizeRole(user.user_metadata?.role);
+      if (!user.user_metadata?.role) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+        role = normalizeRole(profile?.role);
+      }
 
       if (!canAccessRoute(role, window.location.pathname)) {
         window.location.replace(defaultRouteForRole(role));

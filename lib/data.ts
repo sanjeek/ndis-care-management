@@ -12,6 +12,7 @@ import {
   Settings,
   ShieldCheck,
   Stethoscope,
+  UserCog,
   Users,
   WalletCards
 } from "lucide-react";
@@ -27,6 +28,7 @@ export const navItems = [
   { label: "Invoices", href: "/invoices", icon: ReceiptText },
   { label: "Documents", href: "/documents", icon: WalletCards },
   { label: "Worker Portal", href: "/worker-portal", icon: Smartphone },
+  { label: "User Management", href: "/admin/users", icon: UserCog },
   { label: "Profile", href: "/profile", icon: UserCircle },
   { label: "Settings", href: "/settings", icon: Settings }
 ];

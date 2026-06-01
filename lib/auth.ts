@@ -3,8 +3,8 @@ export type UserRole = "admin" | "support_worker";
 const workerRoutes = ["/worker-portal", "/profile", "/progress-notes", "/incident-reports"];
 
 export function normalizeRole(role: unknown): UserRole {
-  if (role === "support_worker") return "support_worker";
-  return "admin";
+  if (role === "admin" || role === "provider_admin") return "admin";
+  return "support_worker";
 }
 
 export function canAccessRoute(role: UserRole, pathname: string) {

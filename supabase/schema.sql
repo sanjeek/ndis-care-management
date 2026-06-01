@@ -14,9 +14,13 @@ create table if not exists public.profiles (
   full_name text,
   organisation text,
   role text not null default 'support_worker' check (role in ('admin', 'support_worker')),
+  active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.profiles
+add column if not exists active boolean not null default true;
 
 create table if not exists public.support_workers (
   id uuid primary key default gen_random_uuid(),

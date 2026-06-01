@@ -19,9 +19,14 @@ export function LoginCard() {
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
-    supabase.auth.getSession().then(({ data }) => {
+    const client = supabase;
+    client.auth.getSession().then(async ({ data }) => {
       if (data.session) {
-        const role = normalizeRole(data.session.user.user_metadata?.role);
+        let role = normalizeRole(data.session.user.user_metadata?.role);
+        if (!data.session.user.user_metadata?.role) {
+          const { data: profile } = await client.from("profiles").select("role").eq("id", data.session.user.id).maybeSingle();
+          role = normalizeRole(profile?.role);
+        }
         window.location.replace(getSafeNextPath(role));
       }
     });
@@ -36,6 +41,7 @@ export function LoginCard() {
       setLoading(false);
       return;
     }
+    const client = supabase;
 
     if (forgotMode) {
       if (Date.now() < resetLockedUntil) {
@@ -46,7 +52,7 @@ export function LoginCard() {
       }
 
       const siteUrl = window.location.origin;
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const { error } = await client.auth.resetPasswordForEmail(email, {
         redirectTo: `${siteUrl}/reset-password`
       });
       setLoading(false);
@@ -64,13 +70,17 @@ export function LoginCard() {
       return;
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await client.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) {
       setMessage(error.message);
       return;
     }
-    const role = normalizeRole(data.user?.user_metadata?.role);
+    let role = normalizeRole(data.user?.user_metadata?.role);
+    if (!data.user?.user_metadata?.role && data.user?.id) {
+      const { data: profile } = await client.from("profiles").select("role").eq("id", data.user.id).maybeSingle();
+      role = normalizeRole(profile?.role);
+    }
     setMessage(remember ? "Signed in and session saved." : "Signed in for this session.");
     window.location.href = getSafeNextPath(role);
   }
