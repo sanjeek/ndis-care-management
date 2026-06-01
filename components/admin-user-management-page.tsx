@@ -96,8 +96,8 @@ export function AdminUserManagementPage() {
             <h2 className="font-semibold text-ink">Create support worker login</h2>
           </div>
           <form onSubmit={createUser} className="mt-5 grid gap-4">
-            <Field name="name" label="Full name" defaultValue="Asha Patel" />
-            <Field name="email" label="Email address" type="email" defaultValue="asha.patel@example.com" />
+            <Field name="name" label="Full name" defaultValue="" placeholder="Full name" />
+            <Field name="email" label="Email address" type="email" defaultValue="" placeholder="worker@example.com" />
             <Field name="organisation" label="Organisation" defaultValue="Worker portal" />
             <label>
               <span className="mb-2 block text-sm font-medium text-slate-700">Role</span>
@@ -106,7 +106,7 @@ export function AdminUserManagementPage() {
                 <option value="admin">Admin</option>
               </select>
             </label>
-            <Field name="password" label="Temporary password" defaultValue="CareOS-temp-123" />
+            <Field name="password" label="Temporary password" defaultValue="" placeholder="Temporary password" />
             <button disabled={loading} className="inline-flex items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d625d] disabled:opacity-70">
               <UserPlus className="h-4 w-4" />
               Create account
@@ -149,7 +149,7 @@ export function AdminUserManagementPage() {
 }
 
 function UserRow({ user, disabled, onUpdate }: { user: ManagedUser; disabled: boolean; onUpdate: (payload: Record<string, unknown>) => Promise<void> }) {
-  const [password, setPassword] = useState("CareOS-temp-123");
+  const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>(user.role);
 
   return (
@@ -193,11 +193,11 @@ function UserRow({ user, disabled, onUpdate }: { user: ManagedUser; disabled: bo
   );
 }
 
-function Field({ name, label, defaultValue, type = "text" }: { name: string; label: string; defaultValue: string; type?: string }) {
+function Field({ name, label, defaultValue, placeholder = "", type = "text" }: { name: string; label: string; defaultValue: string; placeholder?: string; type?: string }) {
   return (
     <label>
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
-      <input name={name} type={type} required defaultValue={defaultValue} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
+      <input name={name} type={type} required defaultValue={defaultValue} placeholder={placeholder} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
     </label>
   );
 }

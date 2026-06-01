@@ -35,12 +35,12 @@ type ModalKind = "participant" | "worker" | "shift" | "note" | "incident" | "tim
 const rosterStatuses = ["Draft", "Offered", "Confirmed", "In progress", "Completed"];
 
 const emptyShift = {
-  participant: "Mia Harrison",
-  worker: "Asha Patel",
-  location: "Parramatta NSW",
-  start: "2026-05-31T07:00",
-  end: "2026-05-31T11:00",
-  status: "Confirmed"
+  participant: "",
+  worker: "",
+  location: "",
+  start: "",
+  end: "",
+  status: "Draft"
 };
 
 export function CareApp() {
@@ -239,13 +239,13 @@ export function CareApp() {
           <Rostering shifts={shifts} participants={participants} workers={workers} addShift={addShift} />
 
           <section className="grid gap-6 xl:grid-cols-2">
-            <Panel id="timesheets" title="Timesheets" items={["11 pending approval", "3 with kilometre claims", "2 overnight allowances flagged"]} />
-            <Panel id="notes" title="Progress Notes" items={["42 notes this week", "8 require coordinator review", "Participant goals linked to 31 notes"]} />
+            <Panel id="timesheets" title="Timesheets" items={[]} />
+            <Panel id="notes" title="Progress Notes" items={[]} />
             <IncidentReports />
             <Panel
               id="invoices"
               title="Invoices"
-              items={["$84,260 ready to export", "19 invoices awaiting plan manager details", "NDIS line items mapped for 2025-26 support catalogue"]}
+              items={[]}
             />
           </section>
 
@@ -272,21 +272,21 @@ export function CareApp() {
 
       {modal === "participant" && (
         <RecordModal title="Add participant" submitLabel="Save participant" onClose={() => setModal(null)} onSubmit={addParticipant}>
-          <TextField name="name" label="Participant name" defaultValue="Ruby Wilson" />
-          <TextField name="ndis" label="NDIS number" defaultValue="721 003 445" />
-          <TextField name="plan" label="Plan type" defaultValue="Plan managed" />
-          <TextField name="emergency" label="Emergency contact" defaultValue="Jordan Wilson, 0410 332 118" />
-          <TextArea name="needs" label="Support needs" defaultValue="Community access, domestic assistance, transport to appointments" />
+          <TextField name="name" label="Participant name" defaultValue="" />
+          <TextField name="ndis" label="NDIS number" defaultValue="" />
+          <TextField name="plan" label="Plan type" defaultValue="" />
+          <TextField name="emergency" label="Emergency contact" defaultValue="" />
+          <TextArea name="needs" label="Support needs" defaultValue="" />
         </RecordModal>
       )}
 
       {modal === "worker" && (
         <RecordModal title="Add support worker" submitLabel="Save worker" onClose={() => setModal(null)} onSubmit={addWorker}>
-          <TextField name="name" label="Staff name" defaultValue="Harper Singh" />
-          <TextField name="role" label="Role" defaultValue="Disability Support Worker" />
-          <TextField name="availability" label="Availability" defaultValue="Mon to Fri" />
-          <TextArea name="qualifications" label="Qualifications" defaultValue="Cert III Individual Support, First Aid, CPR, manual handling" />
-          <TextField name="compliance" label="Compliance status" defaultValue="Clear" />
+          <TextField name="name" label="Staff name" defaultValue="" />
+          <TextField name="role" label="Role" defaultValue="" />
+          <TextField name="availability" label="Availability" defaultValue="" />
+          <TextArea name="qualifications" label="Qualifications" defaultValue="" />
+          <TextField name="compliance" label="Compliance status" defaultValue="" />
         </RecordModal>
       )}
 
