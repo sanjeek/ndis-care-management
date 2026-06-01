@@ -20,7 +20,7 @@ export function LoginCard() {
     if (!isSupabaseConfigured || !supabase) return;
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
-        window.location.replace("/dashboard");
+        window.location.replace(getSafeNextPath());
       }
     });
   }, []);
@@ -69,7 +69,7 @@ export function LoginCard() {
       return;
     }
     setMessage(remember ? "Signed in and session saved." : "Signed in for this session.");
-    window.location.href = "/dashboard";
+    window.location.href = getSafeNextPath();
   }
 
   return (
@@ -178,4 +178,13 @@ export function LoginCard() {
       </div>
     </section>
   );
+}
+
+function getSafeNextPath() {
+  if (typeof window === "undefined") return "/dashboard";
+  const next = new URLSearchParams(window.location.search).get("next");
+  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/login")) {
+    return "/dashboard";
+  }
+  return next;
 }

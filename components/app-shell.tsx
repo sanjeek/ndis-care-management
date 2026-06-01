@@ -14,14 +14,50 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
   const [search, setSearch] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    if (!supabase) return;
-    supabase.auth.getUser().then(({ data }) => {
-      const user = data.user;
-      setUserEmail(user?.email ?? "");
-      setUserName(String(user?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "User"));
-    });
+    let active = true;
+
+    async function checkSession() {
+      if (!supabase) {
+        redirectToLogin();
+        return;
+      }
+
+      const { data } = await supabase.auth.getSession();
+      const session = data.session;
+
+      if (!session) {
+        redirectToLogin();
+        return;
+      }
+
+      if (!active) return;
+      const user = session.user;
+      setUserEmail(user.email ?? "");
+      setUserName(String(user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "User"));
+      setAuthChecked(true);
+    }
+
+    function redirectToLogin() {
+      if (typeof window === "undefined") return;
+      const requestedPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      window.location.replace(`/login?next=${encodeURIComponent(requestedPath)}`);
+    }
+
+    void checkSession();
+
+    const { data: authListener } = supabase?.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        redirectToLogin();
+      }
+    }) ?? { data: null };
+
+    return () => {
+      active = false;
+      authListener?.subscription.unsubscribe();
+    };
   }, []);
 
   const initials = useMemo(() => {
@@ -37,7 +73,18 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
     if (supabase) {
       await supabase.auth.signOut();
     }
-    window.location.href = "/";
+    window.location.href = "/login";
+  }
+
+  if (!authChecked) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+        <div className="rounded border border-slate-200 bg-white px-6 py-5 text-center shadow-sm">
+          <p className="text-sm font-semibold text-ink">Checking secure session...</p>
+          <p className="mt-1 text-xs text-slate-500">Private CareOS pages require sign in.</p>
+        </div>
+      </main>
+    );
   }
 
   return (
