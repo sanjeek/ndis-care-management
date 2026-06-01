@@ -108,6 +108,15 @@ alter table public.progress_notes enable row level security;
 alter table public.incident_reports enable row level security;
 alter table public.module_records enable row level security;
 
+alter table public.participants force row level security;
+alter table public.profiles force row level security;
+alter table public.support_workers force row level security;
+alter table public.worker_invitations force row level security;
+alter table public.shifts force row level security;
+alter table public.progress_notes force row level security;
+alter table public.incident_reports force row level security;
+alter table public.module_records force row level security;
+
 drop policy if exists "Authenticated users can manage participants" on public.participants;
 drop policy if exists "Authenticated users can manage support workers" on public.support_workers;
 drop policy if exists "Authenticated users can manage worker invitations" on public.worker_invitations;
@@ -118,24 +127,75 @@ drop policy if exists "Authenticated users can manage module records" on public.
 drop policy if exists "Users can read their profile" on public.profiles;
 drop policy if exists "Admins can manage profiles" on public.profiles;
 drop policy if exists "Admins can manage participants" on public.participants;
+drop policy if exists "Workers can read assigned participants" on public.participants;
 drop policy if exists "Admins can manage support workers" on public.support_workers;
+drop policy if exists "Workers can read own support worker record" on public.support_workers;
 drop policy if exists "Admins can manage worker invitations" on public.worker_invitations;
 drop policy if exists "Admins can manage shifts" on public.shifts;
 drop policy if exists "Workers can read assigned shifts" on public.shifts;
 drop policy if exists "Role based progress notes" on public.progress_notes;
+drop policy if exists "Admins can manage progress notes" on public.progress_notes;
+drop policy if exists "Workers can read own progress notes" on public.progress_notes;
+drop policy if exists "Workers can create own assigned progress notes" on public.progress_notes;
+drop policy if exists "Workers can update own progress notes" on public.progress_notes;
 drop policy if exists "Role based incident reports" on public.incident_reports;
+drop policy if exists "Admins can manage incident reports" on public.incident_reports;
+drop policy if exists "Workers can read own incident reports" on public.incident_reports;
+drop policy if exists "Workers can create own assigned incident reports" on public.incident_reports;
+drop policy if exists "Workers can update own incident reports" on public.incident_reports;
 drop policy if exists "Role based module records" on public.module_records;
+drop policy if exists "Admins can manage module records" on public.module_records;
 
 create or replace function public.current_app_role()
 returns text
 language sql
 stable
+security definer
+set search_path = public
 as $$
   select coalesce(
     case when lower(coalesce(auth.jwt() ->> 'email', '')) = 'sanjee@live.com' then 'admin' end,
     nullif(auth.jwt() -> 'user_metadata' ->> 'role', ''),
-    (select role from public.profiles where id = auth.uid()),
+    (select role from public.profiles where id = auth.uid() and active = true),
     'support_worker'
+  );
+$$;
+
+create or replace function public.current_app_email()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select lower(coalesce(auth.jwt() ->> 'email', ''));
+$$;
+
+create or replace function public.current_user_is_active()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    (select active from public.profiles where id = auth.uid()),
+    lower(coalesce(auth.jwt() ->> 'email', '')) = 'sanjee@live.com'
+  );
+$$;
+
+create or replace function public.worker_is_assigned_to_participant(participant text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.shifts
+    where lower(shifts.support_worker_email) = public.current_app_email()
+      and shifts.participant_name = participant
   );
 $$;
 
@@ -158,8 +218,20 @@ create or replace function public.is_admin()
 returns boolean
 language sql
 stable
+security definer
+set search_path = public
 as $$
-  select public.current_app_role() in ('admin', 'provider_admin');
+  select public.current_user_is_active() and public.current_app_role() in ('admin', 'provider_admin');
+$$;
+
+create or replace function public.is_support_worker()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.current_user_is_active() and public.current_app_role() = 'support_worker';
 $$;
 
 create policy "Users can read their profile"
@@ -179,11 +251,32 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+create policy "Workers can read assigned participants"
+on public.participants for select
+to authenticated
+using (
+  public.is_support_worker()
+  and exists (
+    select 1
+    from public.shifts
+    where shifts.participant_name = participants.name
+      and lower(shifts.support_worker_email) = public.current_app_email()
+  )
+);
+
 create policy "Admins can manage support workers"
 on public.support_workers for all
 to authenticated
 using (public.is_admin())
 with check (public.is_admin());
+
+create policy "Workers can read own support worker record"
+on public.support_workers for select
+to authenticated
+using (
+  public.is_support_worker()
+  and lower(email) = public.current_app_email()
+);
 
 create policy "Admins can manage worker invitations"
 on public.worker_invitations for all
@@ -200,22 +293,89 @@ with check (public.is_admin());
 create policy "Workers can read assigned shifts"
 on public.shifts for select
 to authenticated
-using (public.is_admin() or lower(support_worker_email) = lower(coalesce(auth.jwt() ->> 'email', '')));
+using (
+  public.is_support_worker()
+  and lower(support_worker_email) = public.current_app_email()
+);
 
-create policy "Role based progress notes"
+create policy "Admins can manage progress notes"
 on public.progress_notes for all
 to authenticated
-using (public.is_admin() or lower(worker_email) = lower(coalesce(auth.jwt() ->> 'email', '')))
-with check (public.is_admin() or lower(worker_email) = lower(coalesce(auth.jwt() ->> 'email', '')));
+using (public.is_admin())
+with check (public.is_admin());
 
-create policy "Role based incident reports"
+create policy "Workers can read own progress notes"
+on public.progress_notes for select
+to authenticated
+using (
+  public.is_support_worker()
+  and lower(worker_email) = public.current_app_email()
+  and public.worker_is_assigned_to_participant(participant_name)
+);
+
+create policy "Workers can create own assigned progress notes"
+on public.progress_notes for insert
+to authenticated
+with check (
+  public.is_support_worker()
+  and lower(worker_email) = public.current_app_email()
+  and public.worker_is_assigned_to_participant(participant_name)
+);
+
+create policy "Workers can update own progress notes"
+on public.progress_notes for update
+to authenticated
+using (
+  public.is_support_worker()
+  and lower(worker_email) = public.current_app_email()
+  and public.worker_is_assigned_to_participant(participant_name)
+)
+with check (
+  public.is_support_worker()
+  and lower(worker_email) = public.current_app_email()
+  and public.worker_is_assigned_to_participant(participant_name)
+);
+
+create policy "Admins can manage incident reports"
 on public.incident_reports for all
 to authenticated
-using (public.is_admin() or lower(worker_email) = lower(coalesce(auth.jwt() ->> 'email', '')))
-with check (public.is_admin() or lower(worker_email) = lower(coalesce(auth.jwt() ->> 'email', '')));
+using (public.is_admin())
+with check (public.is_admin());
 
-create policy "Role based module records"
+create policy "Workers can read own incident reports"
+on public.incident_reports for select
+to authenticated
+using (
+  public.is_support_worker()
+  and lower(worker_email) = public.current_app_email()
+  and public.worker_is_assigned_to_participant(participant_name)
+);
+
+create policy "Workers can create own assigned incident reports"
+on public.incident_reports for insert
+to authenticated
+with check (
+  public.is_support_worker()
+  and lower(worker_email) = public.current_app_email()
+  and public.worker_is_assigned_to_participant(participant_name)
+);
+
+create policy "Workers can update own incident reports"
+on public.incident_reports for update
+to authenticated
+using (
+  public.is_support_worker()
+  and lower(worker_email) = public.current_app_email()
+  and public.worker_is_assigned_to_participant(participant_name)
+)
+with check (
+  public.is_support_worker()
+  and lower(worker_email) = public.current_app_email()
+  and public.worker_is_assigned_to_participant(participant_name)
+);
+
+create policy "Admins can manage module records"
 on public.module_records for all
 to authenticated
-using (public.is_admin() or (public.current_app_role() = 'support_worker' and module in ('notes', 'incidents')))
-with check (public.is_admin() or (public.current_app_role() = 'support_worker' and module in ('notes', 'incidents')));
+using (public.is_admin())
+with check (public.is_admin());
