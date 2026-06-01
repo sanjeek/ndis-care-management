@@ -2,10 +2,16 @@ export type UserRole = "admin" | "support_worker";
 
 const workerRoutes = ["/worker-portal", "/my-shifts", "/progress-notes", "/incident-reports", "/profile", "/unauthorised"];
 const workerNavOrder = ["/worker-portal", "/my-shifts", "/progress-notes", "/incident-reports", "/profile"];
+const adminEmails = ["sanjee@live.com"];
 
 export function normalizeRole(role: unknown): UserRole {
   if (role === "admin" || role === "provider_admin") return "admin";
   return "support_worker";
+}
+
+export function roleForUser(role: unknown, email?: string | null): UserRole {
+  if (email && adminEmails.includes(email.toLowerCase())) return "admin";
+  return normalizeRole(role);
 }
 
 export function canAccessRoute(role: UserRole, pathname: string) {

@@ -6,7 +6,7 @@ import { LogOut, Menu, Search, UserCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { navItems } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
-import { canAccessRoute, defaultRouteForRole, friendlyRole, normalizeRole, type UserRole, visibleNavForRole } from "@/lib/auth";
+import { canAccessRoute, defaultRouteForRole, friendlyRole, roleForUser, type UserRole, visibleNavForRole } from "@/lib/auth";
 import { CopyrightFooter } from "@/components/copyright-footer";
 
 export function AppShell({ title, eyebrow, children }: { title: string; eyebrow: string; children: React.ReactNode }) {
@@ -37,11 +37,11 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
 
       if (!active) return;
       const user = session.user;
-      let role = normalizeRole(user.user_metadata?.role);
+      let role = roleForUser(user.user_metadata?.role, user.email);
       let profileName = "";
       if (!user.user_metadata?.role) {
         const { data: profile } = await supabase.from("profiles").select("role, full_name").eq("id", user.id).maybeSingle();
-        role = normalizeRole(profile?.role);
+        role = roleForUser(profile?.role, user.email);
         profileName = String(profile?.full_name ?? "");
       }
 

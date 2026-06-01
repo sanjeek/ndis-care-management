@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
-import { canAccessRoute, defaultRouteForRole, normalizeRole, type UserRole } from "@/lib/auth";
+import { canAccessRoute, defaultRouteForRole, roleForUser, type UserRole } from "@/lib/auth";
 import { CopyrightFooter } from "@/components/copyright-footer";
 
 export function LoginCard() {
@@ -22,10 +22,10 @@ export function LoginCard() {
     const client = supabase;
     client.auth.getSession().then(async ({ data }) => {
       if (data.session) {
-        let role = normalizeRole(data.session.user.user_metadata?.role);
+        let role = roleForUser(data.session.user.user_metadata?.role, data.session.user.email);
         if (!data.session.user.user_metadata?.role) {
           const { data: profile } = await client.from("profiles").select("role").eq("id", data.session.user.id).maybeSingle();
-          role = normalizeRole(profile?.role);
+          role = roleForUser(profile?.role, data.session.user.email);
         }
         window.location.replace(getSafeNextPath(role));
       }
@@ -76,10 +76,10 @@ export function LoginCard() {
       setMessage(error.message);
       return;
     }
-    let role = normalizeRole(data.user?.user_metadata?.role);
+    let role = roleForUser(data.user?.user_metadata?.role, data.user?.email);
     if (!data.user?.user_metadata?.role && data.user?.id) {
       const { data: profile } = await client.from("profiles").select("role").eq("id", data.user.id).maybeSingle();
-      role = normalizeRole(profile?.role);
+      role = roleForUser(profile?.role, data.user.email);
     }
     setMessage("Login successful. Redirecting...");
     window.location.href = getSafeNextPath(role);

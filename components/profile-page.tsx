@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Mail, ShieldCheck, UserCircle } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { friendlyRole, normalizeRole } from "@/lib/auth";
+import { friendlyRole, roleForUser } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 
 type Profile = {
@@ -29,7 +29,7 @@ export function ProfilePage() {
         .eq("id", user.id)
         .maybeSingle()
         .then(({ data: profileData }) => {
-          const role = normalizeRole(user.user_metadata?.role ?? profileData?.role);
+          const role = roleForUser(user.user_metadata?.role ?? profileData?.role, user.email);
           setProfile({
             email: user.email ?? user.id,
             name: String(user.user_metadata?.full_name || profileData?.full_name || user.email || user.id),

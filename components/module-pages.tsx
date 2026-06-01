@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { StatCard } from "@/components/stat-card";
-import { normalizeRole, type UserRole } from "@/lib/auth";
+import { roleForUser, type UserRole } from "@/lib/auth";
 import { documents, incidents, metrics, participants as seedParticipants, todayShifts, workers as seedWorkers } from "@/lib/data";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
@@ -404,7 +404,7 @@ export function SimpleModulePage({ kind }: { kind: "timesheets" | "notes" | "inc
     supabase.auth.getUser().then(({ data }) => {
       const user = data.user;
       setWorkerContext({
-        role: normalizeRole(user?.user_metadata?.role),
+        role: roleForUser(user?.user_metadata?.role, user?.email),
         email: user?.email ?? "",
         name: String(user?.user_metadata?.full_name || user?.email || user?.id || "")
       });

@@ -132,11 +132,27 @@ language sql
 stable
 as $$
   select coalesce(
+    case when lower(coalesce(auth.jwt() ->> 'email', '')) = 'sanjee@live.com' then 'admin' end,
     nullif(auth.jwt() -> 'user_metadata' ->> 'role', ''),
     (select role from public.profiles where id = auth.uid()),
     'support_worker'
   );
 $$;
+
+update auth.users
+set raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) || '{"role":"admin"}'::jsonb
+where lower(email) = 'sanjee@live.com';
+
+insert into public.profiles (id, email, full_name, organisation, role, active)
+select id, email, coalesce(raw_user_meta_data ->> 'full_name', email), coalesce(raw_user_meta_data ->> 'organisation', ''), 'admin', true
+from auth.users
+where lower(email) = 'sanjee@live.com'
+on conflict (id) do update
+set role = 'admin',
+    active = true,
+    email = excluded.email,
+    full_name = coalesce(public.profiles.full_name, excluded.full_name),
+    updated_at = now();
 
 create or replace function public.is_admin()
 returns boolean

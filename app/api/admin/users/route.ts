@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { normalizeRole } from "@/lib/auth";
+import { normalizeRole, roleForUser } from "@/lib/auth";
 
 type AdminAction = "create" | "status" | "password" | "role";
 
@@ -52,12 +52,12 @@ async function requireAdmin(request: Request) {
     return { error: "Admin session is invalid.", status: 401 };
   }
 
-  let role = normalizeRole(data.user.user_metadata?.role);
+  let role = roleForUser(data.user.user_metadata?.role, data.user.email);
   if (!data.user.user_metadata?.role) {
     const admin = adminClient();
     if (hasAdminClient(admin)) {
       const { data: profile } = await admin.client.from("profiles").select("role").eq("id", data.user.id).maybeSingle();
-      role = normalizeRole(profile?.role);
+      role = roleForUser(profile?.role, data.user.email);
     }
   }
   if (role !== "admin") {
@@ -87,7 +87,7 @@ export async function GET(request: Request) {
     id: user.id,
     email: user.email ?? "",
     name: String(user.user_metadata?.full_name || user.email || user.id),
-    role: normalizeRole(user.user_metadata?.role),
+    role: roleForUser(user.user_metadata?.role, user.email),
     active: !user.banned_until || new Date(user.banned_until).getTime() <= Date.now(),
     createdAt: user.created_at
   }));
