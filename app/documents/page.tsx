@@ -1,5 +1,5 @@
-import { SimpleModulePage } from "@/components/module-pages";
+import { DocumentsPage } from "@/components/documents-page";
 
 export default function Page() {
-  return <SimpleModulePage kind="documents" />;
+  return <DocumentsPage />;
 }
