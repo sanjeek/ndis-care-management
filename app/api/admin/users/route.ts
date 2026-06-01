@@ -86,7 +86,7 @@ export async function GET(request: Request) {
   const users = data.users.map((user) => ({
     id: user.id,
     email: user.email ?? "",
-    name: String(user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "User"),
+    name: String(user.user_metadata?.full_name || user.email || user.id),
     role: normalizeRole(user.user_metadata?.role),
     active: !user.banned_until || new Date(user.banned_until).getTime() <= Date.now(),
     createdAt: user.created_at

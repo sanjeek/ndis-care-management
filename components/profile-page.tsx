@@ -9,36 +9,43 @@ import { supabase } from "@/lib/supabase";
 type Profile = {
   email: string;
   name: string;
-  organisation: string;
+  organisation?: string;
   role: string;
   id: string;
 };
 
 export function ProfilePage() {
-  const [profile, setProfile] = useState<Profile>({
-    email: "",
-    name: "Guest user",
-    organisation: "Not set",
-    role: "Not set",
-    id: ""
-  });
+  const [profile, setProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getUser().then(({ data }) => {
+    const client = supabase;
+    client.auth.getUser().then(({ data }) => {
       const user = data.user;
-      setProfile({
-        email: user?.email ?? "No active session",
-        name: String(user?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "Guest user"),
-        organisation: String(user?.user_metadata?.organisation ?? "Not set"),
-        role: normalizeRole(user?.user_metadata?.role),
-        id: user?.id ?? "Not signed in"
-      });
+      if (!user) return;
+      client
+        .from("profiles")
+        .select("full_name, organisation, role")
+        .eq("id", user.id)
+        .maybeSingle()
+        .then(({ data: profileData }) => {
+          const role = normalizeRole(user.user_metadata?.role ?? profileData?.role);
+          setProfile({
+            email: user.email ?? user.id,
+            name: String(user.user_metadata?.full_name || profileData?.full_name || user.email || user.id),
+            organisation: String(user.user_metadata?.organisation || profileData?.organisation || ""),
+            role,
+            id: user.id
+          });
+        });
     });
   }, []);
 
   return (
     <AppShell title="Profile" eyebrow="Account, role, and portal access">
+      {!profile ? (
+        <section className="rounded border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">Loading profile...</section>
+      ) : (
       <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
         <section className="rounded border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-4">
@@ -66,13 +73,13 @@ export function ProfilePage() {
         <section className="rounded border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-ink">Provider details</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <InfoCard title="Organisation" value={profile.organisation} />
+            {profile.organisation ? <InfoCard title="Organisation" value={profile.organisation} /> : null}
             <InfoCard title="Portal access" value={profile.role === "support_worker" ? "Worker portal, assigned shifts, notes, and incidents" : "All provider pages"} />
             <InfoCard title="Authentication" value="Supabase Auth" />
-            <InfoCard title="Session" value={profile.email === "No active session" ? "Not signed in" : "Active"} />
           </div>
         </section>
       </div>
+      )}
     </AppShell>
   );
 }

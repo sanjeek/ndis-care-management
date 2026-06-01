@@ -178,14 +178,14 @@ export function WorkersPage() {
 
 export function WorkerPortalPage() {
   const [workerEmail, setWorkerEmail] = useState("");
-  const [workerNameFromSession, setWorkerNameFromSession] = useState("Support worker");
+  const [workerNameFromSession, setWorkerNameFromSession] = useState("");
 
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getUser().then(({ data }) => {
       const user = data.user;
       setWorkerEmail(user?.email ?? "");
-      setWorkerNameFromSession(String(user?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "Support worker"));
+      setWorkerNameFromSession(String(user?.user_metadata?.full_name || user?.email || user?.id || ""));
     });
   }, []);
 
@@ -255,14 +255,14 @@ export function WorkerPortalPage() {
 
 export function MyShiftsPage() {
   const [workerEmail, setWorkerEmail] = useState("");
-  const [workerName, setWorkerName] = useState("Support worker");
+  const [workerName, setWorkerName] = useState("");
 
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getUser().then(({ data }) => {
       const user = data.user;
       setWorkerEmail(user?.email ?? "");
-      setWorkerName(String(user?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "Support worker"));
+      setWorkerName(String(user?.user_metadata?.full_name || user?.email || user?.id || ""));
     });
   }, []);
 
@@ -364,7 +364,7 @@ export function RosteringPage() {
 
 export function SimpleModulePage({ kind }: { kind: "timesheets" | "notes" | "incidents" | "invoices" | "documents" | "settings" }) {
   const [notice, setNotice] = useState("Ready.");
-  const [workerContext, setWorkerContext] = useState({ role: "support_worker" as UserRole, email: "", name: "Support worker" });
+  const [workerContext, setWorkerContext] = useState({ role: "support_worker" as UserRole, email: "", name: "" });
   const content = {
     timesheets: {
       title: "Timesheets",
@@ -406,7 +406,7 @@ export function SimpleModulePage({ kind }: { kind: "timesheets" | "notes" | "inc
       setWorkerContext({
         role: normalizeRole(user?.user_metadata?.role),
         email: user?.email ?? "",
-        name: String(user?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "Support worker")
+        name: String(user?.user_metadata?.full_name || user?.email || user?.id || "")
       });
     });
   }, []);

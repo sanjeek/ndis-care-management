@@ -81,7 +81,7 @@ export function LoginCard() {
       const { data: profile } = await client.from("profiles").select("role").eq("id", data.user.id).maybeSingle();
       role = normalizeRole(profile?.role);
     }
-    setMessage(remember ? "Signed in and session saved." : "Signed in for this session.");
+    setMessage("Login successful. Redirecting...");
     window.location.href = getSafeNextPath(role);
   }
 

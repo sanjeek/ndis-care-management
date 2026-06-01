@@ -38,9 +38,11 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
       if (!active) return;
       const user = session.user;
       let role = normalizeRole(user.user_metadata?.role);
+      let profileName = "";
       if (!user.user_metadata?.role) {
-        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+        const { data: profile } = await supabase.from("profiles").select("role, full_name").eq("id", user.id).maybeSingle();
         role = normalizeRole(profile?.role);
+        profileName = String(profile?.full_name ?? "");
       }
 
       if (!canAccessRoute(role, window.location.pathname)) {
@@ -50,7 +52,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
       }
 
       setUserEmail(user.email ?? "");
-      setUserName(String(user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "User"));
+      setUserName(String(user.user_metadata?.full_name || profileName || user.email || user.id));
       setUserRole(role);
       setAuthChecked(true);
     }
@@ -83,8 +85,8 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
       .map((part) => part[0])
       .join("")
       .slice(0, 2)
-      .toUpperCase() || "U";
-  }, [userName]);
+      .toUpperCase() || userEmail.slice(0, 2).toUpperCase();
+  }, [userEmail, userName]);
 
   async function signOut() {
     if (supabase) {
@@ -141,9 +143,9 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
           </nav>
 
           <div className="mt-6 hidden rounded border border-slate-200 bg-slate-50 p-3 lg:block">
-            <p className="text-xs font-semibold uppercase text-slate-400">Signed in</p>
-            <p className="mt-1 truncate text-sm font-semibold text-ink">{userName || "Guest user"}</p>
-            <p className="truncate text-xs text-slate-500">{userEmail || "No active session"}</p>
+            <p className="text-xs font-semibold uppercase text-slate-400">Account</p>
+            <p className="mt-1 truncate text-sm font-semibold text-ink">{userName}</p>
+            <p className="truncate text-xs text-slate-500">{userEmail}</p>
             <p className="mt-2 inline-flex rounded bg-gumleaf/10 px-2 py-1 text-xs font-semibold text-gumleaf">{friendlyRole(userRole)}</p>
           </div>
         </aside>
@@ -172,7 +174,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                 ) : null}
                 <Link href="/profile" className="inline-flex items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gumleaf text-xs font-bold text-white">{initials}</span>
-                  <span className="hidden max-w-32 truncate md:inline">{userName || "Profile"}</span>
+                  <span className="hidden max-w-32 truncate md:inline">{userName}</span>
                   <UserCircle className="h-4 w-4 text-slate-400" />
                 </Link>
                 <button onClick={signOut} className="inline-flex items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
