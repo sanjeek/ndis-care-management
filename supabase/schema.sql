@@ -76,6 +76,21 @@ add column if not exists category text;
 alter table public.progress_notes
 add column if not exists worker_email text;
 
+alter table public.progress_notes
+add column if not exists service_date date;
+
+alter table public.progress_notes
+add column if not exists start_time time;
+
+alter table public.progress_notes
+add column if not exists end_time time;
+
+alter table public.progress_notes
+add column if not exists outcomes text;
+
+alter table public.progress_notes
+add column if not exists digital_signature text;
+
 create table if not exists public.incident_reports (
   id uuid primary key default gen_random_uuid(),
   participant_name text not null,

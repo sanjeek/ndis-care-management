@@ -67,6 +67,22 @@ type ModuleItem = {
   status: string;
 };
 
+type ProgressNoteRecord = {
+  id: string;
+  participantName: string;
+  workerName: string;
+  workerEmail: string;
+  serviceDate: string;
+  startTime: string;
+  endTime: string;
+  category: string;
+  note: string;
+  outcomes: string;
+  signature: string;
+  isImportant: boolean;
+  createdAt: string;
+};
+
 const statuses = ["Draft", "Offered", "Confirmed", "In progress", "Completed"];
 type ModuleKind = "timesheets" | "notes" | "incidents" | "invoices" | "documents" | "settings";
 
@@ -537,6 +553,145 @@ export function RosteringPage() {
   );
 }
 
+export function ProgressNotesPage() {
+  const [notes, setNotes] = useState<ProgressNoteRecord[]>([]);
+  const [participants, setParticipants] = useState<ParticipantRecord[]>([]);
+  const [workers, setWorkers] = useState<WorkerRecord[]>([]);
+  const [context, setContext] = useState<{ role: UserRole; email: string; name: string }>({ role: "support_worker", email: "", name: "" });
+  const [notice, setNotice] = useState("Loading progress notes from Supabase.");
+
+  const refresh = useCallback(async () => {
+    const userContext = await getCurrentUserContext();
+    const userName = await getCurrentUserName();
+    const assignedShifts = userContext.role === "support_worker" && userContext.email ? await loadShifts(userContext.email) : [];
+    const [loadedNotes, loadedParticipants, loadedWorkers] = await Promise.all([
+      loadProgressNotes(userContext.role === "support_worker" ? userContext.email : undefined),
+      userContext.role === "support_worker" ? loadParticipantsForShifts(assignedShifts) : loadParticipants(),
+      userContext.role === "support_worker" ? Promise.resolve([]) : loadWorkers()
+    ]);
+    setContext({ ...userContext, name: assignedShifts[0]?.worker || userName || userContext.email });
+    setNotes(loadedNotes);
+    setParticipants(loadedParticipants);
+    setWorkers(loadedWorkers);
+    setNotice(
+      loadedNotes.length
+        ? userContext.role === "support_worker"
+          ? "Showing your submitted progress notes."
+          : "Showing all progress notes from the database."
+        : "No progress notes recorded yet."
+    );
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  async function submit(form: FormData) {
+    const workerName = context.role === "support_worker" ? context.name : get(form, "worker");
+    const workerEmail = context.role === "support_worker" ? context.email : workers.find((worker) => worker.name === workerName)?.email ?? "";
+    const participant = get(form, "participant");
+    const ok = await persist(
+      "progress_notes",
+      {
+        participant_name: participant,
+        worker_name: workerName,
+        worker_email: workerEmail,
+        service_date: get(form, "serviceDate"),
+        start_time: get(form, "startTime"),
+        end_time: get(form, "endTime"),
+        category: get(form, "category"),
+        note: get(form, "note"),
+        outcomes: get(form, "outcomes"),
+        digital_signature: get(form, "signature"),
+        is_important: get(form, "important") === "Important"
+      },
+      setNotice,
+      {
+        action: "progress_note",
+        recordLabel: participant,
+        metadata: {
+          serviceDate: get(form, "serviceDate"),
+          workerName,
+          operation: "create"
+        }
+      }
+    );
+    if (ok) await refresh();
+  }
+
+  const canSubmit = participants.length > 0 && (context.role === "support_worker" || workers.length > 0);
+
+  return (
+    <AppShell title="Progress Notes" eyebrow={notice}>
+      <section className="mb-6 rounded border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-5 flex flex-col gap-2">
+          <h2 className="text-lg font-semibold text-ink">New progress note</h2>
+          <p className="text-sm text-slate-500">Record service delivery, outcomes, and a digital worker signature.</p>
+        </div>
+        {canSubmit ? (
+          <RecordForm submitLabel="Save progress note" onSubmit={submit}>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Select name="participant" label="Participant" options={participants.map((participant) => participant.name)} />
+              {context.role === "support_worker" ? (
+                <ReadOnlyField label="Support worker" value={context.name || context.email || "Current worker"} />
+              ) : (
+                <Select name="worker" label="Support worker" options={workers.map((worker) => worker.name)} />
+              )}
+              <Field name="serviceDate" label="Service date" type="date" />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field name="startTime" label="Start time" type="time" />
+                <Field name="endTime" label="End time" type="time" />
+              </div>
+              <Select name="category" label="Support category" options={["Self care", "Community access", "Medication prompt", "Meal preparation", "Behaviour support", "Transport assistance", "Domestic assistance"]} />
+              <Select name="important" label="Priority" options={["Standard", "Important"]} />
+              <div className="lg:col-span-2">
+                <Area name="note" label="Notes" placeholder="Write what support was provided, observations, and participant response." />
+              </div>
+              <div className="lg:col-span-2">
+                <Area name="outcomes" label="Outcomes" placeholder="Record achieved goals, progress, risks, follow-up, or coordinator actions." />
+              </div>
+              <div className="lg:col-span-2">
+                <Field name="signature" label="Digital signature" placeholder="Type full name as signature" />
+              </div>
+            </div>
+          </RecordForm>
+        ) : (
+          <EmptyState
+            title="Progress note setup required"
+            message={context.role === "support_worker" ? "You can add progress notes after a participant is assigned to one of your shifts." : "Add at least one participant and support worker before creating progress notes."}
+          />
+        )}
+      </section>
+
+      {notes.length ? (
+        <div className="grid gap-4 xl:grid-cols-2">
+          {notes.map((note) => (
+            <article key={note.id} className="rounded border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-ink">{note.participantName}</h2>
+                  <p className="text-sm text-slate-500">{note.category || "Progress note"} by {note.workerName || note.workerEmail || "Worker"}</p>
+                </div>
+                <span className="rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{note.isImportant ? "Important" : "Standard"}</span>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <Info label="Service date" value={note.serviceDate || "Not recorded"} />
+                <Info label="Start time" value={note.startTime || "Not recorded"} />
+                <Info label="End time" value={note.endTime || "Not recorded"} />
+              </div>
+              <Info label="Notes" value={note.note || "Not recorded"} />
+              <Info label="Outcomes" value={note.outcomes || "Not recorded"} />
+              <Info label="Digital signature" value={note.signature || "Not signed"} />
+            </article>
+          ))}
+        </div>
+      ) : (
+        <EmptyState title="No progress notes yet" message="Structured progress notes will appear here after they are saved." />
+      )}
+    </AppShell>
+  );
+}
+
 export function SimpleModulePage({ kind }: { kind: ModuleKind }) {
   const [notice, setNotice] = useState("Loading records from Supabase.");
   const [items, setItems] = useState<ModuleItem[]>([]);
@@ -654,8 +809,11 @@ function WorkerProgressNoteForm({ workerName, workerEmail, participants }: { wor
         participant_name: get(form, "participant"),
         worker_name: workerName,
         worker_email: workerEmail,
+        service_date: new Date().toISOString().slice(0, 10),
         category: get(form, "category"),
         note,
+        outcomes: get(form, "outcomes"),
+        digital_signature: get(form, "signature"),
         is_important: get(form, "important") === "Important"
       },
       setNotice,
@@ -680,6 +838,8 @@ function WorkerProgressNoteForm({ workerName, workerEmail, participants }: { wor
           <Select name="category" label="Support category" options={["Self care", "Community access", "Medication prompt", "Meal preparation", "Behaviour support", "Transport assistance"]} />
           <Select name="important" label="Priority" options={["Important", "Standard"]} />
           <Area name="note" label="Progress note details" placeholder="Write the support provided, outcomes, changes, and follow-up required." />
+          <Area name="outcomes" label="Outcomes" placeholder="Record achieved goals, progress, risks, and follow-up actions." />
+          <Field name="signature" label="Digital signature" placeholder="Type full name as signature" />
         </RecordForm>
       )}
       <p className="mt-3 text-sm text-slate-500">{notice}</p>
@@ -1121,6 +1281,16 @@ async function getCurrentUserContext(): Promise<{ role: UserRole; email: string 
   return { role, email: user.email ?? "" };
 }
 
+async function getCurrentUserName() {
+  if (!supabase) return "";
+  const { data } = await supabase.auth.getUser();
+  const user = data.user;
+  if (!user) return "";
+  if (user.user_metadata?.full_name) return String(user.user_metadata.full_name);
+  const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+  return String(profile?.full_name || user.email || user.id);
+}
+
 async function loadWorkers(): Promise<WorkerRecord[]> {
   if (!isSupabaseConfigured || !supabase) return [];
   const { data, error } = await supabase.from("support_workers").select("*").order("created_at", { ascending: false });
@@ -1138,6 +1308,29 @@ async function loadWorkers(): Promise<WorkerRecord[]> {
       assigned: shifts.filter((shift) => shift.worker === name).length
     };
   });
+}
+
+async function loadProgressNotes(workerEmail?: string): Promise<ProgressNoteRecord[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  let query = supabase.from("progress_notes").select("*").order("created_at", { ascending: false });
+  if (workerEmail) query = query.eq("worker_email", workerEmail);
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: String(row.id ?? `${row.participant_name}-${row.created_at}`),
+    participantName: String(row.participant_name ?? ""),
+    workerName: String(row.worker_name ?? ""),
+    workerEmail: String(row.worker_email ?? ""),
+    serviceDate: String(row.service_date ?? ""),
+    startTime: normalizeTime(String(row.start_time ?? "")),
+    endTime: normalizeTime(String(row.end_time ?? "")),
+    category: String(row.category ?? ""),
+    note: String(row.note ?? ""),
+    outcomes: String(row.outcomes ?? ""),
+    signature: String(row.digital_signature ?? ""),
+    isImportant: Boolean(row.is_important),
+    createdAt: String(row.created_at ?? "")
+  }));
 }
 
 async function loadShifts(workerEmail?: string): Promise<ShiftRecord[]> {
@@ -1305,6 +1498,11 @@ function timeOnly(value: string) {
     return date.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit", hour12: false });
   }
   return value.split("T")[1] || value;
+}
+
+function normalizeTime(value: string) {
+  if (!value) return "";
+  return value.slice(0, 5);
 }
 
 function shortName(name: string) {

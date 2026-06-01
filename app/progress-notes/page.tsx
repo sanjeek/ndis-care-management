@@ -1,5 +1,5 @@
-import { SimpleModulePage } from "@/components/module-pages";
+import { ProgressNotesPage } from "@/components/module-pages";
 
 export default function Page() {
-  return <SimpleModulePage kind="notes" />;
+  return <ProgressNotesPage />;
 }
