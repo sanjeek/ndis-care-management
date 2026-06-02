@@ -20,6 +20,7 @@ const backupTables = [
   "medication_records",
   "medication_events",
   "ndis_funding_records",
+  "service_agreements",
   "care_documents",
   "app_notifications",
   "email_notifications",

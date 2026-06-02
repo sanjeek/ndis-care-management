@@ -16,6 +16,7 @@ const restoreOrder = [
   "medication_records",
   "medication_events",
   "ndis_funding_records",
+  "service_agreements",
   "care_documents",
   "audit_logs"
 ];
