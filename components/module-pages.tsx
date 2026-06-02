@@ -50,6 +50,17 @@ type WorkerRecord = {
   assigned: number;
 };
 
+type AvailabilityRecord = {
+  id: string;
+  workerName: string;
+  workerEmail: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  notes: string;
+};
+
 type ShiftRecord = {
   id: string;
   time: string;
@@ -131,6 +142,7 @@ type DashboardMetrics = {
 };
 
 const statuses = ["Draft", "Offered", "Confirmed", "In progress", "Completed"];
+const availabilityStatuses = ["available", "preferred", "unavailable"];
 const incidentSeverities = ["Low", "Medium", "High", "Critical"];
 const incidentStatuses = ["Submitted", "Under review", "Investigation", "Action required", "Closed"];
 const reportableIncidentTypes = ["Not reportable", "Death", "Serious injury", "Abuse or neglect", "Unlawful sexual or physical contact", "Sexual misconduct", "Unauthorised restrictive practice"];
@@ -383,6 +395,7 @@ export function WorkerPortalPage() {
   const [workerNameFromSession, setWorkerNameFromSession] = useState("");
   const [visibleShifts, setVisibleShifts] = useState<ShiftRecord[]>([]);
   const [visibleParticipants, setVisibleParticipants] = useState<ParticipantRecord[]>([]);
+  const [availability, setAvailability] = useState<AvailabilityRecord[]>([]);
   const [notice, setNotice] = useState("Loading your worker portal.");
 
   const refresh = useCallback(async () => {
@@ -393,10 +406,12 @@ export function WorkerPortalPage() {
       const name = String(user?.user_metadata?.full_name || user?.email || user?.id || "");
       const shifts = email ? await loadShifts(email) : [];
       const participants = await loadParticipantsForShifts(shifts);
+      const availabilityRows = email ? await loadWorkerAvailability(email) : [];
       setWorkerEmail(email);
       setWorkerNameFromSession(name);
       setVisibleShifts(shifts);
       setVisibleParticipants(participants);
+      setAvailability(availabilityRows);
       setNotice(shifts.length ? "Clock shifts, submit notes, and report incidents from your phone." : "No assigned shifts are linked to this login yet.");
   }, []);
 
@@ -454,6 +469,7 @@ export function WorkerPortalPage() {
         <div className="space-y-6">
           <WorkerProgressNoteForm workerName={workerName} workerEmail={workerEmail} participants={visibleParticipants} />
           <WorkerIncidentForm workerName={workerName} workerEmail={workerEmail} participants={visibleParticipants} />
+          <WorkerAvailabilityForm workerName={workerName} workerEmail={workerEmail} availability={availability} onSaved={refresh} setNotice={setNotice} />
           <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="font-semibold text-ink">Important worker reminders</h2>
             <div className="mt-4 grid gap-3">
@@ -645,14 +661,16 @@ export function RosteringPage() {
   const [shifts, setShifts] = useState<ShiftRecord[]>([]);
   const [participants, setParticipants] = useState<ParticipantRecord[]>([]);
   const [workers, setWorkers] = useState<WorkerRecord[]>([]);
+  const [availability, setAvailability] = useState<AvailabilityRecord[]>([]);
   const [notice, setNotice] = useState("Loading scheduler records from Supabase.");
   const [createOpen, setCreateOpen] = useState(false);
 
   const refresh = useCallback(async () => {
-    const [loadedShifts, loadedParticipants, loadedWorkers] = await Promise.all([loadShifts(), loadParticipants(), loadWorkers()]);
+    const [loadedShifts, loadedParticipants, loadedWorkers, loadedAvailability] = await Promise.all([loadShifts(), loadParticipants(), loadWorkers(), loadWorkerAvailability()]);
     setShifts(loadedShifts);
     setParticipants(loadedParticipants);
     setWorkers(loadedWorkers);
+    setAvailability(loadedAvailability);
     setNotice(loadedShifts.length ? "Showing shifts from the database." : "No shifts yet. Add a shift to build the roster.");
   }, []);
 
@@ -686,7 +704,7 @@ export function RosteringPage() {
   return (
     <AppShell title="Rostering / Shifts" eyebrow={notice}>
       <SchedulerGrid shifts={shifts} workers={workers} onAddShift={() => setCreateOpen(true)} />
-      {createOpen ? <ShiftCreateModal participants={participants} workers={workers} onClose={() => setCreateOpen(false)} onSubmit={submit} /> : null}
+      {createOpen ? <ShiftCreateModal participants={participants} workers={workers} availability={availability} onClose={() => setCreateOpen(false)} onSubmit={submit} /> : null}
     </AppShell>
   );
 }
@@ -1249,6 +1267,74 @@ function WorkerIncidentForm({ workerName, workerEmail, participants }: { workerN
   );
 }
 
+function WorkerAvailabilityForm({
+  workerName,
+  workerEmail,
+  availability,
+  onSaved,
+  setNotice
+}: {
+  workerName: string;
+  workerEmail: string;
+  availability: AvailabilityRecord[];
+  onSaved: () => Promise<void>;
+  setNotice: (message: string) => void;
+}) {
+  async function submit(form: FormData) {
+    const ok = await postJson(
+      "/api/availability",
+      {
+        worker_name: workerName,
+        worker_email: workerEmail,
+        available_date: get(form, "availableDate"),
+        start_time: get(form, "startTime"),
+        end_time: get(form, "endTime"),
+        availability_status: get(form, "status"),
+        notes: get(form, "notes")
+      },
+      setNotice
+    );
+    if (ok) await onSaved();
+  }
+
+  return (
+    <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="font-semibold text-ink">My availability</h2>
+          <p className="mt-1 text-sm text-slate-500">Submit the dates and times you can work.</p>
+        </div>
+        <CalendarDays className="h-5 w-5 text-gumleaf" />
+      </div>
+      <RecordForm submitLabel="Submit availability" onSubmit={submit}>
+        <Field name="availableDate" label="Date" type="date" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field name="startTime" label="Start time" type="time" />
+          <Field name="endTime" label="End time" type="time" />
+        </div>
+        <Select name="status" label="Status" options={availabilityStatuses} />
+        <OptionalArea name="notes" label="Notes" placeholder="Preferred locations, transport limits, sleepover notes, or leave details" />
+      </RecordForm>
+      {availability.length ? (
+        <div className="grid gap-2">
+          {availability.slice(0, 4).map((slot) => (
+            <div key={slot.id} className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-semibold text-ink">{formatDateLabel(slot.date)}</p>
+                <span className={`rounded px-2 py-1 text-xs font-semibold ${availabilityBadge(slot.status)}`}>{friendlyAvailability(slot.status)}</span>
+              </div>
+              <p className="mt-1 text-slate-600">{formatTimeRange(slot.startTime, slot.endTime)}</p>
+              {slot.notes ? <p className="mt-1 text-xs text-slate-500">{slot.notes}</p> : null}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyWorkerState title="No availability submitted" message="Your submitted availability will appear here." />
+      )}
+    </section>
+  );
+}
+
 function WorkerShiftMobilePanel({ shifts, onClock, onSubmit }: { shifts: ShiftRecord[]; onClock: (shiftId: string, action: "in" | "out") => Promise<void>; onSubmit: (shiftId: string) => Promise<void> }) {
   const nextShift = shifts.find((shift) => !shift.clockOutAt) ?? shifts[0];
 
@@ -1563,11 +1649,36 @@ function StaffScheduleRow({ worker, hours }: { worker: WorkerRecord; hours: numb
   );
 }
 
-function ShiftCreateModal({ participants, workers, onClose, onSubmit }: { participants: ParticipantRecord[]; workers: WorkerRecord[]; onClose: () => void; onSubmit: (form: FormData) => Promise<void> }) {
+function ShiftCreateModal({
+  participants,
+  workers,
+  availability,
+  onClose,
+  onSubmit
+}: {
+  participants: ParticipantRecord[];
+  workers: WorkerRecord[];
+  availability: AvailabilityRecord[];
+  onClose: () => void;
+  onSubmit: (form: FormData) => Promise<void>;
+}) {
+  const [selectedWorker, setSelectedWorker] = useState(workers[0]?.name ?? "");
+  const [startValue, setStartValue] = useState("");
+  const [endValue, setEndValue] = useState("");
   const canCreate = participants.length > 0 && workers.length > 0;
+  const selectedWorkerEmail = workers.find((worker) => worker.name === selectedWorker)?.email ?? "";
+  const workerAvailability = availability
+    .filter((slot) => slot.workerEmail.toLowerCase() === selectedWorkerEmail.toLowerCase())
+    .slice(0, 6);
+
+  function applyAvailability(slot: AvailabilityRecord) {
+    setStartValue(toDateTimeLocal(slot.date, slot.startTime));
+    setEndValue(toDateTimeLocal(slot.date, slot.endTime));
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-ink/45 px-4 py-6 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" aria-labelledby="create-shift-title">
-      <div className="w-full max-w-xl rounded border border-slate-200 bg-white shadow-2xl">
+      <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-gumleaf">Weekly scheduler</p>
@@ -1581,11 +1692,58 @@ function ShiftCreateModal({ participants, workers, onClose, onSubmit }: { partic
           {canCreate ? (
             <RecordForm submitLabel="Save shift" onSubmit={onSubmit}>
               <Select name="participant" label="Participant" options={participants.map((participant) => participant.name)} />
-              <Select name="worker" label="Assign support worker" options={workers.map((item) => item.name)} />
+              <label>
+                <span className="mb-2 block text-sm font-medium text-slate-700">Assign support worker</span>
+                <select
+                  name="worker"
+                  required
+                  value={selectedWorker}
+                  onChange={(event) => setSelectedWorker(event.target.value)}
+                  className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15"
+                >
+                  {workers.map((worker) => (
+                    <option key={worker.email || worker.name}>{worker.name}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="rounded border border-slate-200 bg-slate-50 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-ink">Submitted availability</p>
+                  <span className="text-xs text-slate-500">{selectedWorker || "Select worker"}</span>
+                </div>
+                {workerAvailability.length ? (
+                  <div className="mt-3 grid gap-2">
+                    {workerAvailability.map((slot) => (
+                      <div key={slot.id} className="flex flex-col gap-2 rounded border border-slate-200 bg-white p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="font-semibold text-ink">{formatDateLabel(slot.date)} | {formatTimeRange(slot.startTime, slot.endTime)}</p>
+                          <p className="mt-1 text-xs text-slate-500">{friendlyAvailability(slot.status)}{slot.notes ? ` | ${slot.notes}` : ""}</p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={slot.status === "unavailable"}
+                          onClick={() => applyAvailability(slot)}
+                          className="rounded border border-gumleaf/30 px-3 py-2 text-xs font-semibold text-gumleaf hover:bg-gumleaf/5 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                        >
+                          {slot.status === "unavailable" ? "Unavailable" : "Use time"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-slate-500">No submitted availability for this support worker yet.</p>
+                )}
+              </div>
               <Field name="location" label="Location" placeholder="Shift location" />
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field name="start" label="Start time" type="datetime-local" />
-                <Field name="end" label="End time" type="datetime-local" />
+                <label>
+                  <span className="mb-2 block text-sm font-medium text-slate-700">Start time</span>
+                  <input name="start" type="datetime-local" required value={startValue} onChange={(event) => setStartValue(event.target.value)} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
+                </label>
+                <label>
+                  <span className="mb-2 block text-sm font-medium text-slate-700">End time</span>
+                  <input name="end" type="datetime-local" required value={endValue} onChange={(event) => setEndValue(event.target.value)} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
+                </label>
               </div>
               <Select name="status" label="Shift status" options={statuses} />
             </RecordForm>
@@ -1656,6 +1814,15 @@ function Area({ name, label, defaultValue = "", placeholder = "" }: { name: stri
     <label>
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
       <textarea name={name} required rows={3} defaultValue={defaultValue} placeholder={placeholder} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
+    </label>
+  );
+}
+
+function OptionalArea({ name, label, defaultValue = "", placeholder = "" }: { name: string; label: string; defaultValue?: string; placeholder?: string }) {
+  return (
+    <label>
+      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+      <textarea name={name} rows={3} defaultValue={defaultValue} placeholder={placeholder} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
     </label>
   );
 }
@@ -1761,6 +1928,24 @@ async function loadWorkers(): Promise<WorkerRecord[]> {
       assigned: shifts.filter((shift) => shift.worker === name).length
     };
   });
+}
+
+async function loadWorkerAvailability(workerEmail?: string): Promise<AvailabilityRecord[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  let query = supabase.from("worker_availability").select("*").order("available_date", { ascending: true }).order("start_time", { ascending: true });
+  if (workerEmail) query = query.eq("worker_email", workerEmail);
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: String(row.id ?? `${row.worker_email}-${row.available_date}-${row.start_time}`),
+    workerName: String(row.worker_name ?? ""),
+    workerEmail: String(row.worker_email ?? ""),
+    date: String(row.available_date ?? ""),
+    startTime: normalizeTime(String(row.start_time ?? "")),
+    endTime: normalizeTime(String(row.end_time ?? "")),
+    status: String(row.availability_status ?? "available"),
+    notes: String(row.notes ?? "")
+  }));
 }
 
 async function loadDashboardMetrics(): Promise<DashboardMetrics> {
@@ -2164,6 +2349,34 @@ function dateTimeOrFallback(value: string) {
 function normalizeTime(value: string) {
   if (!value) return "";
   return value.slice(0, 5);
+}
+
+function formatDateLabel(value: string) {
+  if (!value) return "Date not recorded";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-AU", { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
+}
+
+function formatTimeRange(start: string, end: string) {
+  return `${normalizeTime(start) || "start"} - ${normalizeTime(end) || "end"}`;
+}
+
+function toDateTimeLocal(date: string, time: string) {
+  if (!date || !time) return "";
+  return `${date}T${normalizeTime(time)}`;
+}
+
+function friendlyAvailability(status: string) {
+  if (status === "preferred") return "Preferred";
+  if (status === "unavailable") return "Unavailable";
+  return "Available";
+}
+
+function availabilityBadge(status: string) {
+  if (status === "preferred") return "bg-banksia/30 text-ink";
+  if (status === "unavailable") return "bg-coral/10 text-coral";
+  return "bg-gumleaf/10 text-gumleaf";
 }
 
 function generateIncidentNumber() {
