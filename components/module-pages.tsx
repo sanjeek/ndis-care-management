@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardPlus,
+  Download,
   Eye,
   EyeOff,
   FilePlus2,
@@ -83,7 +84,27 @@ type ProgressNoteRecord = {
   createdAt: string;
 };
 
+type IncidentManagementRecord = {
+  id: string;
+  incidentNumber: string;
+  participantName: string;
+  workerName: string;
+  workerEmail: string;
+  staffInvolved: string;
+  severity: string;
+  incidentDate: string;
+  incidentTime: string;
+  location: string;
+  summary: string;
+  investigationNotes: string;
+  status: string;
+  attachmentNames: string[];
+  createdAt: string;
+};
+
 const statuses = ["Draft", "Offered", "Confirmed", "In progress", "Completed"];
+const incidentSeverities = ["Low", "Medium", "High", "Critical"];
+const incidentStatuses = ["Submitted", "Under review", "Investigation", "Action required", "Closed"];
 type ModuleKind = "timesheets" | "notes" | "incidents" | "invoices" | "documents" | "settings";
 
 export function DashboardPage() {
@@ -692,6 +713,190 @@ export function ProgressNotesPage() {
   );
 }
 
+export function IncidentManagementPage() {
+  const [incidents, setIncidents] = useState<IncidentManagementRecord[]>([]);
+  const [participants, setParticipants] = useState<ParticipantRecord[]>([]);
+  const [workers, setWorkers] = useState<WorkerRecord[]>([]);
+  const [context, setContext] = useState<{ role: UserRole; email: string; name: string }>({ role: "support_worker", email: "", name: "" });
+  const [incidentNumber, setIncidentNumber] = useState(() => generateIncidentNumber());
+  const [notice, setNotice] = useState("Loading incident records from Supabase.");
+
+  const refresh = useCallback(async () => {
+    const userContext = await getCurrentUserContext();
+    const userName = await getCurrentUserName();
+    const assignedShifts = userContext.role === "support_worker" && userContext.email ? await loadShifts(userContext.email) : [];
+    const [loadedIncidents, loadedParticipants, loadedWorkers] = await Promise.all([
+      loadIncidentRecords(userContext.role === "support_worker" ? userContext.email : undefined),
+      userContext.role === "support_worker" ? loadParticipantsForShifts(assignedShifts) : loadParticipants(),
+      userContext.role === "support_worker" ? Promise.resolve([]) : loadWorkers()
+    ]);
+    setContext({ ...userContext, name: assignedShifts[0]?.worker || userName || userContext.email });
+    setIncidents(loadedIncidents);
+    setParticipants(loadedParticipants);
+    setWorkers(loadedWorkers);
+    setNotice(
+      loadedIncidents.length
+        ? userContext.role === "support_worker"
+          ? "Showing only incidents linked to your assigned participants."
+          : "Showing all incident records from the database."
+        : "No incident reports recorded yet."
+    );
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  async function submit(form: FormData) {
+    if (!supabase) {
+      setNotice("Supabase is not connected, so the incident was not saved.");
+      return;
+    }
+
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) {
+      setNotice("Please sign in again before submitting an incident.");
+      return;
+    }
+
+    const participantName = get(form, "participant");
+    const staffName = context.role === "support_worker" ? context.name : get(form, "staff");
+    const staffEmail = context.role === "support_worker" ? context.email : workers.find((worker) => worker.name === staffName)?.email ?? "";
+    form.set("incidentNumber", incidentNumber);
+    form.set("participantName", participantName);
+    form.set("staffName", staffName);
+    form.set("staffEmail", staffEmail);
+
+    const response = await fetch("/api/incidents", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form
+    });
+    const result = await response.json().catch(() => ({ message: "Incident could not be saved." }));
+    setNotice(response.ok ? "Incident saved and status tracking started." : result.message);
+
+    if (response.ok) {
+      setIncidentNumber(generateIncidentNumber());
+      await refresh();
+    }
+  }
+
+  async function openAttachment(incidentId: string, index: number) {
+    if (!supabase) return;
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) {
+      setNotice("Please sign in again before opening the attachment.");
+      return;
+    }
+    const response = await fetch(`/api/incidents/${incidentId}/attachments/${index}/download`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const result = await response.json().catch(() => ({ message: "Attachment could not be opened." }));
+    if (!response.ok || !result.url) {
+      setNotice(result.message);
+      return;
+    }
+    window.open(result.url, "_blank", "noopener,noreferrer");
+  }
+
+  const canSubmit = participants.length > 0 && (context.role === "support_worker" || workers.length > 0);
+
+  return (
+    <AppShell title="Incident Management" eyebrow={notice}>
+      <section className="mb-6 rounded border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-5 flex flex-col gap-2">
+          <h2 className="text-lg font-semibold text-ink">New incident report</h2>
+          <p className="text-sm text-slate-500">Generate an incident number, record severity, attach evidence, and track investigation status.</p>
+        </div>
+        {canSubmit ? (
+          <RecordForm submitLabel="Save incident" onSubmit={submit}>
+            <input type="hidden" name="incidentNumber" value={incidentNumber} />
+            <div className="grid gap-4 lg:grid-cols-2">
+              <ReadOnlyField label="Incident number" value={incidentNumber} />
+              <Select name="severity" label="Severity level" options={incidentSeverities} />
+              <Select name="participant" label="Participant involved" options={participants.map((participant) => participant.name)} />
+              {context.role === "support_worker" ? (
+                <ReadOnlyField label="Staff involved" value={context.name || context.email || "Current worker"} />
+              ) : (
+                <Select name="staff" label="Staff involved" options={workers.map((worker) => worker.name)} />
+              )}
+              <Field name="incidentDate" label="Incident date" type="date" />
+              <Field name="incidentTime" label="Incident time" type="time" />
+              <Field name="location" label="Location" placeholder="Where the incident occurred" />
+              <Select name="status" label="Status" options={incidentStatuses} />
+              <div className="lg:col-span-2">
+                <Area name="summary" label="Incident details" placeholder="Describe what happened, immediate response, people notified, and current risk." />
+              </div>
+              <div className="lg:col-span-2">
+                <Area name="investigationNotes" label="Investigation notes" placeholder="Record investigation findings, follow-up actions, and manager review notes." />
+              </div>
+              <div className="lg:col-span-2">
+                <FileField name="attachments" label="Attachments" />
+              </div>
+            </div>
+          </RecordForm>
+        ) : (
+          <EmptyState
+            title="Incident setup required"
+            message={context.role === "support_worker" ? "You can submit incidents after a participant is assigned to one of your shifts." : "Add at least one participant and support worker before creating incident records."}
+          />
+        )}
+      </section>
+
+      {incidents.length ? (
+        <div className="grid gap-4 xl:grid-cols-2">
+          {incidents.map((incident) => (
+            <article key={incident.id} className="rounded border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gumleaf">{incident.incidentNumber || "Incident"}</p>
+                  <h2 className="mt-1 text-lg font-semibold text-ink">{incident.participantName || "Participant not recorded"}</h2>
+                  <p className="text-sm text-slate-500">Staff: {incident.staffInvolved || incident.workerName || incident.workerEmail || "Not recorded"}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <span className="rounded bg-coral/10 px-2.5 py-1 text-xs font-semibold text-coral">{incident.severity || "Severity not set"}</span>
+                  <span className="rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{incident.status || "Submitted"}</span>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <Info label="Date" value={incident.incidentDate || "Not recorded"} />
+                <Info label="Time" value={incident.incidentTime || "Not recorded"} />
+                <Info label="Location" value={incident.location || "Not recorded"} />
+              </div>
+              <Info label="Incident details" value={incident.summary || "Not recorded"} />
+              <Info label="Investigation notes" value={incident.investigationNotes || "Not recorded"} />
+              <div className="mt-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Attachments</p>
+                {incident.attachmentNames.length ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {incident.attachmentNames.map((name, index) => (
+                      <button
+                        type="button"
+                        key={`${incident.id}-${name}-${index}`}
+                        onClick={() => void openAttachment(incident.id, index)}
+                        className="inline-flex items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-gumleaf/40 hover:bg-gumleaf/5"
+                      >
+                        <Download className="h-3.5 w-3.5 text-gumleaf" />
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-sm text-slate-500">No attachments uploaded.</p>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <EmptyState title="No incident records yet" message="Incident reports will appear here after they are saved." />
+      )}
+    </AppShell>
+  );
+}
+
 export function SimpleModulePage({ kind }: { kind: ModuleKind }) {
   const [notice, setNotice] = useState("Loading records from Supabase.");
   const [items, setItems] = useState<ModuleItem[]>([]);
@@ -1235,6 +1440,21 @@ function Select({ name, label, options }: { name: string; label: string; options
   );
 }
 
+function FileField({ name, label }: { name: string; label: string }) {
+  return (
+    <label>
+      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+      <input
+        name={name}
+        type="file"
+        multiple
+        className="w-full rounded border border-dashed border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 file:mr-3 file:rounded file:border-0 file:bg-gumleaf file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:border-gumleaf/40"
+      />
+      <span className="mt-2 block text-xs text-slate-500">Files are uploaded to private Supabase storage and opened through permission-checked links.</span>
+    </label>
+  );
+}
+
 function ReadOnlyField({ label, value }: { label: string; value: string }) {
   return (
     <div>
@@ -1329,6 +1549,31 @@ async function loadProgressNotes(workerEmail?: string): Promise<ProgressNoteReco
     outcomes: String(row.outcomes ?? ""),
     signature: String(row.digital_signature ?? ""),
     isImportant: Boolean(row.is_important),
+    createdAt: String(row.created_at ?? "")
+  }));
+}
+
+async function loadIncidentRecords(workerEmail?: string): Promise<IncidentManagementRecord[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  let query = supabase.from("incident_reports").select("*").order("created_at", { ascending: false });
+  if (workerEmail) query = query.eq("worker_email", workerEmail);
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: String(row.id ?? `${row.participant_name}-${row.created_at}`),
+    incidentNumber: String(row.incident_number ?? ""),
+    participantName: String(row.participant_name ?? ""),
+    workerName: String(row.worker_name ?? ""),
+    workerEmail: String(row.worker_email ?? ""),
+    staffInvolved: String(row.staff_involved ?? row.worker_name ?? ""),
+    severity: String(row.severity ?? row.priority ?? ""),
+    incidentDate: String(row.incident_date ?? ""),
+    incidentTime: normalizeTime(String(row.incident_time ?? "")),
+    location: String(row.location ?? ""),
+    summary: String(row.summary ?? ""),
+    investigationNotes: String(row.investigation_notes ?? ""),
+    status: String(row.status ?? "Submitted"),
+    attachmentNames: Array.isArray(row.attachment_names) ? (row.attachment_names as unknown[]).map((name) => String(name)) : [],
     createdAt: String(row.created_at ?? "")
   }));
 }
@@ -1517,6 +1762,13 @@ function timeOnly(value: string) {
 function normalizeTime(value: string) {
   if (!value) return "";
   return value.slice(0, 5);
+}
+
+function generateIncidentNumber() {
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10).replace(/-/g, "");
+  const stamp = String(now.getTime()).slice(-5);
+  return `INC-${date}-${stamp}`;
 }
 
 function shortName(name: string) {

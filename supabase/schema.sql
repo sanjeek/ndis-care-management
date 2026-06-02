@@ -93,17 +93,61 @@ add column if not exists digital_signature text;
 
 create table if not exists public.incident_reports (
   id uuid primary key default gen_random_uuid(),
+  incident_number text unique,
   participant_name text not null,
   worker_name text not null,
   worker_email text,
+  staff_involved text,
   priority text not null,
+  severity text,
+  incident_date date,
+  incident_time time,
+  location text,
   summary text not null,
+  investigation_notes text,
+  attachment_names text[] not null default '{}'::text[],
+  attachment_paths text[] not null default '{}'::text[],
   status text not null default 'submitted',
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 alter table public.incident_reports
 add column if not exists worker_email text;
+
+alter table public.incident_reports
+add column if not exists incident_number text;
+
+alter table public.incident_reports
+add column if not exists staff_involved text;
+
+alter table public.incident_reports
+add column if not exists severity text;
+
+alter table public.incident_reports
+add column if not exists incident_date date;
+
+alter table public.incident_reports
+add column if not exists incident_time time;
+
+alter table public.incident_reports
+add column if not exists location text;
+
+alter table public.incident_reports
+add column if not exists investigation_notes text;
+
+alter table public.incident_reports
+add column if not exists attachment_names text[] not null default '{}'::text[];
+
+alter table public.incident_reports
+add column if not exists attachment_paths text[] not null default '{}'::text[];
+
+alter table public.incident_reports
+add column if not exists updated_at timestamptz not null default now();
+
+create unique index if not exists incident_reports_incident_number_key
+on public.incident_reports (incident_number)
+where incident_number is not null;
 
 create table if not exists public.module_records (
   id uuid primary key default gen_random_uuid(),
@@ -186,6 +230,27 @@ set public = false,
     file_size_limit = excluded.file_size_limit,
     allowed_mime_types = excluded.allowed_mime_types;
 
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'incident-attachments',
+  'incident-attachments',
+  false,
+  52428800,
+  array[
+    'application/pdf',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/plain'
+  ]
+)
+on conflict (id) do update
+set public = false,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
+
 drop policy if exists "Authenticated users can manage participants" on public.participants;
 drop policy if exists "Authenticated users can manage support workers" on public.support_workers;
 drop policy if exists "Authenticated users can manage worker invitations" on public.worker_invitations;
@@ -219,6 +284,7 @@ drop policy if exists "Workers can read assigned care documents" on public.care_
 drop policy if exists "Admins can read audit logs" on public.audit_logs;
 drop policy if exists "Users can create own audit logs" on public.audit_logs;
 drop policy if exists "No public storage access to care documents" on storage.objects;
+drop policy if exists "No public storage access to incident attachments" on storage.objects;
 
 create or replace function public.current_app_role()
 returns text
@@ -473,6 +539,11 @@ create policy "No public storage access to care documents"
 on storage.objects for select
 to authenticated
 using (bucket_id = 'care-documents' and false);
+
+create policy "No public storage access to incident attachments"
+on storage.objects for select
+to authenticated
+using (bucket_id = 'incident-attachments' and false);
 
 create policy "Admins can read audit logs"
 on public.audit_logs for select
