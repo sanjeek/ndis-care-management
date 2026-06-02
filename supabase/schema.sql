@@ -533,6 +533,27 @@ create table if not exists public.medication_events (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.ndis_funding_records (
+  id uuid primary key default gen_random_uuid(),
+  participant_name text not null,
+  ndis_number text,
+  plan_type text,
+  plan_start date,
+  plan_end date,
+  plan_total_budget numeric not null default 0 check (plan_total_budget >= 0),
+  support_category text not null,
+  service_booking_reference text,
+  service_booking_amount numeric not null default 0 check (service_booking_amount >= 0),
+  spent_amount numeric not null default 0 check (spent_amount >= 0),
+  provider_reference text,
+  notes text,
+  status text not null default 'active' check (status in ('active', 'exhausted', 'closed')),
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.care_documents (
   id uuid primary key default gen_random_uuid(),
   title text not null,
@@ -618,6 +639,7 @@ alter table public.module_records enable row level security;
 alter table public.care_plans enable row level security;
 alter table public.medication_records enable row level security;
 alter table public.medication_events enable row level security;
+alter table public.ndis_funding_records enable row level security;
 alter table public.care_documents enable row level security;
 alter table public.audit_logs enable row level security;
 alter table public.backup_logs enable row level security;
@@ -639,6 +661,7 @@ alter table public.module_records force row level security;
 alter table public.care_plans force row level security;
 alter table public.medication_records force row level security;
 alter table public.medication_events force row level security;
+alter table public.ndis_funding_records force row level security;
 alter table public.care_documents force row level security;
 alter table public.audit_logs force row level security;
 alter table public.backup_logs force row level security;
@@ -747,6 +770,8 @@ drop policy if exists "Admins can manage medication events" on public.medication
 drop policy if exists "Team leaders can manage medication events" on public.medication_events;
 drop policy if exists "Workers can read assigned medication events" on public.medication_events;
 drop policy if exists "Workers can create assigned medication events" on public.medication_events;
+drop policy if exists "Admins can manage NDIS funding records" on public.ndis_funding_records;
+drop policy if exists "Team leaders can read NDIS funding records" on public.ndis_funding_records;
 drop policy if exists "Admins can manage care documents" on public.care_documents;
 drop policy if exists "Workers can read assigned care documents" on public.care_documents;
 drop policy if exists "Admins can read audit logs" on public.audit_logs;
@@ -1160,6 +1185,17 @@ with check (
   and lower(recorded_by_email) = public.current_app_email()
   and public.worker_is_assigned_to_participant(participant_name)
 );
+
+create policy "Admins can manage NDIS funding records"
+on public.ndis_funding_records for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create policy "Team leaders can read NDIS funding records"
+on public.ndis_funding_records for select
+to authenticated
+using (public.is_team_leader());
 
 create policy "Admins can manage care documents"
 on public.care_documents for all
