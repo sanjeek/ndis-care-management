@@ -162,7 +162,7 @@ export async function POST(request: Request) {
         tableName: "auth.users",
         recordId: data.user.id,
         recordLabel: email,
-        metadata: { recordType: "support_worker_login", role }
+        metadata: { recordType: "user_login", role }
       });
     }
 

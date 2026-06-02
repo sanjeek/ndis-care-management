@@ -6,6 +6,7 @@ const backupBucket = "database-backups";
 const backupTables = [
   "participants",
   "profiles",
+  "family_members",
   "support_workers",
   "worker_invitations",
   "worker_availability",

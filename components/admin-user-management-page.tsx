@@ -15,8 +15,19 @@ type ManagedUser = {
   createdAt: string;
 };
 
+type FamilyAccess = {
+  id: string;
+  family_name: string;
+  family_email: string;
+  participant_name: string;
+  relationship: string;
+  status: string;
+};
+
 export function AdminUserManagementPage() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [familyAccess, setFamilyAccess] = useState<FamilyAccess[]>([]);
+  const [participants, setParticipants] = useState<Array<{ name: string }>>([]);
   const [message, setMessage] = useState("Create and manage staff login access.");
   const [loading, setLoading] = useState(false);
 
@@ -45,9 +56,20 @@ export function AdminUserManagementPage() {
     setMessage("Admin user management ready.");
   }, [authHeaders]);
 
+  const loadFamilyAccess = useCallback(async () => {
+    const response = await fetch("/api/admin/family-members", {
+      headers: await authHeaders()
+    });
+    const result = await response.json();
+    if (!response.ok) return;
+    setFamilyAccess(result.familyMembers ?? []);
+    setParticipants(result.participants ?? []);
+  }, [authHeaders]);
+
   useEffect(() => {
     void loadUsers();
-  }, [loadUsers]);
+    void loadFamilyAccess();
+  }, [loadUsers, loadFamilyAccess]);
 
   async function createUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -87,13 +109,37 @@ export function AdminUserManagementPage() {
     if (response.ok) await loadUsers();
   }
 
+  async function approveFamilyAccess(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setLoading(true);
+    const response = await fetch("/api/admin/family-members", {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify({
+        family_name: String(form.get("familyName")),
+        family_email: String(form.get("familyEmail")),
+        participant_name: String(form.get("participant")),
+        relationship: String(form.get("relationship")),
+        status: String(form.get("status"))
+      })
+    });
+    const result = await response.json();
+    setLoading(false);
+    setMessage(result.message ?? "Family access updated.");
+    if (response.ok) {
+      event.currentTarget.reset();
+      await loadFamilyAccess();
+    }
+  }
+
   return (
     <AppShell title="User Management" eyebrow={message}>
       <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
         <section className="rounded border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-3">
             <UserPlus className="h-5 w-5 text-gumleaf" />
-            <h2 className="font-semibold text-ink">Create support worker login</h2>
+            <h2 className="font-semibold text-ink">Create user login</h2>
           </div>
           <form onSubmit={createUser} className="mt-5 grid gap-4">
             <Field name="name" label="Full name" defaultValue="" placeholder="Full name" />
@@ -104,6 +150,7 @@ export function AdminUserManagementPage() {
               <select name="role" defaultValue="support_worker" className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15">
                 <option value="support_worker">Support worker</option>
                 <option value="team_leader">Team leader</option>
+                <option value="family">Family member</option>
                 <option value="admin">Admin</option>
               </select>
             </label>
@@ -145,6 +192,51 @@ export function AdminUserManagementPage() {
           </div>
         </section>
       </div>
+      <section className="mt-6 rounded border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center gap-3">
+          <ShieldCheck className="h-5 w-5 text-gumleaf" />
+          <h2 className="font-semibold text-ink">Family portal access</h2>
+        </div>
+        <p className="mt-2 text-sm text-slate-500">Approve which family member can view each participant. Family users only see participant-facing schedule, goals, notes, and service updates.</p>
+        <form onSubmit={approveFamilyAccess} className="mt-5 grid gap-4 lg:grid-cols-5">
+          <Field name="familyName" label="Family name" defaultValue="" placeholder="Family member name" />
+          <Field name="familyEmail" label="Family email" type="email" defaultValue="" placeholder="family@example.com" />
+          <label>
+            <span className="mb-2 block text-sm font-medium text-slate-700">Participant</span>
+            <select name="participant" required className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15">
+              {participants.map((participant) => (
+                <option key={participant.name} value={participant.name}>{participant.name}</option>
+              ))}
+            </select>
+          </label>
+          <Field name="relationship" label="Relationship" defaultValue="" placeholder="Parent, guardian, nominee" />
+          <label>
+            <span className="mb-2 block text-sm font-medium text-slate-700">Status</span>
+            <select name="status" defaultValue="approved" className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15">
+              <option value="approved">Approved</option>
+              <option value="pending">Pending</option>
+              <option value="suspended">Suspended</option>
+            </select>
+          </label>
+          <button disabled={loading || !participants.length} className="inline-flex items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d625d] disabled:opacity-70 lg:col-span-5">
+            Approve family access
+          </button>
+        </form>
+        {familyAccess.length ? (
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {familyAccess.map((access) => (
+              <article key={access.id} className="rounded border border-slate-200 bg-slate-50 p-4 text-sm">
+                <p className="font-semibold text-ink">{access.family_name}</p>
+                <p className="text-slate-500">{access.family_email}</p>
+                <p className="mt-2 text-slate-700">{access.relationship} for {access.participant_name}</p>
+                <span className="mt-3 inline-flex rounded bg-gumleaf/10 px-2.5 py-1 text-xs font-semibold text-gumleaf">{access.status}</span>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-5 rounded border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">No family portal access records yet.</p>
+        )}
+      </section>
     </AppShell>
   );
 }
@@ -164,6 +256,7 @@ function UserRow({ user, disabled, onUpdate }: { user: ManagedUser; disabled: bo
           <select value={role} onChange={(event) => setRole(event.target.value as UserRole)} className="rounded border border-slate-200 bg-white px-2 py-2 text-sm text-ink">
             <option value="support_worker">Support worker</option>
             <option value="team_leader">Team leader</option>
+            <option value="family">Family member</option>
             <option value="admin">Admin</option>
           </select>
           <button disabled={disabled || role === user.role} onClick={() => onUpdate({ action: "role", userId: user.id, role })} className="rounded border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">

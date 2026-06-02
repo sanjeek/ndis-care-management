@@ -74,7 +74,7 @@ export function ProfilePage() {
           <h2 className="text-lg font-semibold text-ink">Provider details</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             {profile.organisation ? <InfoCard title="Organisation" value={profile.organisation} /> : null}
-            <InfoCard title="Portal access" value={profile.role === "support_worker" ? "Worker portal, assigned shifts, notes, and incidents" : "All provider pages"} />
+            <InfoCard title="Portal access" value={portalAccess(profile.role)} />
             <InfoCard title="Authentication" value="Supabase Auth" />
           </div>
         </section>
@@ -103,4 +103,11 @@ function InfoCard({ title, value }: { title: string; value: string }) {
       <p className="mt-2 text-sm text-slate-600">{value}</p>
     </article>
   );
+}
+
+function portalAccess(role: string) {
+  if (role === "support_worker") return "Worker portal, assigned shifts, notes, and incidents";
+  if (role === "team_leader") return "Dashboard, timesheets, and profile";
+  if (role === "family") return "Family portal only: participant schedules, goals, notes, and service updates";
+  return "All provider pages";
 }

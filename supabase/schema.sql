@@ -45,7 +45,7 @@ create table if not exists public.profiles (
   email text not null,
   full_name text,
   organisation text,
-  role text not null default 'support_worker' check (role in ('admin', 'support_worker', 'team_leader')),
+  role text not null default 'support_worker' check (role in ('admin', 'support_worker', 'team_leader', 'family')),
   active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -58,7 +58,25 @@ alter table public.profiles
 drop constraint if exists profiles_role_check;
 
 alter table public.profiles
-add constraint profiles_role_check check (role in ('admin', 'support_worker', 'team_leader'));
+add constraint profiles_role_check check (role in ('admin', 'support_worker', 'team_leader', 'family'));
+
+create table if not exists public.family_members (
+  id uuid primary key default gen_random_uuid(),
+  family_user_id uuid references auth.users(id) on delete set null,
+  family_name text not null,
+  family_email text not null,
+  participant_name text not null,
+  relationship text not null,
+  status text not null default 'approved' check (status in ('pending', 'approved', 'suspended')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists family_members_email_participant_idx
+on public.family_members (lower(family_email), participant_name);
+
+create unique index if not exists family_members_email_participant_raw_idx
+on public.family_members (family_email, participant_name);
 
 create table if not exists public.support_workers (
   id uuid primary key default gen_random_uuid(),
@@ -494,6 +512,7 @@ create table if not exists public.app_notifications (
 
 alter table public.participants enable row level security;
 alter table public.profiles enable row level security;
+alter table public.family_members enable row level security;
 alter table public.support_workers enable row level security;
 alter table public.worker_invitations enable row level security;
 alter table public.worker_availability enable row level security;
@@ -511,6 +530,7 @@ alter table public.app_notifications enable row level security;
 
 alter table public.participants force row level security;
 alter table public.profiles force row level security;
+alter table public.family_members force row level security;
 alter table public.support_workers force row level security;
 alter table public.worker_invitations force row level security;
 alter table public.worker_availability force row level security;
@@ -589,6 +609,8 @@ drop policy if exists "Authenticated users can manage incident reports" on publi
 drop policy if exists "Authenticated users can manage module records" on public.module_records;
 drop policy if exists "Users can read their profile" on public.profiles;
 drop policy if exists "Admins can manage profiles" on public.profiles;
+drop policy if exists "Admins can manage family members" on public.family_members;
+drop policy if exists "Family can read own approved participant links" on public.family_members;
 drop policy if exists "Admins can manage participants" on public.participants;
 drop policy if exists "Workers can read assigned participants" on public.participants;
 drop policy if exists "Admins can manage support workers" on public.support_workers;
@@ -729,6 +751,16 @@ as $$
     and public.current_app_role() in ('admin', 'team_leader');
 $$;
 
+create or replace function public.is_family()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.current_user_is_active() and public.current_app_role() = 'family';
+$$;
+
 create policy "Users can read their profile"
 on public.profiles for select
 to authenticated
@@ -739,6 +771,21 @@ on public.profiles for all
 to authenticated
 using (public.is_admin())
 with check (public.is_admin());
+
+create policy "Admins can manage family members"
+on public.family_members for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create policy "Family can read own approved participant links"
+on public.family_members for select
+to authenticated
+using (
+  public.is_family()
+  and status = 'approved'
+  and lower(family_email) = public.current_app_email()
+);
 
 create policy "Admins can manage participants"
 on public.participants for all
