@@ -139,6 +139,11 @@ create table if not exists public.shifts (
   allowed_latitude numeric,
   allowed_longitude numeric,
   allowed_radius_m integer not null default 250,
+  recurrence_series_id uuid,
+  recurrence_type text not null default 'single',
+  recurrence_interval_days integer,
+  recurrence_count integer not null default 1,
+  recurrence_position integer not null default 1,
   clock_in_latitude numeric,
   clock_in_longitude numeric,
   clock_in_accuracy_m numeric,
@@ -184,6 +189,21 @@ add column if not exists allowed_longitude numeric;
 
 alter table public.shifts
 add column if not exists allowed_radius_m integer not null default 250;
+
+alter table public.shifts
+add column if not exists recurrence_series_id uuid;
+
+alter table public.shifts
+add column if not exists recurrence_type text not null default 'single';
+
+alter table public.shifts
+add column if not exists recurrence_interval_days integer;
+
+alter table public.shifts
+add column if not exists recurrence_count integer not null default 1;
+
+alter table public.shifts
+add column if not exists recurrence_position integer not null default 1;
 
 alter table public.shifts
 add column if not exists clock_in_latitude numeric;

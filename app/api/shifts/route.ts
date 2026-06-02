@@ -21,6 +21,10 @@ export async function POST(request: Request) {
   const allowedLatitude = Number(body.allowed_latitude);
   const allowedLongitude = Number(body.allowed_longitude);
   const allowedRadiusM = Number(body.allowed_radius_m ?? 250);
+  const recurrenceType = String(body.recurrence_type ?? "single").trim();
+  const customIntervalDays = Number(body.custom_interval_days ?? 0);
+  const recurrenceCount = Math.min(Math.max(Number(body.recurrence_count ?? 1), 1), 60);
+  const recurrence = recurrenceConfig(recurrenceType, customIntervalDays, recurrenceCount);
 
   if (!participantName || !workerName || !workerEmail || !startsAt || !endsAt) {
     return NextResponse.json({ message: "Participant, support worker, worker email, start time, and end time are required." }, { status: 400 });
@@ -28,27 +32,49 @@ export async function POST(request: Request) {
   if (!isValidLatitude(allowedLatitude) || !isValidLongitude(allowedLongitude) || !isValidRadius(allowedRadiusM)) {
     return NextResponse.json({ message: "Valid GPS latitude, longitude, and an allowed radius between 25 and 5000 metres are required." }, { status: 400 });
   }
+  if (!recurrence) {
+    return NextResponse.json({ message: "Select a valid recurrence: single, daily, weekly, fortnightly, or custom." }, { status: 400 });
+  }
 
-  const { data: shift, error } = await auth.client
-    .from("shifts")
-    .insert({
+  const seriesId = recurrence.count > 1 ? crypto.randomUUID() : null;
+  const startDate = new Date(startsAt);
+  const endDate = new Date(endsAt);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate <= startDate) {
+    return NextResponse.json({ message: "Start and end time must be valid, and end time must be after start time." }, { status: 400 });
+  }
+  const durationMs = endDate.getTime() - startDate.getTime();
+  const rows = Array.from({ length: recurrence.count }).map((_, index) => {
+    const nextStart = new Date(startDate);
+    nextStart.setDate(startDate.getDate() + recurrence.intervalDays * index);
+    const nextEnd = new Date(nextStart.getTime() + durationMs);
+    return {
       participant_name: participantName,
       support_worker_name: workerName,
       support_worker_email: workerEmail,
       location,
-      starts_at: startsAt,
-      ends_at: endsAt,
+      starts_at: nextStart.toISOString(),
+      ends_at: nextEnd.toISOString(),
       status,
       allowed_latitude: allowedLatitude,
       allowed_longitude: allowedLongitude,
-      allowed_radius_m: Math.round(allowedRadiusM)
-    })
-    .select("id")
-    .single();
+      allowed_radius_m: Math.round(allowedRadiusM),
+      recurrence_series_id: seriesId,
+      recurrence_type: recurrence.type,
+      recurrence_interval_days: recurrence.intervalDays,
+      recurrence_count: recurrence.count,
+      recurrence_position: index + 1
+    };
+  });
+
+  const { data: shifts, error } = await auth.client
+    .from("shifts")
+    .insert(rows)
+    .select("id");
 
   if (error) {
     return NextResponse.json({ message: error.message }, { status: 400 });
   }
+  const firstShiftId = shifts?.[0]?.id ?? "";
 
   await recordServerAudit(auth.client, {
     userId: auth.user.id,
@@ -57,43 +83,45 @@ export async function POST(request: Request) {
     userRole: auth.user.role,
     action: "create",
     tableName: "shifts",
-    recordId: shift.id,
+    recordId: firstShiftId,
     recordLabel: `${participantName} shift`,
-    metadata: { participantName, workerName, workerEmail, startsAt, endsAt, status, allowedLatitude, allowedLongitude, allowedRadiusM }
+    metadata: { participantName, workerName, workerEmail, startsAt, endsAt, status, allowedLatitude, allowedLongitude, allowedRadiusM, recurrence, seriesId, createdCount: rows.length }
   });
 
   const adminRecipients = await getAdminNotificationRecipients(auth.client, { fallback: [auth.user.email] });
   await sendCareNotification(auth.client, {
     type: "new_shift",
     to: [workerEmail],
-    subject: `New shift assigned: ${participantName}`,
+    subject: rows.length > 1 ? `New recurring shifts assigned: ${participantName}` : `New shift assigned: ${participantName}`,
     text: [
-      `A new shift has been assigned to you.`,
+      rows.length > 1 ? `${rows.length} recurring shifts have been assigned to you.` : `A new shift has been assigned to you.`,
       `Participant: ${participantName}`,
       `Location: ${location || "Not recorded"}`,
       `Start: ${startsAt}`,
       `End: ${endsAt}`,
+      `Recurrence: ${recurrenceLabel(recurrence.type, recurrence.intervalDays, recurrence.count)}`,
       `Status: ${status}`,
       `Open worker portal: ${appUrl("/worker-portal")}`
     ].join("\n"),
-    metadata: { shiftId: shift.id, participantName, workerName, workerEmail, startsAt, endsAt, status, allowedLatitude, allowedLongitude, allowedRadiusM }
+    metadata: { shiftId: firstShiftId, seriesId, participantName, workerName, workerEmail, startsAt, endsAt, status, allowedLatitude, allowedLongitude, allowedRadiusM, recurrence, createdCount: rows.length }
   });
   await sendCareNotification(auth.client, {
     type: "new_shift",
     to: adminRecipients,
-    subject: `Shift created for ${participantName}`,
+    subject: rows.length > 1 ? `Recurring shift series created for ${participantName}` : `Shift created for ${participantName}`,
     text: [
-      `Shift created by ${auth.user.name} (${auth.user.email}).`,
+      rows.length > 1 ? `${rows.length} shifts created by ${auth.user.name} (${auth.user.email}).` : `Shift created by ${auth.user.name} (${auth.user.email}).`,
       `Participant: ${participantName}`,
       `Support worker: ${workerName} (${workerEmail})`,
       `Start: ${startsAt}`,
       `End: ${endsAt}`,
+      `Recurrence: ${recurrenceLabel(recurrence.type, recurrence.intervalDays, recurrence.count)}`,
       `Open roster: ${appUrl("/rostering")}`
     ].join("\n"),
-    metadata: { shiftId: shift.id, participantName, workerName, workerEmail, startsAt, endsAt, status, allowedLatitude, allowedLongitude, allowedRadiusM }
+    metadata: { shiftId: firstShiftId, seriesId, participantName, workerName, workerEmail, startsAt, endsAt, status, allowedLatitude, allowedLongitude, allowedRadiusM, recurrence, createdCount: rows.length }
   });
 
-  return NextResponse.json({ message: "Shift saved and notifications recorded.", id: shift.id });
+  return NextResponse.json({ message: rows.length > 1 ? `${rows.length} recurring shifts saved and notifications recorded.` : "Shift saved and notifications recorded.", id: firstShiftId, seriesId });
 }
 
 function isValidLatitude(value: number) {
@@ -106,4 +134,21 @@ function isValidLongitude(value: number) {
 
 function isValidRadius(value: number) {
   return Number.isFinite(value) && value >= 25 && value <= 5000;
+}
+
+function recurrenceConfig(type: string, customIntervalDays: number, count: number) {
+  if (type === "single") return { type, intervalDays: 0, count: 1 };
+  if (type === "daily") return { type, intervalDays: 1, count };
+  if (type === "weekly") return { type, intervalDays: 7, count };
+  if (type === "fortnightly") return { type, intervalDays: 14, count };
+  if (type === "custom" && Number.isFinite(customIntervalDays) && customIntervalDays >= 1 && customIntervalDays <= 365) {
+    return { type, intervalDays: Math.round(customIntervalDays), count };
+  }
+  return null;
+}
+
+function recurrenceLabel(type: string, intervalDays: number, count: number) {
+  if (type === "single") return "Single shift";
+  if (type === "custom") return `Every ${intervalDays} day${intervalDays === 1 ? "" : "s"} for ${count} shifts`;
+  return `${type} for ${count} shifts`;
 }

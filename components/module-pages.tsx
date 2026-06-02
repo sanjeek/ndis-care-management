@@ -122,6 +122,11 @@ type ShiftRecord = {
   clockOutLatitude: string;
   clockOutLongitude: string;
   clockOutDistanceM: string;
+  recurrenceSeriesId: string;
+  recurrenceType: string;
+  recurrenceIntervalDays: string;
+  recurrenceCount: string;
+  recurrencePosition: string;
   submittedAt: string;
   submittedByEmail: string;
   approvedAt: string;
@@ -190,6 +195,7 @@ type DashboardMetrics = {
 
 const statuses = ["Draft", "Offered", "Confirmed", "In progress", "Completed"];
 const availabilityStatuses = ["available", "preferred", "unavailable"];
+const recurrenceTypes = ["single", "daily", "weekly", "fortnightly", "custom"];
 const incidentSeverities = ["Low", "Medium", "High", "Critical"];
 const incidentStatuses = ["Submitted", "Under review", "Investigation", "Action required", "Closed"];
 const reportableIncidentTypes = ["Not reportable", "Death", "Serious injury", "Abuse or neglect", "Unlawful sexual or physical contact", "Sexual misconduct", "Unauthorised restrictive practice"];
@@ -1013,7 +1019,10 @@ export function RosteringPage() {
         status: get(form, "status"),
         allowed_latitude: get(form, "allowedLatitude"),
         allowed_longitude: get(form, "allowedLongitude"),
-        allowed_radius_m: get(form, "allowedRadius")
+        allowed_radius_m: get(form, "allowedRadius"),
+        recurrence_type: get(form, "recurrenceType"),
+        recurrence_count: get(form, "recurrenceCount"),
+        custom_interval_days: get(form, "customIntervalDays")
       },
       setNotice
     );
@@ -1024,6 +1033,7 @@ export function RosteringPage() {
   return (
     <AppShell title="Rostering / Shifts" eyebrow={notice}>
       <SchedulerGrid shifts={shifts} workers={workers} onAddShift={() => setCreateOpen(true)} />
+      <RecurringSeriesPanel shifts={shifts} setNotice={setNotice} onSaved={refresh} />
       {createOpen ? <ShiftCreateModal participants={participants} workers={workers} availability={availability} onClose={() => setCreateOpen(false)} onSubmit={submit} /> : null}
     </AppShell>
   );
@@ -1956,6 +1966,84 @@ function VacantShiftRow({ shifts }: { shifts: ShiftRecord[] }) {
   );
 }
 
+function RecurringSeriesPanel({ shifts, setNotice, onSaved }: { shifts: ShiftRecord[]; setNotice: (message: string) => void; onSaved: () => Promise<void> }) {
+  const series = useMemo(() => recurringSeriesSummaries(shifts), [shifts]);
+  const [selectedSeriesId, setSelectedSeriesId] = useState(series[0]?.id ?? "");
+
+  useEffect(() => {
+    if (!selectedSeriesId && series[0]?.id) setSelectedSeriesId(series[0].id);
+    if (selectedSeriesId && !series.some((item) => item.id === selectedSeriesId)) setSelectedSeriesId(series[0]?.id ?? "");
+  }, [series, selectedSeriesId]);
+
+  async function submit(form: FormData) {
+    const ok = await patchJson(
+      "/api/shifts/series",
+      {
+        series_id: get(form, "seriesId"),
+        location: get(form, "location"),
+        status: get(form, "status"),
+        allowed_latitude: get(form, "allowedLatitude"),
+        allowed_longitude: get(form, "allowedLongitude"),
+        allowed_radius_m: get(form, "allowedRadius")
+      },
+      setNotice
+    );
+    if (ok) await onSaved();
+  }
+
+  if (!series.length) {
+    return (
+      <section className="mt-6 rounded border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+        No recurring shift series yet. Use the Create shift popup and set recurrence to daily, weekly, fortnightly, or custom.
+      </section>
+    );
+  }
+
+  const selected = series.find((item) => item.id === selectedSeriesId) ?? series[0];
+
+  return (
+    <section className="mt-6 rounded border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h2 className="font-semibold text-ink">Recurring shift series</h2>
+          <p className="mt-1 text-sm text-slate-500">Bulk edit unclocked shifts in a recurring series. Completed or clocked shifts are left unchanged.</p>
+        </div>
+        <span className="w-fit rounded bg-harbour/10 px-3 py-1 text-sm font-semibold text-harbour">{series.length} series</span>
+      </div>
+      <div className="mt-4 grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+        <div className="grid gap-2">
+          {series.map((item) => (
+            <button
+              type="button"
+              key={item.id}
+              onClick={() => setSelectedSeriesId(item.id)}
+              className={`rounded border p-3 text-left text-sm ${item.id === selected.id ? "border-gumleaf bg-gumleaf/5" : "border-slate-200 bg-slate-50 hover:border-gumleaf/30"}`}
+            >
+              <p className="font-semibold text-ink">{item.participantName}</p>
+              <p className="mt-1 text-slate-600">{item.workerName} | {friendlyRecurrence(item.type, item.intervalDays, item.count)}</p>
+              <p className="mt-1 text-xs text-slate-500">{dateTimeOrFallback(item.firstStart)} to {dateTimeOrFallback(item.lastStart)}</p>
+            </button>
+          ))}
+        </div>
+        <RecordForm submitLabel="Bulk update series" onSubmit={submit}>
+          <input type="hidden" name="seriesId" value={selected.id} />
+          <div className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
+            <p className="font-semibold text-ink">{selected.participantName}</p>
+            <p className="mt-1 text-slate-600">{selected.workerName} | {selected.count} generated shifts</p>
+          </div>
+          <Field name="location" label="New location" placeholder={selected.location || "Leave blank to keep existing location"} required={false} />
+          <Select name="status" label="New shift status" options={["", ...statuses]} required={false} />
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field name="allowedLatitude" label="Allowed latitude" type="number" placeholder={selected.allowedLatitude || "-33.8688"} step="any" required={false} />
+            <Field name="allowedLongitude" label="Allowed longitude" type="number" placeholder={selected.allowedLongitude || "151.2093"} step="any" required={false} />
+            <Field name="allowedRadius" label="Radius metres" type="number" placeholder={selected.allowedRadiusM || "250"} min="25" max="5000" required={false} />
+          </div>
+        </RecordForm>
+      </div>
+    </section>
+  );
+}
+
 function StaffScheduleRow({ worker, hours }: { worker: WorkerRecord; hours: number }) {
   return (
     <div className="flex min-h-[102px] items-center gap-3 border-b border-slate-200 px-3 py-4">
@@ -2077,6 +2165,15 @@ function ShiftCreateModal({
                   <input name="end" type="datetime-local" required value={endValue} onChange={(event) => setEndValue(event.target.value)} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
                 </label>
               </div>
+              <div className="rounded border border-slate-200 bg-slate-50 p-3">
+                <p className="text-sm font-semibold text-ink">Recurring schedule</p>
+                <p className="mt-1 text-xs text-slate-500">Create daily, weekly, fortnightly, or custom repeating shifts from the selected start/end time.</p>
+                <div className="mt-3 grid gap-4 sm:grid-cols-3">
+                  <Select name="recurrenceType" label="Recurrence" options={recurrenceTypes} />
+                  <Field name="recurrenceCount" label="Number of shifts" type="number" defaultValue="1" min="1" max="60" />
+                  <Field name="customIntervalDays" label="Custom interval days" type="number" defaultValue="7" min="1" max="365" />
+                </div>
+              </div>
               <Select name="status" label="Shift status" options={statuses} />
             </RecordForm>
           ) : (
@@ -2113,7 +2210,8 @@ function Field({
   type = "text",
   step,
   min,
-  max
+  max,
+  required = true
 }: {
   name: string;
   label: string;
@@ -2123,11 +2221,12 @@ function Field({
   step?: string;
   min?: string;
   max?: string;
+  required?: boolean;
 }) {
   return (
     <label>
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
-      <input name={name} type={type} required defaultValue={defaultValue} placeholder={placeholder} step={step} min={min} max={max} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
+      <input name={name} type={type} required={required} defaultValue={defaultValue} placeholder={placeholder} step={step} min={min} max={max} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
     </label>
   );
 }
@@ -2177,13 +2276,13 @@ function OptionalArea({ name, label, defaultValue = "", placeholder = "" }: { na
   );
 }
 
-function Select({ name, label, options }: { name: string; label: string; options: string[] }) {
+function Select({ name, label, options, required = true }: { name: string; label: string; options: string[]; required?: boolean }) {
   return (
     <label>
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
-      <select name={name} required className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15">
+      <select name={name} required={required} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15">
         {options.map((option) => (
-          <option key={option}>{option}</option>
+          <option key={option} value={option}>{option || "Leave unchanged"}</option>
         ))}
       </select>
     </label>
@@ -2533,6 +2632,11 @@ async function loadShifts(workerEmail?: string): Promise<ShiftRecord[]> {
       clockOutLatitude: String(row.clock_out_latitude ?? ""),
       clockOutLongitude: String(row.clock_out_longitude ?? ""),
       clockOutDistanceM: String(row.clock_out_distance_m ?? ""),
+      recurrenceSeriesId: String(row.recurrence_series_id ?? ""),
+      recurrenceType: String(row.recurrence_type ?? "single"),
+      recurrenceIntervalDays: String(row.recurrence_interval_days ?? ""),
+      recurrenceCount: String(row.recurrence_count ?? "1"),
+      recurrencePosition: String(row.recurrence_position ?? "1"),
       submittedAt: String(row.submitted_at ?? ""),
       submittedByEmail: String(row.submitted_by_email ?? ""),
       approvedAt: String(row.approved_at ?? ""),
@@ -2624,6 +2728,29 @@ async function postJson(path: string, payload: Record<string, unknown>, setNotic
     body: JSON.stringify(payload)
   });
   const result = await response.json().catch(() => ({ message: "Save failed." }));
+  setNotice(result.message);
+  return response.ok;
+}
+
+async function patchJson(path: string, payload: Record<string, unknown>, setNotice: (message: string) => void) {
+  if (!isSupabaseConfigured || !supabase) {
+    setNotice("Supabase is not connected, so the record was not updated.");
+    return false;
+  }
+  const token = (await supabase.auth.getSession()).data.session?.access_token;
+  if (!token) {
+    setNotice("Please sign in again before updating this record.");
+    return false;
+  }
+  const response = await fetch(path, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  });
+  const result = await response.json().catch(() => ({ message: "Update failed." }));
   setNotice(result.message);
   return response.ok;
 }
@@ -2869,6 +2996,41 @@ function complianceItems(worker: WorkerRecord) {
     { label: "CPR", value: worker.cprExpiry },
     { label: "Driver's licence", value: worker.driversLicenceExpiry }
   ];
+}
+
+function recurringSeriesSummaries(shifts: ShiftRecord[]) {
+  const groups = new Map<string, ShiftRecord[]>();
+  shifts.forEach((shift) => {
+    if (!shift.recurrenceSeriesId) return;
+    groups.set(shift.recurrenceSeriesId, [...(groups.get(shift.recurrenceSeriesId) ?? []), shift]);
+  });
+  return Array.from(groups.entries()).map(([id, group]) => {
+    const ordered = [...group].sort((a, b) => new Date(a.startsAt ?? "").getTime() - new Date(b.startsAt ?? "").getTime());
+    const first = ordered[0];
+    const last = ordered[ordered.length - 1];
+    return {
+      id,
+      participantName: first?.participantName || "Participant",
+      workerName: first?.worker || "Support worker",
+      location: first?.location || "",
+      type: first?.recurrenceType || "custom",
+      intervalDays: Number(first?.recurrenceIntervalDays || 0),
+      count: ordered.length,
+      firstStart: first?.startsAt || "",
+      lastStart: last?.startsAt || "",
+      allowedLatitude: first?.allowedLatitude || "",
+      allowedLongitude: first?.allowedLongitude || "",
+      allowedRadiusM: first?.allowedRadiusM || ""
+    };
+  });
+}
+
+function friendlyRecurrence(type: string, intervalDays: number, count: number) {
+  if (type === "daily") return `Daily, ${count} shifts`;
+  if (type === "weekly") return `Weekly, ${count} shifts`;
+  if (type === "fortnightly") return `Fortnightly, ${count} shifts`;
+  if (type === "custom") return `Every ${intervalDays || "custom"} day${intervalDays === 1 ? "" : "s"}, ${count} shifts`;
+  return `${count} shifts`;
 }
 
 function workerComplianceAlerts(worker: WorkerRecord) {
