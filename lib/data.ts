@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   ClipboardCheck,
   Clock3,
+  Database,
   FileText,
   HeartHandshake,
   LayoutDashboard,
@@ -30,6 +31,7 @@ export const navItems = [
   { label: "Worker Portal", href: "/worker-portal", icon: Smartphone },
   { label: "My Shifts", href: "/my-shifts", icon: ListChecks },
   { label: "User Management", href: "/admin/users", icon: UserCog },
+  { label: "Database Backups", href: "/admin/backups", icon: Database },
   { label: "Audit Logs", href: "/admin/audit", icon: History },
   { label: "Profile", href: "/profile", icon: UserCircle },
   { label: "Settings", href: "/settings", icon: Settings }

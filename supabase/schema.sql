@@ -247,6 +247,20 @@ create table if not exists public.audit_logs (
   metadata jsonb not null default '{}'::jsonb
 );
 
+create table if not exists public.backup_logs (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  completed_at timestamptz,
+  status text not null default 'running',
+  storage_bucket text not null default 'database-backups',
+  storage_path text,
+  file_name text,
+  size_bytes bigint,
+  table_counts jsonb not null default '{}'::jsonb,
+  started_by text,
+  error_message text
+);
+
 alter table public.participants enable row level security;
 alter table public.profiles enable row level security;
 alter table public.support_workers enable row level security;
@@ -257,6 +271,7 @@ alter table public.incident_reports enable row level security;
 alter table public.module_records enable row level security;
 alter table public.care_documents enable row level security;
 alter table public.audit_logs enable row level security;
+alter table public.backup_logs enable row level security;
 
 alter table public.participants force row level security;
 alter table public.profiles force row level security;
@@ -268,6 +283,7 @@ alter table public.incident_reports force row level security;
 alter table public.module_records force row level security;
 alter table public.care_documents force row level security;
 alter table public.audit_logs force row level security;
+alter table public.backup_logs force row level security;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
@@ -310,6 +326,19 @@ set public = false,
     file_size_limit = excluded.file_size_limit,
     allowed_mime_types = excluded.allowed_mime_types;
 
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'database-backups',
+  'database-backups',
+  false,
+  104857600,
+  array['application/json']
+)
+on conflict (id) do update
+set public = false,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
+
 drop policy if exists "Authenticated users can manage participants" on public.participants;
 drop policy if exists "Authenticated users can manage support workers" on public.support_workers;
 drop policy if exists "Authenticated users can manage worker invitations" on public.worker_invitations;
@@ -342,8 +371,11 @@ drop policy if exists "Admins can manage care documents" on public.care_document
 drop policy if exists "Workers can read assigned care documents" on public.care_documents;
 drop policy if exists "Admins can read audit logs" on public.audit_logs;
 drop policy if exists "Users can create own audit logs" on public.audit_logs;
+drop policy if exists "Admins can read backup logs" on public.backup_logs;
+drop policy if exists "Admins can manage backup logs" on public.backup_logs;
 drop policy if exists "No public storage access to care documents" on storage.objects;
 drop policy if exists "No public storage access to incident attachments" on storage.objects;
+drop policy if exists "No public storage access to database backups" on storage.objects;
 
 create or replace function public.current_app_role()
 returns text
@@ -615,6 +647,11 @@ on storage.objects for select
 to authenticated
 using (bucket_id = 'incident-attachments' and false);
 
+create policy "No public storage access to database backups"
+on storage.objects for select
+to authenticated
+using (bucket_id = 'database-backups' and false);
+
 create policy "Admins can read audit logs"
 on public.audit_logs for select
 to authenticated
@@ -628,3 +665,8 @@ with check (
   and user_id = auth.uid()
   and lower(coalesce(user_email, '')) = public.current_app_email()
 );
+
+create policy "Admins can read backup logs"
+on public.backup_logs for select
+to authenticated
+using (public.is_admin());
