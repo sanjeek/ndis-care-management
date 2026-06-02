@@ -99,6 +99,20 @@ type AvailabilityRecord = {
   notes: string;
 };
 
+type LeaveRecord = {
+  id: string;
+  workerName: string;
+  workerEmail: string;
+  leaveType: string;
+  startsAt: string;
+  endsAt: string;
+  reason: string;
+  status: string;
+  reviewedByEmail: string;
+  reviewedAt: string;
+  reviewNotes: string;
+};
+
 type ShiftRecord = {
   id: string;
   time: string;
@@ -195,6 +209,7 @@ type DashboardMetrics = {
 
 const statuses = ["Draft", "Offered", "Confirmed", "In progress", "Completed"];
 const availabilityStatuses = ["available", "preferred", "unavailable"];
+const leaveTypes = ["Annual leave", "Sick leave", "Unavailable period"];
 const recurrenceTypes = ["single", "daily", "weekly", "fortnightly", "custom"];
 const incidentSeverities = ["Low", "Medium", "High", "Critical"];
 const incidentStatuses = ["Submitted", "Under review", "Investigation", "Action required", "Closed"];
@@ -719,6 +734,7 @@ export function WorkerPortalPage() {
   const [visibleShifts, setVisibleShifts] = useState<ShiftRecord[]>([]);
   const [visibleParticipants, setVisibleParticipants] = useState<ParticipantRecord[]>([]);
   const [availability, setAvailability] = useState<AvailabilityRecord[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRecord[]>([]);
   const [notice, setNotice] = useState("Loading your worker portal.");
 
   const refresh = useCallback(async () => {
@@ -730,11 +746,13 @@ export function WorkerPortalPage() {
       const shifts = email ? await loadShifts(email) : [];
       const participants = await loadParticipantsForShifts(shifts);
       const availabilityRows = email ? await loadWorkerAvailability(email) : [];
+      const leaveRows = email ? await loadWorkerLeave(email) : [];
       setWorkerEmail(email);
       setWorkerNameFromSession(name);
       setVisibleShifts(shifts);
       setVisibleParticipants(participants);
       setAvailability(availabilityRows);
+      setLeaveRequests(leaveRows);
       setNotice(shifts.length ? "Clock shifts, submit notes, and report incidents from your phone." : "No assigned shifts are linked to this login yet.");
   }, []);
 
@@ -792,6 +810,7 @@ export function WorkerPortalPage() {
         <div className="space-y-6">
           <WorkerProgressNoteForm workerName={workerName} workerEmail={workerEmail} participants={visibleParticipants} />
           <WorkerIncidentForm workerName={workerName} workerEmail={workerEmail} participants={visibleParticipants} />
+          <WorkerLeaveForm workerName={workerName} workerEmail={workerEmail} leaveRequests={leaveRequests} onSaved={refresh} setNotice={setNotice} />
           <WorkerAvailabilityForm workerName={workerName} workerEmail={workerEmail} availability={availability} onSaved={refresh} setNotice={setNotice} />
           <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="font-semibold text-ink">Important worker reminders</h2>
@@ -985,15 +1004,17 @@ export function RosteringPage() {
   const [participants, setParticipants] = useState<ParticipantRecord[]>([]);
   const [workers, setWorkers] = useState<WorkerRecord[]>([]);
   const [availability, setAvailability] = useState<AvailabilityRecord[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRecord[]>([]);
   const [notice, setNotice] = useState("Loading scheduler records from Supabase.");
   const [createOpen, setCreateOpen] = useState(false);
 
   const refresh = useCallback(async () => {
-    const [loadedShifts, loadedParticipants, loadedWorkers, loadedAvailability] = await Promise.all([loadShifts(), loadParticipants(), loadWorkers(), loadWorkerAvailability()]);
+    const [loadedShifts, loadedParticipants, loadedWorkers, loadedAvailability, loadedLeave] = await Promise.all([loadShifts(), loadParticipants(), loadWorkers(), loadWorkerAvailability(), loadWorkerLeave()]);
     setShifts(loadedShifts);
     setParticipants(loadedParticipants);
     setWorkers(loadedWorkers);
     setAvailability(loadedAvailability);
+    setLeaveRequests(loadedLeave);
     setNotice(loadedShifts.length ? "Showing shifts from the database." : "No shifts yet. Add a shift to build the roster.");
   }, []);
 
@@ -1033,8 +1054,9 @@ export function RosteringPage() {
   return (
     <AppShell title="Rostering / Shifts" eyebrow={notice}>
       <SchedulerGrid shifts={shifts} workers={workers} onAddShift={() => setCreateOpen(true)} />
+      <LeaveManagementPanel leaveRequests={leaveRequests} workers={workers} setNotice={setNotice} onSaved={refresh} />
       <RecurringSeriesPanel shifts={shifts} setNotice={setNotice} onSaved={refresh} />
-      {createOpen ? <ShiftCreateModal participants={participants} workers={workers} availability={availability} onClose={() => setCreateOpen(false)} onSubmit={submit} /> : null}
+      {createOpen ? <ShiftCreateModal participants={participants} workers={workers} availability={availability} leaveRequests={leaveRequests} onClose={() => setCreateOpen(false)} onSubmit={submit} /> : null}
     </AppShell>
   );
 }
@@ -1597,6 +1619,73 @@ function WorkerIncidentForm({ workerName, workerEmail, participants }: { workerN
   );
 }
 
+function WorkerLeaveForm({
+  workerName,
+  workerEmail,
+  leaveRequests,
+  onSaved,
+  setNotice
+}: {
+  workerName: string;
+  workerEmail: string;
+  leaveRequests: LeaveRecord[];
+  onSaved: () => Promise<void>;
+  setNotice: (message: string) => void;
+}) {
+  async function submit(form: FormData) {
+    const ok = await postJson(
+      "/api/leave",
+      {
+        worker_name: workerName,
+        worker_email: workerEmail,
+        leave_type: get(form, "leaveType"),
+        starts_at: get(form, "startsAt"),
+        ends_at: get(form, "endsAt"),
+        reason: get(form, "reason")
+      },
+      setNotice
+    );
+    if (ok) await onSaved();
+  }
+
+  return (
+    <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="font-semibold text-ink">Leave management</h2>
+          <p className="mt-1 text-sm text-slate-500">Request annual leave, sick leave, or unavailable periods. Approved leave blocks scheduling.</p>
+        </div>
+        <CalendarPlus className="h-5 w-5 text-gumleaf" />
+      </div>
+      <RecordForm submitLabel="Submit leave request" onSubmit={submit}>
+        <Select name="leaveType" label="Leave type" options={leaveTypes} />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field name="startsAt" label="Start" type="datetime-local" />
+          <Field name="endsAt" label="End" type="datetime-local" />
+        </div>
+        <OptionalArea name="reason" label="Reason / notes" placeholder="Annual leave, sick leave, appointment, training, or unavailable period details" />
+      </RecordForm>
+      {leaveRequests.length ? (
+        <div className="grid gap-2">
+          {leaveRequests.slice(0, 4).map((leave) => (
+            <div key={leave.id} className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-semibold text-ink">{friendlyLeaveType(leave.leaveType)}</p>
+                <span className={`rounded px-2 py-1 text-xs font-semibold ${leaveStatusBadge(leave.status)}`}>{friendlyLeaveStatus(leave.status)}</span>
+              </div>
+              <p className="mt-1 text-slate-600">{dateTimeOrFallback(leave.startsAt)} to {dateTimeOrFallback(leave.endsAt)}</p>
+              {leave.reason ? <p className="mt-1 text-xs text-slate-500">{leave.reason}</p> : null}
+              {leave.reviewNotes ? <p className="mt-1 text-xs text-slate-500">Review: {leave.reviewNotes}</p> : null}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyWorkerState title="No leave requests" message="Your annual leave, sick leave, and unavailable period requests will appear here." />
+      )}
+    </section>
+  );
+}
+
 function WorkerAvailabilityForm({
   workerName,
   workerEmail,
@@ -1953,6 +2042,105 @@ function ScheduleRow({ worker, shifts }: { worker: WorkerRecord; shifts: ShiftRe
   );
 }
 
+function LeaveManagementPanel({ leaveRequests, workers, setNotice, onSaved }: { leaveRequests: LeaveRecord[]; workers: WorkerRecord[]; setNotice: (message: string) => void; onSaved: () => Promise<void> }) {
+  const [reviewNoteById, setReviewNoteById] = useState<Record<string, string>>({});
+
+  async function createAdminLeave(form: FormData) {
+    const workerName = get(form, "worker");
+    const worker = workers.find((item) => item.name === workerName);
+    const ok = await postJson(
+      "/api/leave",
+      {
+        worker_name: workerName,
+        worker_email: worker?.email ?? "",
+        leave_type: get(form, "leaveType"),
+        starts_at: get(form, "startsAt"),
+        ends_at: get(form, "endsAt"),
+        reason: get(form, "reason"),
+        status: get(form, "status")
+      },
+      setNotice
+    );
+    if (ok) await onSaved();
+  }
+
+  async function reviewLeave(id: string, status: "approved" | "rejected" | "cancelled") {
+    const ok = await patchJson(
+      "/api/leave",
+      {
+        id,
+        status,
+        review_notes: reviewNoteById[id] ?? ""
+      },
+      setNotice
+    );
+    if (ok) await onSaved();
+  }
+
+  const pending = leaveRequests.filter((leave) => leave.status === "pending");
+  const approved = leaveRequests.filter((leave) => leave.status === "approved");
+
+  return (
+    <section className="mt-6 rounded border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h2 className="font-semibold text-ink">Leave management</h2>
+          <p className="mt-1 text-sm text-slate-500">Review annual leave, sick leave, and unavailable periods. Approved leave blocks new shifts automatically.</p>
+        </div>
+        <span className="w-fit rounded bg-gumleaf/10 px-3 py-1 text-sm font-semibold text-gumleaf">{approved.length} approved blocks</span>
+      </div>
+      <div className="mt-4 grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+        <RecordForm submitLabel="Add leave block" onSubmit={createAdminLeave}>
+          <Select name="worker" label="Support worker" options={workers.map((worker) => worker.name)} />
+          <Select name="leaveType" label="Leave type" options={leaveTypes} />
+          <Select name="status" label="Status" options={["Pending", "Approved"]} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field name="startsAt" label="Start" type="datetime-local" />
+            <Field name="endsAt" label="End" type="datetime-local" />
+          </div>
+          <OptionalArea name="reason" label="Reason / notes" placeholder="Annual leave, sick leave, appointment, training, or unavailable period details" />
+        </RecordForm>
+        <div className="grid gap-3">
+          {leaveRequests.length ? (
+            leaveRequests.slice(0, 8).map((leave) => (
+              <article key={leave.id} className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="font-semibold text-ink">{leave.workerName}</p>
+                    <p className="mt-1 text-slate-600">{friendlyLeaveType(leave.leaveType)} | {dateTimeOrFallback(leave.startsAt)} to {dateTimeOrFallback(leave.endsAt)}</p>
+                    {leave.reason ? <p className="mt-1 text-xs text-slate-500">{leave.reason}</p> : null}
+                    {leave.reviewNotes ? <p className="mt-1 text-xs text-slate-500">Review: {leave.reviewNotes}</p> : null}
+                  </div>
+                  <span className={`w-fit rounded px-2 py-1 text-xs font-semibold ${leaveStatusBadge(leave.status)}`}>{friendlyLeaveStatus(leave.status)}</span>
+                </div>
+                {leave.status === "pending" ? (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+                    <input
+                      value={reviewNoteById[leave.id] ?? ""}
+                      onChange={(event) => setReviewNoteById({ ...reviewNoteById, [leave.id]: event.target.value })}
+                      placeholder="Review notes"
+                      className="rounded border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15"
+                    />
+                    <button type="button" onClick={() => void reviewLeave(leave.id, "approved")} className="rounded bg-gumleaf px-3 py-2 text-xs font-semibold text-white hover:bg-[#1d625d]">
+                      Approve
+                    </button>
+                    <button type="button" onClick={() => void reviewLeave(leave.id, "rejected")} className="rounded border border-coral/30 px-3 py-2 text-xs font-semibold text-coral hover:bg-coral/5">
+                      Reject
+                    </button>
+                  </div>
+                ) : null}
+              </article>
+            ))
+          ) : (
+            <EmptyWorkerState title="No leave requests" message="Worker leave requests and admin-added leave blocks will appear here." />
+          )}
+          {pending.length ? <p className="text-xs text-slate-500">{pending.length} pending leave request{pending.length === 1 ? "" : "s"} waiting for review.</p> : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function VacantShiftRow({ shifts }: { shifts: ShiftRecord[] }) {
   const vacant = shifts.filter((shift) => !shift.worker || shift.status.toLowerCase() === "unfilled").length;
   return (
@@ -2064,12 +2252,14 @@ function ShiftCreateModal({
   participants,
   workers,
   availability,
+  leaveRequests,
   onClose,
   onSubmit
 }: {
   participants: ParticipantRecord[];
   workers: WorkerRecord[];
   availability: AvailabilityRecord[];
+  leaveRequests: LeaveRecord[];
   onClose: () => void;
   onSubmit: (form: FormData) => Promise<void>;
 }) {
@@ -2081,6 +2271,9 @@ function ShiftCreateModal({
   const workerAvailability = availability
     .filter((slot) => slot.workerEmail.toLowerCase() === selectedWorkerEmail.toLowerCase())
     .slice(0, 6);
+  const workerApprovedLeave = leaveRequests
+    .filter((leave) => leave.workerEmail.toLowerCase() === selectedWorkerEmail.toLowerCase() && leave.status === "approved")
+    .slice(0, 4);
 
   function applyAvailability(slot: AvailabilityRecord) {
     setStartValue(toDateTimeLocal(slot.date, slot.startTime));
@@ -2145,6 +2338,19 @@ function ShiftCreateModal({
                 ) : (
                   <p className="mt-3 text-sm text-slate-500">No submitted availability for this support worker yet.</p>
                 )}
+                {workerApprovedLeave.length ? (
+                  <div className="mt-3 border-t border-slate-200 pt-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-coral">Approved leave blocks</p>
+                    <div className="mt-2 grid gap-2">
+                      {workerApprovedLeave.map((leave) => (
+                        <div key={leave.id} className="rounded border border-coral/20 bg-coral/5 p-2 text-xs text-slate-700">
+                          <p className="font-semibold text-coral">{friendlyLeaveType(leave.leaveType)}</p>
+                          <p>{dateTimeOrFallback(leave.startsAt)} to {dateTimeOrFallback(leave.endsAt)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
               <Field name="location" label="Location" placeholder="Shift location" />
               <div className="rounded border border-slate-200 bg-white p-3">
@@ -2497,6 +2703,27 @@ async function loadWorkerAvailability(workerEmail?: string): Promise<Availabilit
     endTime: normalizeTime(String(row.end_time ?? "")),
     status: String(row.availability_status ?? "available"),
     notes: String(row.notes ?? "")
+  }));
+}
+
+async function loadWorkerLeave(workerEmail?: string): Promise<LeaveRecord[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  let query = supabase.from("worker_leave_requests").select("*").order("starts_at", { ascending: false });
+  if (workerEmail) query = query.eq("worker_email", workerEmail);
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: String(row.id ?? `${row.worker_email}-${row.starts_at}`),
+    workerName: String(row.worker_name ?? ""),
+    workerEmail: String(row.worker_email ?? ""),
+    leaveType: String(row.leave_type ?? "unavailable"),
+    startsAt: String(row.starts_at ?? ""),
+    endsAt: String(row.ends_at ?? ""),
+    reason: String(row.reason ?? ""),
+    status: String(row.status ?? "pending"),
+    reviewedByEmail: String(row.reviewed_by_email ?? ""),
+    reviewedAt: String(row.reviewed_at ?? ""),
+    reviewNotes: String(row.review_notes ?? "")
   }));
 }
 
@@ -2987,6 +3214,25 @@ function availabilityBadge(status: string) {
   if (status === "preferred") return "bg-banksia/30 text-ink";
   if (status === "unavailable") return "bg-coral/10 text-coral";
   return "bg-gumleaf/10 text-gumleaf";
+}
+
+function friendlyLeaveType(value: string) {
+  if (value === "annual_leave") return "Annual leave";
+  if (value === "sick_leave") return "Sick leave";
+  return "Unavailable period";
+}
+
+function friendlyLeaveStatus(value: string) {
+  if (value === "approved") return "Approved";
+  if (value === "rejected") return "Rejected";
+  if (value === "cancelled") return "Cancelled";
+  return "Pending";
+}
+
+function leaveStatusBadge(status: string) {
+  if (status === "approved") return "bg-gumleaf/10 text-gumleaf";
+  if (status === "rejected" || status === "cancelled") return "bg-coral/10 text-coral";
+  return "bg-banksia/30 text-ink";
 }
 
 function complianceItems(worker: WorkerRecord) {

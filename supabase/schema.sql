@@ -122,6 +122,24 @@ create table if not exists public.worker_availability (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.worker_leave_requests (
+  id uuid primary key default gen_random_uuid(),
+  worker_user_id uuid references auth.users(id) on delete set null,
+  worker_name text not null,
+  worker_email text not null,
+  leave_type text not null check (leave_type in ('annual_leave', 'sick_leave', 'unavailable')),
+  starts_at timestamptz not null,
+  ends_at timestamptz not null,
+  reason text,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'cancelled')),
+  reviewed_by uuid references auth.users(id) on delete set null,
+  reviewed_by_email text,
+  reviewed_at timestamptz,
+  review_notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.shifts (
   id uuid primary key default gen_random_uuid(),
   participant_name text not null,
@@ -466,6 +484,7 @@ alter table public.profiles enable row level security;
 alter table public.support_workers enable row level security;
 alter table public.worker_invitations enable row level security;
 alter table public.worker_availability enable row level security;
+alter table public.worker_leave_requests enable row level security;
 alter table public.shifts enable row level security;
 alter table public.progress_notes enable row level security;
 alter table public.incident_reports enable row level security;
@@ -481,6 +500,7 @@ alter table public.profiles force row level security;
 alter table public.support_workers force row level security;
 alter table public.worker_invitations force row level security;
 alter table public.worker_availability force row level security;
+alter table public.worker_leave_requests force row level security;
 alter table public.shifts force row level security;
 alter table public.progress_notes force row level security;
 alter table public.incident_reports force row level security;
@@ -562,6 +582,9 @@ drop policy if exists "Admins can manage worker invitations" on public.worker_in
 drop policy if exists "Admins can manage worker availability" on public.worker_availability;
 drop policy if exists "Team leaders can read worker availability" on public.worker_availability;
 drop policy if exists "Workers can manage own availability" on public.worker_availability;
+drop policy if exists "Admins can manage worker leave" on public.worker_leave_requests;
+drop policy if exists "Team leaders can manage worker leave" on public.worker_leave_requests;
+drop policy if exists "Workers can manage own leave" on public.worker_leave_requests;
 drop policy if exists "Admins can manage shifts" on public.shifts;
 drop policy if exists "Workers can read assigned shifts" on public.shifts;
 drop policy if exists "Role based progress notes" on public.progress_notes;
@@ -751,6 +774,30 @@ using (public.is_team_leader());
 
 create policy "Workers can manage own availability"
 on public.worker_availability for all
+to authenticated
+using (
+  public.is_support_worker()
+  and lower(worker_email) = public.current_app_email()
+)
+with check (
+  public.is_support_worker()
+  and lower(worker_email) = public.current_app_email()
+);
+
+create policy "Admins can manage worker leave"
+on public.worker_leave_requests for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create policy "Team leaders can manage worker leave"
+on public.worker_leave_requests for all
+to authenticated
+using (public.is_team_leader())
+with check (public.is_team_leader());
+
+create policy "Workers can manage own leave"
+on public.worker_leave_requests for all
 to authenticated
 using (
   public.is_support_worker()

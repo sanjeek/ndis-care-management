@@ -77,6 +77,16 @@ export async function POST(request: Request) {
     );
   }
 
+  const leaveConflict = await findApprovedLeaveConflict(auth.client, workerEmail, rows);
+  if (leaveConflict) {
+    return NextResponse.json(
+      {
+        message: `${workerName} has approved ${friendlyLeaveType(leaveConflict.leaveType)} from ${formatDateTime(leaveConflict.startsAt)} to ${formatDateTime(leaveConflict.endsAt)}. Shift booking blocked.`
+      },
+      { status: 409 }
+    );
+  }
+
   const { data: shifts, error } = await auth.client
     .from("shifts")
     .insert(rows)
@@ -197,10 +207,54 @@ async function findUnavailableConflict(client: SupabaseClient, workerEmail: stri
   return null;
 }
 
+async function findApprovedLeaveConflict(client: SupabaseClient, workerEmail: string, rows: Array<{ starts_at: string; ends_at: string }>) {
+  const rangeStart = rows.reduce((earliest, row) => row.starts_at < earliest ? row.starts_at : earliest, rows[0]?.starts_at ?? "");
+  const rangeEnd = rows.reduce((latest, row) => row.ends_at > latest ? row.ends_at : latest, rows[0]?.ends_at ?? "");
+  if (!rangeStart || !rangeEnd) return null;
+
+  const { data, error } = await client
+    .from("worker_leave_requests")
+    .select("starts_at, ends_at, leave_type, status")
+    .eq("worker_email", workerEmail)
+    .eq("status", "approved")
+    .lt("starts_at", rangeEnd)
+    .gt("ends_at", rangeStart);
+
+  if (error || !data?.length) return null;
+
+  for (const row of rows) {
+    const shiftStart = new Date(row.starts_at);
+    const shiftEnd = new Date(row.ends_at);
+    for (const leave of data) {
+      const leaveStart = new Date(String(leave.starts_at));
+      const leaveEnd = new Date(String(leave.ends_at));
+      if (shiftStart < leaveEnd && shiftEnd > leaveStart) {
+        return {
+          startsAt: String(leave.starts_at),
+          endsAt: String(leave.ends_at),
+          leaveType: String(leave.leave_type ?? "unavailable")
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
 function normalizeTime(value: string) {
   return value.slice(0, 5);
 }
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString("en-AU", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function friendlyLeaveType(value: string) {
+  if (value === "annual_leave") return "annual leave";
+  if (value === "sick_leave") return "sick leave";
+  return "unavailable period";
 }

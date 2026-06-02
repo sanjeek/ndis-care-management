@@ -6,7 +6,8 @@ export type EmailNotificationType =
   | "password_reset"
   | "participant_update"
   | "document_upload"
-  | "worker_availability";
+  | "worker_availability"
+  | "worker_leave";
 
 type EmailInput = {
   type: EmailNotificationType;

@@ -9,6 +9,7 @@ const backupTables = [
   "support_workers",
   "worker_invitations",
   "worker_availability",
+  "worker_leave_requests",
   "shifts",
   "progress_notes",
   "incident_reports",
