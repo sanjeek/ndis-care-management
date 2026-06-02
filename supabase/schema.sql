@@ -5,8 +5,40 @@ create table if not exists public.participants (
   plan_type text not null,
   emergency_contact text not null,
   support_needs text not null,
+  date_of_birth date,
+  emergency_contacts text,
+  support_plans text,
+  goals text,
+  risk_information text,
+  medical_notes text,
+  allergies text,
+  communication_preferences text,
   created_at timestamptz not null default now()
 );
+
+alter table public.participants
+add column if not exists date_of_birth date;
+
+alter table public.participants
+add column if not exists emergency_contacts text;
+
+alter table public.participants
+add column if not exists support_plans text;
+
+alter table public.participants
+add column if not exists goals text;
+
+alter table public.participants
+add column if not exists risk_information text;
+
+alter table public.participants
+add column if not exists medical_notes text;
+
+alter table public.participants
+add column if not exists allergies text;
+
+alter table public.participants
+add column if not exists communication_preferences text;
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,

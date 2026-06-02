@@ -31,13 +31,31 @@ import { roleForUser, type UserRole } from "@/lib/auth";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 type ParticipantRecord = {
+  id: string;
   name: string;
   ndis: string;
   plan: string;
+  dateOfBirth: string;
   emergency: string;
+  emergencyContacts: string;
   needs: string;
+  supportPlans: string;
+  goals: string;
+  riskInformation: string;
+  medicalNotes: string;
+  allergies: string;
+  communicationPreferences: string;
   docs: number;
   notes: number;
+};
+
+type ParticipantDocument = {
+  id: string;
+  title: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: string;
 };
 
 type WorkerRecord = {
@@ -238,8 +256,17 @@ export function ParticipantsPage() {
       name: get(form, "name"),
       ndis_number: get(form, "ndis"),
       plan_type: get(form, "plan"),
+      date_of_birth: get(form, "dateOfBirth"),
       emergency_contact: get(form, "emergency"),
+      emergency_contacts: get(form, "emergencyContacts"),
       support_needs: get(form, "needs")
+      ,
+      support_plans: get(form, "supportPlans"),
+      goals: get(form, "goals"),
+      risk_information: get(form, "riskInformation"),
+      medical_notes: get(form, "medicalNotes"),
+      allergies: get(form, "allergies"),
+      communication_preferences: get(form, "communicationPreferences")
     };
     const ok = await postJson("/api/participants", payload, setNotice);
     if (ok) await refresh();
@@ -252,8 +279,16 @@ export function ParticipantsPage() {
           <Field name="name" label="Participant profile" placeholder="Full name" />
           <Field name="ndis" label="NDIS number" placeholder="NDIS participant number" />
           <Field name="plan" label="Plan type" placeholder="NDIS managed, plan managed, or self managed" />
+          <Field name="dateOfBirth" label="Date of birth" type="date" />
           <Field name="emergency" label="Emergency contact" placeholder="Name and phone number" />
+          <Area name="emergencyContacts" label="Emergency contacts" placeholder="Primary and secondary contacts, relationship, phone, and email" />
           <Area name="needs" label="Support needs" placeholder="Support needs, routines, risks, and goals" />
+          <Area name="supportPlans" label="Support plans" placeholder="Current support plan details, routines, funded supports, and review dates" />
+          <Area name="goals" label="Participant goals" placeholder="NDIS goals, short-term goals, and progress measures" />
+          <Area name="riskInformation" label="Risk information" placeholder="Known risks, triggers, behaviour support, safeguarding, and mitigation actions" />
+          <Area name="medicalNotes" label="Medical notes" placeholder="Medical conditions, medication notes, mobility, swallowing, seizures, or care alerts" />
+          <Area name="allergies" label="Allergies" placeholder="Food, medication, environmental allergies, and response plan" />
+          <Area name="communicationPreferences" label="Communication preferences" placeholder="Preferred language, communication method, interpreter needs, and decision supports" />
         </RecordForm>
       ) : (
         <section className="mb-6 rounded border border-gumleaf/25 bg-gumleaf/5 p-4 text-sm text-slate-700">
@@ -273,7 +308,11 @@ export function ParticipantsPage() {
               </div>
               <Info label="Emergency contact" value={participant.emergency || "Not recorded"} />
               <Info label="Support needs" value={participant.needs || "Not recorded"} />
+              <Info label="Goals" value={participant.goals || "Not recorded"} />
               <Info label="Documents / Notes" value={`${participant.docs} documents, ${participant.notes} progress notes`} />
+              <Link href={`/participants/${participant.id}`} className="mt-4 inline-flex rounded border border-gumleaf/30 px-3 py-2 text-sm font-semibold text-gumleaf hover:bg-gumleaf/5">
+                Open profile
+              </Link>
             </article>
           ))}
         </div>
@@ -282,6 +321,115 @@ export function ParticipantsPage() {
           title={canManageParticipants ? "No participants yet" : "No assigned participants"}
           message={canManageParticipants ? "Participant records will appear here after they are added to the database." : "Participant records appear here only when you are assigned to their shifts."}
         />
+      )}
+    </AppShell>
+  );
+}
+
+export function ParticipantProfilePage({ participantId }: { participantId: string }) {
+  const [participant, setParticipant] = useState<ParticipantRecord | null>(null);
+  const [documents, setDocuments] = useState<ParticipantDocument[]>([]);
+  const [notice, setNotice] = useState("Loading participant profile.");
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      const row = await loadParticipantById(participantId);
+      if (!active) return;
+      setParticipant(row);
+      if (!row) {
+        setNotice("Participant not found or you do not have permission to view this profile.");
+        return;
+      }
+      const docs = await loadParticipantDocuments(row.name);
+      if (!active) return;
+      setDocuments(docs);
+      setNotice("Showing participant profile from Supabase.");
+    }
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [participantId]);
+
+  async function openDocument(documentId: string) {
+    if (!supabase) {
+      setNotice("Please sign in before opening documents.");
+      return;
+    }
+    const token = (await supabase.auth.getSession()).data.session?.access_token;
+    if (!token) {
+      setNotice("Please sign in again before opening documents.");
+      return;
+    }
+    const response = await fetch(`/api/documents/${documentId}/download`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const result = await response.json().catch(() => ({ message: "Could not open document." }));
+    if (!response.ok) {
+      setNotice(result.message);
+      return;
+    }
+    window.open(result.url, "_blank", "noopener,noreferrer");
+  }
+
+  return (
+    <AppShell title={participant?.name || "Participant Profile"} eyebrow={notice}>
+      {participant ? (
+        <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+          <section className="space-y-4">
+            <article className="rounded border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-gumleaf">Participant profile</p>
+                  <h2 className="mt-1 text-2xl font-semibold text-ink">{participant.name}</h2>
+                  <p className="mt-1 text-sm text-slate-500">NDIS {participant.ndis || "not recorded"}</p>
+                </div>
+                <span className="rounded bg-harbour/10 px-3 py-1 text-sm font-semibold text-harbour">{participant.plan || "Plan not recorded"}</span>
+              </div>
+              <Info label="Date of birth" value={participant.dateOfBirth ? dateOnly(participant.dateOfBirth) : "Not recorded"} />
+              <Info label="Communication preferences" value={participant.communicationPreferences || "Not recorded"} />
+              <Info label="Emergency contact" value={participant.emergency || "Not recorded"} />
+              <Info label="Emergency contacts" value={participant.emergencyContacts || "Not recorded"} />
+            </article>
+
+            <article className="rounded border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="font-semibold text-ink">Uploaded documents</h2>
+              <p className="mt-1 text-sm text-slate-500">Documents are stored privately and opened through permission-checked signed links.</p>
+              {documents.length ? (
+                <div className="mt-4 grid gap-3">
+                  {documents.map((document) => (
+                    <div key={document.id} className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="font-semibold text-ink">{document.title}</p>
+                          <p className="mt-1 text-xs text-slate-500">{document.fileName} | {formatBytes(document.sizeBytes)} | {dateTimeOrFallback(document.createdAt)}</p>
+                        </div>
+                        <button type="button" onClick={() => openDocument(document.id)} className="inline-flex items-center justify-center gap-2 rounded bg-ink px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800">
+                          <Download className="h-4 w-4" />
+                          Open
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyWorkerState title="No uploaded documents" message="Documents linked to this participant will appear here after upload." />
+              )}
+            </article>
+          </section>
+
+          <section className="grid gap-4">
+            <ProfileSection title="Support plans" value={participant.supportPlans} />
+            <ProfileSection title="Participant goals" value={participant.goals} />
+            <ProfileSection title="Support needs" value={participant.needs} />
+            <ProfileSection title="Risk information" value={participant.riskInformation} tone="risk" />
+            <ProfileSection title="Medical notes" value={participant.medicalNotes} />
+            <ProfileSection title="Allergies" value={participant.allergies} tone="risk" />
+          </section>
+        </div>
+      ) : (
+        <EmptyState title="Participant profile unavailable" message="This participant could not be found, or your login does not have permission to view it." />
       )}
     </AppShell>
   );
@@ -1873,19 +2021,66 @@ function Info({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ProfileSection({ title, value, tone = "default" }: { title: string; value: string; tone?: "default" | "risk" }) {
+  return (
+    <article className={`rounded border p-5 shadow-sm ${tone === "risk" ? "border-coral/20 bg-coral/5" : "border-slate-200 bg-white"}`}>
+      <h2 className="font-semibold text-ink">{title}</h2>
+      <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">{value || "Not recorded"}</p>
+    </article>
+  );
+}
+
 async function loadParticipants(): Promise<ParticipantRecord[]> {
   if (!isSupabaseConfigured || !supabase) return [];
   const { data, error } = await supabase.from("participants").select("*").order("created_at", { ascending: false });
   if (error || !data) return [];
+  return data.map(mapParticipantRow);
+}
+
+async function loadParticipantById(participantId: string): Promise<ParticipantRecord | null> {
+  if (!isSupabaseConfigured || !supabase) return null;
+  const { data, error } = await supabase.from("participants").select("*").eq("id", participantId).maybeSingle();
+  if (error || !data) return null;
+  return mapParticipantRow(data);
+}
+
+async function loadParticipantDocuments(participantName: string): Promise<ParticipantDocument[]> {
+  if (!isSupabaseConfigured || !supabase || !participantName) return [];
+  const { data, error } = await supabase
+    .from("care_documents")
+    .select("id, title, file_name, content_type, size_bytes, created_at")
+    .eq("participant_name", participantName)
+    .order("created_at", { ascending: false });
+  if (error || !data) return [];
   return data.map((row) => ({
+    id: String(row.id ?? ""),
+    title: String(row.title ?? ""),
+    fileName: String(row.file_name ?? ""),
+    contentType: String(row.content_type ?? ""),
+    sizeBytes: Number(row.size_bytes ?? 0),
+    createdAt: String(row.created_at ?? "")
+  }));
+}
+
+function mapParticipantRow(row: Record<string, unknown>): ParticipantRecord {
+  return {
+    id: String(row.id ?? ""),
     name: String(row.name ?? ""),
     ndis: String(row.ndis_number ?? ""),
     plan: String(row.plan_type ?? ""),
+    dateOfBirth: String(row.date_of_birth ?? ""),
     emergency: String(row.emergency_contact ?? ""),
+    emergencyContacts: String(row.emergency_contacts ?? ""),
     needs: String(row.support_needs ?? ""),
+    supportPlans: String(row.support_plans ?? ""),
+    goals: String(row.goals ?? ""),
+    riskInformation: String(row.risk_information ?? ""),
+    medicalNotes: String(row.medical_notes ?? ""),
+    allergies: String(row.allergies ?? ""),
+    communicationPreferences: String(row.communication_preferences ?? ""),
     docs: Number(row.document_count ?? 0),
     notes: Number(row.note_count ?? 0)
-  }));
+  };
 }
 
 async function getCurrentUserContext(): Promise<{ role: UserRole; email: string }> {
@@ -2088,15 +2283,7 @@ async function loadParticipantsForShifts(shifts: ShiftRecord[]): Promise<Partici
   if (!names.length || !isSupabaseConfigured || !supabase) return [];
   const { data, error } = await supabase.from("participants").select("*").in("name", names);
   if (error || !data) return [];
-  return data.map((row) => ({
-    name: String(row.name ?? ""),
-    ndis: String(row.ndis_number ?? ""),
-    plan: String(row.plan_type ?? ""),
-    emergency: String(row.emergency_contact ?? ""),
-    needs: String(row.support_needs ?? ""),
-    docs: Number(row.document_count ?? 0),
-    notes: Number(row.note_count ?? 0)
-  }));
+  return data.map(mapParticipantRow);
 }
 
 async function loadModuleItems(kind: ModuleKind): Promise<ModuleItem[]> {
@@ -2344,6 +2531,12 @@ function dateTimeOrFallback(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short" });
+}
+
+function formatBytes(value: number) {
+  if (!value) return "0 KB";
+  if (value < 1024 * 1024) return `${Math.max(1, Math.round(value / 1024))} KB`;
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function normalizeTime(value: string) {

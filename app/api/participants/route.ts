@@ -20,8 +20,16 @@ export async function POST(request: Request) {
     name,
     ndis_number: String(body.ndis_number ?? "").trim(),
     plan_type: String(body.plan_type ?? "").trim(),
+    date_of_birth: String(body.date_of_birth ?? "").trim() || null,
     emergency_contact: String(body.emergency_contact ?? "").trim(),
-    support_needs: String(body.support_needs ?? "").trim()
+    emergency_contacts: String(body.emergency_contacts ?? "").trim(),
+    support_needs: String(body.support_needs ?? "").trim(),
+    support_plans: String(body.support_plans ?? "").trim(),
+    goals: String(body.goals ?? "").trim(),
+    risk_information: String(body.risk_information ?? "").trim(),
+    medical_notes: String(body.medical_notes ?? "").trim(),
+    allergies: String(body.allergies ?? "").trim(),
+    communication_preferences: String(body.communication_preferences ?? "").trim()
   };
 
   const { data: participant, error } = await auth.client.from("participants").insert(payload).select("id").single();
