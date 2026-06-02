@@ -147,6 +147,11 @@ type ShiftRecord = {
   approvedByEmail: string;
   rejectionReason: string;
   payrollReadyAt: string;
+  workerSignature: string;
+  workerSignedAt: string;
+  participantSignature: string;
+  participantSignedAt: string;
+  signatureCapturedByEmail: string;
 };
 
 type ModuleItem = {
@@ -757,6 +762,7 @@ export function WorkerPortalPage() {
   const [visibleParticipants, setVisibleParticipants] = useState<ParticipantRecord[]>([]);
   const [availability, setAvailability] = useState<AvailabilityRecord[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRecord[]>([]);
+  const [signingShift, setSigningShift] = useState<ShiftRecord | null>(null);
   const [notice, setNotice] = useState("Loading your worker portal.");
 
   const refresh = useCallback(async () => {
@@ -795,14 +801,29 @@ export function WorkerPortalPage() {
     if (ok) await refresh();
   }
 
+  async function submitSignedShift(form: FormData) {
+    if (!signingShift) return;
+    const ok = await runShiftWorkflow(
+      signingShift.id,
+      "submit",
+      setNotice,
+      "",
+      {
+        workerSignature: get(form, "workerSignature"),
+        participantSignature: get(form, "participantSignature")
+      }
+    );
+    if (ok) {
+      setSigningShift(null);
+      await refresh();
+    }
+  }
+
   return (
     <AppShell title="Worker Portal" eyebrow={`${workerName || "Worker"} | ${notice}`}>
       <div className="mx-auto grid max-w-6xl gap-5 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="space-y-6">
-          <WorkerShiftMobilePanel shifts={visibleShifts} onClock={clockShift} onSubmit={async (shiftId) => {
-            const ok = await runShiftWorkflow(shiftId, "submit", setNotice);
-            if (ok) await refresh();
-          }} />
+          <WorkerShiftMobilePanel shifts={visibleShifts} onClock={clockShift} onSubmit={(shift) => setSigningShift(shift)} />
 
           <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
@@ -847,6 +868,7 @@ export function WorkerPortalPage() {
           </section>
         </div>
       </div>
+      {signingShift ? <ShiftSignatureModal shift={signingShift} onClose={() => setSigningShift(null)} onSubmit={submitSignedShift} /> : null}
     </AppShell>
   );
 }
@@ -854,6 +876,7 @@ export function WorkerPortalPage() {
 export function MyShiftsPage() {
   const [workerName, setWorkerName] = useState("");
   const [visibleShifts, setVisibleShifts] = useState<ShiftRecord[]>([]);
+  const [signingShift, setSigningShift] = useState<ShiftRecord | null>(null);
   const [notice, setNotice] = useState("Loading assigned shifts.");
 
   const refresh = useCallback(async () => {
@@ -878,9 +901,22 @@ export function MyShiftsPage() {
     };
   }, [refresh]);
 
-  async function submitShift(shiftId: string) {
-    const ok = await runShiftWorkflow(shiftId, "submit", setNotice);
-    if (ok) await refresh();
+  async function submitSignedShift(form: FormData) {
+    if (!signingShift) return;
+    const ok = await runShiftWorkflow(
+      signingShift.id,
+      "submit",
+      setNotice,
+      "",
+      {
+        workerSignature: get(form, "workerSignature"),
+        participantSignature: get(form, "participantSignature")
+      }
+    );
+    if (ok) {
+      setSigningShift(null);
+      await refresh();
+    }
   }
 
   return (
@@ -898,14 +934,15 @@ export function MyShiftsPage() {
             <button
               type="button"
               disabled={!canSubmitShift(shift)}
-              onClick={() => void submitShift(shift.id)}
+              onClick={() => setSigningShift(shift)}
               className="rounded bg-gumleaf px-3 py-2 text-xs font-semibold text-white hover:bg-[#1d625d] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
             >
-              {shift.approvalStatus === "approved" ? "Approved" : shift.approvalStatus === "submitted" ? "Submitted" : "Submit completed shift"}
+              {shift.approvalStatus === "approved" ? "Approved" : shift.approvalStatus === "submitted" ? "Submitted" : "Sign and submit"}
             </button>
           )}
         />
       </section>
+      {signingShift ? <ShiftSignatureModal shift={signingShift} onClose={() => setSigningShift(null)} onSubmit={submitSignedShift} /> : null}
     </AppShell>
   );
 }
@@ -1964,7 +2001,7 @@ function WorkerAvailabilityForm({
   );
 }
 
-function WorkerShiftMobilePanel({ shifts, onClock, onSubmit }: { shifts: ShiftRecord[]; onClock: (shiftId: string, action: "in" | "out") => Promise<void>; onSubmit: (shiftId: string) => Promise<void> }) {
+function WorkerShiftMobilePanel({ shifts, onClock, onSubmit }: { shifts: ShiftRecord[]; onClock: (shiftId: string, action: "in" | "out") => Promise<void>; onSubmit: (shift: ShiftRecord) => void }) {
   const nextShift = shifts.find((shift) => !shift.clockOutAt) ?? shifts[0];
 
   return (
@@ -2011,11 +2048,12 @@ function WorkerShiftMobilePanel({ shifts, onClock, onSubmit }: { shifts: ShiftRe
           <button
             type="button"
             disabled={!canSubmitShift(nextShift) || !nextShift.clockOutAt}
-            onClick={() => void onSubmit(nextShift.id)}
+            onClick={() => onSubmit(nextShift)}
             className="mt-3 min-h-12 w-full rounded border border-gumleaf/30 bg-white px-4 py-3 text-base font-semibold text-gumleaf hover:bg-gumleaf/5 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
           >
-            Submit completed shift
+            Sign and submit completed shift
           </button>
+          <ShiftSignatureSummary shift={nextShift} />
         </article>
       ) : (
         <EmptyWorkerState title="No assigned shifts" message="Assigned shifts will appear here when your coordinator adds them to the roster." />
@@ -2036,12 +2074,58 @@ function WorkerShiftMobilePanel({ shifts, onClock, onSubmit }: { shifts: ShiftRe
           <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500">
                 <span>In: {shift.clockInAt ? `${timeOnly(shift.clockInAt)}${shift.clockInDistanceM ? ` (${shift.clockInDistanceM}m)` : ""}` : "Not clocked"}</span>
                 <span>Out: {shift.clockOutAt ? `${timeOnly(shift.clockOutAt)}${shift.clockOutDistanceM ? ` (${shift.clockOutDistanceM}m)` : ""}` : "Not clocked"}</span>
+                <span>Worker signed: {shift.workerSignedAt ? dateTimeOrFallback(shift.workerSignedAt) : "No"}</span>
+                <span>Participant signed: {shift.participantSignedAt ? dateTimeOrFallback(shift.participantSignedAt) : "No"}</span>
               </div>
             </article>
           ))}
         </div>
       ) : null}
     </section>
+  );
+}
+
+function ShiftSignatureModal({ shift, onClose, onSubmit }: { shift: ShiftRecord; onClose: () => void; onSubmit: (form: FormData) => Promise<void> }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 px-3 py-4 sm:items-center">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gumleaf">Completed shift signatures</p>
+            <h2 className="mt-1 text-xl font-semibold text-ink">{shift.participantName || shift.participant}</h2>
+            <p className="mt-1 text-sm text-slate-500">{shift.time} | {shift.location || "Location not recorded"}</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded border border-slate-200 p-2 text-slate-500 hover:bg-slate-50" aria-label="Close signature dialog">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <RecordForm submitLabel="Sign and submit for approval" onSubmit={onSubmit}>
+          <div className="grid gap-4">
+            <div className="rounded border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              <p className="font-semibold text-ink">Secure signed record</p>
+              <p className="mt-2 leading-6">
+                These signatures confirm the shift was completed. They are stored on the protected shift record with timestamps and the signed shift details for audit and payroll review.
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <Info label="Clock in" value={shift.clockInAt ? dateTimeOrFallback(shift.clockInAt) : "Not clocked in"} />
+                <Info label="Clock out" value={shift.clockOutAt ? dateTimeOrFallback(shift.clockOutAt) : "Not clocked out"} />
+              </div>
+            </div>
+            <Field name="workerSignature" label="Support worker signature" defaultValue={shift.workerSignature} placeholder="Type support worker full name" />
+            <Field name="participantSignature" label="Participant or representative signature" defaultValue={shift.participantSignature} placeholder="Type participant or representative full name" />
+          </div>
+        </RecordForm>
+      </div>
+    </div>
+  );
+}
+
+function ShiftSignatureSummary({ shift }: { shift: ShiftRecord }) {
+  return (
+    <div className="mt-3 grid gap-2 rounded border border-slate-200 bg-white p-3 text-xs text-slate-600 sm:grid-cols-2">
+      <span>Worker signature: {shift.workerSignedAt ? dateTimeOrFallback(shift.workerSignedAt) : "Required"}</span>
+      <span>Participant signature: {shift.participantSignedAt ? dateTimeOrFallback(shift.participantSignedAt) : "Required"}</span>
+    </div>
   );
 }
 
@@ -2137,6 +2221,9 @@ function ShiftTable({ title, shifts, emptyMessage, renderActions }: { title: str
                       {shift.submittedAt ? <span className="text-xs text-slate-500">Submitted {dateOnly(shift.submittedAt)}</span> : null}
                       {shift.approvedAt ? <span className="text-xs text-slate-500">Approved {dateOnly(shift.approvedAt)}</span> : null}
                       {shift.rejectionReason ? <span className="text-xs text-coral">{shift.rejectionReason}</span> : null}
+                      <span className={`text-xs font-semibold ${shift.workerSignature && shift.participantSignature ? "text-gumleaf" : "text-coral"}`}>
+                        {shift.workerSignature && shift.participantSignature ? "Signed by worker and participant" : "Signatures required"}
+                      </span>
                     </div>
                   </td>
                   {renderActions ? <td className="px-4 py-4">{renderActions(shift)}</td> : null}
@@ -3104,6 +3191,11 @@ async function loadShifts(workerEmail?: string): Promise<ShiftRecord[]> {
       approvedByEmail: String(row.approved_by_email ?? ""),
       rejectionReason: String(row.rejection_reason ?? ""),
       payrollReadyAt: String(row.payroll_ready_at ?? ""),
+      workerSignature: String(row.worker_signature ?? ""),
+      workerSignedAt: String(row.worker_signed_at ?? ""),
+      participantSignature: String(row.participant_signature ?? ""),
+      participantSignedAt: String(row.participant_signed_at ?? ""),
+      signatureCapturedByEmail: String(row.signature_captured_by_email ?? ""),
       time: `${timeOnly(startsAt)} - ${timeOnly(endsAt)}`
     };
   });
@@ -3216,7 +3308,13 @@ async function patchJson(path: string, payload: Record<string, unknown>, setNoti
   return response.ok;
 }
 
-async function runShiftWorkflow(shiftId: string, action: "submit" | "approve" | "reject", setNotice: (message: string) => void, reason = "") {
+async function runShiftWorkflow(
+  shiftId: string,
+  action: "submit" | "approve" | "reject",
+  setNotice: (message: string) => void,
+  reason = "",
+  signatures?: { workerSignature: string; participantSignature: string }
+) {
   if (!supabase) {
     setNotice("Supabase is not connected, so the shift was not updated.");
     return false;
@@ -3232,7 +3330,7 @@ async function runShiftWorkflow(shiftId: string, action: "submit" | "approve" | 
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`
     },
-    body: JSON.stringify({ action, reason })
+    body: JSON.stringify({ action, reason, ...signatures })
   });
   const result = await response.json().catch(() => ({ message: "Shift workflow update failed." }));
   setNotice(response.ok ? result.message : result.message);
@@ -3300,7 +3398,7 @@ function friendlyDatabaseError(message: string, table: string) {
 }
 
 function canSubmitShift(shift: ShiftRecord) {
-  return ["not_submitted", "rejected"].includes(shift.approvalStatus) && !["Draft", "Offered"].includes(shift.status);
+  return ["not_submitted", "rejected"].includes(shift.approvalStatus) && Boolean(shift.clockOutAt) && !["Draft", "Offered"].includes(shift.status);
 }
 
 function approvalLabel(status: string) {

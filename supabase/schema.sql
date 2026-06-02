@@ -196,6 +196,13 @@ create table if not exists public.shifts (
   approved_by_email text,
   rejection_reason text,
   payroll_ready_at timestamptz,
+  worker_signature text,
+  worker_signed_at timestamptz,
+  participant_signature text,
+  participant_signed_at timestamptz,
+  signature_captured_by uuid references auth.users(id) on delete set null,
+  signature_captured_by_email text,
+  signed_record jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
 
@@ -288,6 +295,27 @@ add column if not exists rejection_reason text;
 
 alter table public.shifts
 add column if not exists payroll_ready_at timestamptz;
+
+alter table public.shifts
+add column if not exists worker_signature text;
+
+alter table public.shifts
+add column if not exists worker_signed_at timestamptz;
+
+alter table public.shifts
+add column if not exists participant_signature text;
+
+alter table public.shifts
+add column if not exists participant_signed_at timestamptz;
+
+alter table public.shifts
+add column if not exists signature_captured_by uuid references auth.users(id) on delete set null;
+
+alter table public.shifts
+add column if not exists signature_captured_by_email text;
+
+alter table public.shifts
+add column if not exists signed_record jsonb not null default '{}'::jsonb;
 
 create table if not exists public.progress_notes (
   id uuid primary key default gen_random_uuid(),

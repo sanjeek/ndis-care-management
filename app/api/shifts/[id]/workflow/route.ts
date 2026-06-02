@@ -15,8 +15,15 @@ type ShiftWorkflowRecord = {
   participant_name: string;
   support_worker_name: string;
   support_worker_email: string | null;
+  location: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  clock_in_at: string | null;
+  clock_out_at: string | null;
   status: string;
   approval_status: string | null;
+  worker_signature: string | null;
+  participant_signature: string | null;
 };
 
 async function requireUser(request: Request): Promise<{ user: AuthContext } | { response: NextResponse }> {
@@ -71,10 +78,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const body = await request.json().catch(() => ({}));
   const action = String(body.action ?? "");
   const reason = String(body.reason ?? "").trim();
+  const workerSignature = String(body.workerSignature ?? "").trim();
+  const participantSignature = String(body.participantSignature ?? "").trim();
 
   const { data: shift, error } = await admin
     .from("shifts")
-    .select("id, participant_name, support_worker_name, support_worker_email, status, approval_status")
+    .select("id, participant_name, support_worker_name, support_worker_email, location, starts_at, ends_at, clock_in_at, clock_out_at, status, approval_status, worker_signature, participant_signature")
     .eq("id", id)
     .maybeSingle<ShiftWorkflowRecord>();
 
@@ -95,15 +104,48 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (currentApproval === "submitted") {
       return NextResponse.json({ message: "This shift is already submitted for approval." }, { status: 400 });
     }
+    if (!shift.clock_out_at) {
+      return NextResponse.json({ message: "Clock out before submitting this shift for approval." }, { status: 400 });
+    }
+
+    const finalWorkerSignature = workerSignature || shift.worker_signature || "";
+    const finalParticipantSignature = participantSignature || shift.participant_signature || "";
+    if (finalWorkerSignature.length < 2 || finalParticipantSignature.length < 2) {
+      return NextResponse.json({ message: "Support worker and participant signatures are required before submitting a completed shift." }, { status: 400 });
+    }
+
+    const now = new Date().toISOString();
+    const signedRecord = {
+      shiftId: shift.id,
+      participantName: shift.participant_name,
+      supportWorkerName: shift.support_worker_name,
+      supportWorkerEmail: shift.support_worker_email,
+      location: shift.location,
+      startsAt: shift.starts_at,
+      endsAt: shift.ends_at,
+      clockInAt: shift.clock_in_at,
+      clockOutAt: shift.clock_out_at,
+      workerSignature: finalWorkerSignature,
+      participantSignature: finalParticipantSignature,
+      signedAt: now,
+      capturedByEmail: auth.user.email
+    };
 
     const update = await admin
       .from("shifts")
       .update({
         status: "Submitted for approval",
         approval_status: "submitted",
-        submitted_at: new Date().toISOString(),
+        submitted_at: now,
         submitted_by: auth.user.id,
         submitted_by_email: auth.user.email,
+        worker_signature: finalWorkerSignature,
+        worker_signed_at: now,
+        participant_signature: finalParticipantSignature,
+        participant_signed_at: now,
+        signature_captured_by: auth.user.id,
+        signature_captured_by_email: auth.user.email,
+        signed_record: signedRecord,
         approved_at: null,
         approved_by: null,
         approved_by_email: null,
@@ -123,10 +165,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       tableName: "shifts",
       recordId: shift.id,
       recordLabel: `${shift.participant_name} shift`,
-      metadata: { workflow: "submit_for_approval", participantName: shift.participant_name }
+      metadata: { workflow: "submit_for_approval", participantName: shift.participant_name, signaturesCaptured: true }
     });
 
-    return NextResponse.json({ message: "Shift submitted for approval." });
+    return NextResponse.json({ message: "Shift signed by worker and participant, then submitted for approval." });
   }
 
   if (action === "approve" || action === "reject") {
