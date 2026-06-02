@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { roleForUser, type UserRole } from "@/lib/auth";
+import { appUrl, getAdminNotificationRecipients, sendCareNotification } from "@/lib/email-notifications";
 import { recordServerAudit, serviceClient } from "@/lib/server-audit";
 
 const bucket = "care-documents";
@@ -127,6 +128,28 @@ export async function POST(request: Request) {
     recordId: document.id,
     recordLabel: title,
     metadata: { fileName: file.name, participantName, secureStorage: true }
+  });
+
+  const recipients = await getAdminNotificationRecipients(admin, { fallback: [auth.user.email] });
+  await sendCareNotification(admin, {
+    type: "document_upload",
+    to: recipients,
+    subject: `Secure document uploaded: ${title}`,
+    text: [
+      `A secure document was uploaded.`,
+      `Title: ${title}`,
+      `File: ${file.name}`,
+      `Participant: ${participantName || "Not linked"}`,
+      `Uploaded by: ${auth.user.name} (${auth.user.email})`,
+      `Open documents: ${appUrl("/documents")}`
+    ].join("\n"),
+    metadata: {
+      documentId: document.id,
+      title,
+      fileName: file.name,
+      participantName,
+      uploadedBy: auth.user.email
+    }
   });
 
   return NextResponse.json({ message: "Document uploaded securely.", id: document.id });

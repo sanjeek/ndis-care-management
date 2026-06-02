@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { roleForUser, type UserRole } from "@/lib/auth";
+import { appUrl, getAdminNotificationRecipients, sendCareNotification } from "@/lib/email-notifications";
 import { recordServerAudit, serviceClient } from "@/lib/server-audit";
 
 const bucket = "incident-attachments";
@@ -172,6 +173,32 @@ export async function POST(request: Request) {
       notificationDueAt: read(form, "notificationDueAt") || null,
       status: normaliseStatus(read(form, "status")),
       attachmentCount: uploadedPaths.length
+    }
+  });
+
+  const recipients = await getAdminNotificationRecipients(admin);
+  await sendCareNotification(admin, {
+    type: "incident_report",
+    to: recipients,
+    subject: `${severity} incident reported: ${incidentNumber}`,
+    text: [
+      `New incident report submitted.`,
+      `Incident number: ${incidentNumber}`,
+      `Participant: ${participantName}`,
+      `Staff involved: ${staffName} (${staffEmail})`,
+      `Severity: ${severity}`,
+      `Reportable to NDIS Commission: ${reportableToCommission ? "Yes" : "No"}`,
+      `Status: ${normaliseStatus(read(form, "status"))}`,
+      `Open incident reports: ${appUrl("/incident-reports")}`
+    ].join("\n"),
+    metadata: {
+      incidentId: incident.id,
+      incidentNumber,
+      participantName,
+      staffName,
+      staffEmail,
+      severity,
+      reportableToCommission
     }
   });
 

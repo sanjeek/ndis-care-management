@@ -229,11 +229,7 @@ export function ParticipantsPage() {
       emergency_contact: get(form, "emergency"),
       support_needs: get(form, "needs")
     };
-    const ok = await persist("participants", payload, setNotice, {
-      action: "participant_update",
-      recordLabel: payload.name,
-      metadata: { operation: "create" }
-    });
+    const ok = await postJson("/api/participants", payload, setNotice);
     if (ok) await refresh();
   }
 
@@ -670,8 +666,8 @@ export function RosteringPage() {
     const workerName = get(form, "worker");
     const participantName = get(form, "participant");
     const worker = workers.find((item) => item.name === workerName);
-    const ok = await persist(
-      "shifts",
+    const ok = await postJson(
+      "/api/shifts",
       {
         participant_name: participantName,
         support_worker_name: workerName,
@@ -681,12 +677,7 @@ export function RosteringPage() {
         ends_at: end,
         status: get(form, "status")
       },
-      setNotice,
-      {
-        action: "create",
-        recordLabel: `${participantName} shift`,
-        metadata: { recordType: "shift", participantName, workerName }
-      }
+      setNotice
     );
     if (ok) await refresh();
     setCreateOpen(false);
@@ -1974,6 +1965,29 @@ async function persist(table: string, payload: Record<string, unknown>, setNotic
     });
   }
   return !error;
+}
+
+async function postJson(path: string, payload: Record<string, unknown>, setNotice: (message: string) => void) {
+  if (!isSupabaseConfigured || !supabase) {
+    setNotice("Supabase is not connected, so the record was not saved.");
+    return false;
+  }
+  const token = (await supabase.auth.getSession()).data.session?.access_token;
+  if (!token) {
+    setNotice("Please sign in again before saving this record.");
+    return false;
+  }
+  const response = await fetch(path, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  });
+  const result = await response.json().catch(() => ({ message: "Save failed." }));
+  setNotice(result.message);
+  return response.ok;
 }
 
 async function runShiftWorkflow(shiftId: string, action: "submit" | "approve" | "reject", setNotice: (message: string) => void, reason = "") {

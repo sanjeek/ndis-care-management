@@ -70,6 +70,11 @@ export function LoginCard() {
         return;
       }
       setResetLockedUntil(Date.now() + 60000);
+      void fetch("/api/notifications/password-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
       setMessage("Password reset email sent. Check your inbox.");
       return;
     }
