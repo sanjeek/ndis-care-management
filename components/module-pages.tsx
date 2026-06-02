@@ -79,6 +79,12 @@ type WorkerRecord = {
   availability: string;
   qualifications: string;
   compliance: string;
+  policeCheckExpiry: string;
+  ndisWorkerScreeningExpiry: string;
+  firstAidExpiry: string;
+  cprExpiry: string;
+  driversLicenceExpiry: string;
+  trainingCertificates: string;
   assigned: number;
 };
 
@@ -561,6 +567,8 @@ export function WorkersPage() {
     setNotice(rows.length ? "Showing support worker records from the database." : "No support workers yet. Add a worker to create an invite.");
   }, []);
 
+  const complianceAlerts = useMemo(() => workers.flatMap(workerComplianceAlerts), [workers]);
+
   useEffect(() => {
     void refresh();
   }, [refresh]);
@@ -573,7 +581,13 @@ export function WorkersPage() {
       role: get(form, "role"),
       availability: get(form, "availability"),
       qualifications: get(form, "qualifications"),
-      compliance_status: get(form, "compliance")
+      compliance_status: get(form, "compliance"),
+      police_check_expiry: get(form, "policeCheckExpiry") || null,
+      ndis_worker_screening_expiry: get(form, "ndisWorkerScreeningExpiry") || null,
+      first_aid_expiry: get(form, "firstAidExpiry") || null,
+      cpr_expiry: get(form, "cprExpiry") || null,
+      drivers_licence_expiry: get(form, "driversLicenceExpiry") || null,
+      training_certificates: get(form, "trainingCertificates")
     };
     const workerSaved = await persist("support_workers", next, setNotice, {
       action: "create",
@@ -624,6 +638,28 @@ export function WorkersPage() {
         </div>
       ) : null}
 
+      <section className="mb-6 rounded border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="font-semibold text-ink">Compliance alerts</h2>
+            <p className="mt-1 text-sm text-slate-500">Alerts show expired records and records expiring within 60 days.</p>
+          </div>
+          <span className={`w-fit rounded px-3 py-1 text-sm font-semibold ${complianceAlerts.length ? "bg-coral/10 text-coral" : "bg-gumleaf/10 text-gumleaf"}`}>
+            {complianceAlerts.length ? `${complianceAlerts.length} alert${complianceAlerts.length === 1 ? "" : "s"}` : "No alerts"}
+          </span>
+        </div>
+        {complianceAlerts.length ? (
+          <div className="mt-4 grid gap-2 lg:grid-cols-2">
+            {complianceAlerts.map((alert) => (
+              <div key={`${alert.worker}-${alert.label}`} className={`rounded border p-3 text-sm ${alert.status === "expired" ? "border-coral/25 bg-coral/5" : "border-banksia/40 bg-banksia/10"}`}>
+                <p className="font-semibold text-ink">{alert.worker}</p>
+                <p className="mt-1 text-slate-700">{alert.label}: {alert.message}</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </section>
+
       <RecordForm submitLabel="Add worker and send invite" onSubmit={submit}>
         <Field name="name" label="Staff profile" placeholder="Full name" />
         <Field name="email" label="Email invite address" type="email" placeholder="worker@example.com" />
@@ -631,6 +667,14 @@ export function WorkersPage() {
         <Field name="availability" label="Availability" placeholder="Available days and hours" />
         <Area name="qualifications" label="Qualifications" placeholder="Qualifications, training, clearances, and checks" />
         <Field name="compliance" label="Compliance documents" placeholder="Clear, pending, or renewal details" />
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Field name="policeCheckExpiry" label="Police check expiry" type="date" />
+          <Field name="ndisWorkerScreeningExpiry" label="NDIS worker screening expiry" type="date" />
+          <Field name="firstAidExpiry" label="First aid certificate expiry" type="date" />
+          <Field name="cprExpiry" label="CPR expiry" type="date" />
+          <Field name="driversLicenceExpiry" label="Driver's licence expiry" type="date" />
+        </div>
+        <Area name="trainingCertificates" label="Training certificates" placeholder="List training certificates, completion dates, renewal due dates, and evidence location" />
       </RecordForm>
       {workers.length ? (
         <div className="mt-6 grid gap-4 xl:grid-cols-3">
@@ -642,6 +686,7 @@ export function WorkersPage() {
               <Info label="Availability" value={worker.availability || "Not recorded"} />
               <Info label="Qualifications" value={worker.qualifications || "Not recorded"} />
               <Info label="Compliance" value={worker.compliance || "Not recorded"} />
+              <ComplianceGrid worker={worker} />
               <Info label="Assigned shifts" value={`${worker.assigned} assigned shifts`} />
             </article>
           ))}
@@ -2154,6 +2199,27 @@ function CarePlanDetail({ title, value, tone = "default" }: { title: string; val
   );
 }
 
+function ComplianceGrid({ worker }: { worker: WorkerRecord }) {
+  const items = complianceItems(worker);
+  return (
+    <div className="mt-4 grid gap-2">
+      {items.map((item) => {
+        const status = expiryStatus(item.value);
+        return (
+          <div key={item.label} className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-medium text-ink">{item.label}</p>
+              <span className={`rounded px-2 py-1 text-xs font-semibold ${expiryBadgeClass(status)}`}>{expiryLabel(status)}</span>
+            </div>
+            <p className="mt-1 text-slate-600">{item.value ? dateOnly(item.value) : "Not recorded"}</p>
+          </div>
+        );
+      })}
+      <Info label="Training certificates" value={worker.trainingCertificates || "Not recorded"} />
+    </div>
+  );
+}
+
 async function loadParticipants(): Promise<ParticipantRecord[]> {
   if (!isSupabaseConfigured || !supabase) return [];
   const { data, error } = await supabase.from("participants").select("*").order("created_at", { ascending: false });
@@ -2263,6 +2329,12 @@ async function loadWorkers(): Promise<WorkerRecord[]> {
       availability: String(row.availability ?? ""),
       qualifications: String(row.qualifications ?? ""),
       compliance: String(row.compliance_status ?? row.compliance ?? ""),
+      policeCheckExpiry: String(row.police_check_expiry ?? ""),
+      ndisWorkerScreeningExpiry: String(row.ndis_worker_screening_expiry ?? ""),
+      firstAidExpiry: String(row.first_aid_expiry ?? ""),
+      cprExpiry: String(row.cpr_expiry ?? ""),
+      driversLicenceExpiry: String(row.drivers_licence_expiry ?? ""),
+      trainingCertificates: String(row.training_certificates ?? ""),
       assigned: shifts.filter((shift) => shift.worker === name).length
     };
   });
@@ -2712,6 +2784,63 @@ function friendlyAvailability(status: string) {
 function availabilityBadge(status: string) {
   if (status === "preferred") return "bg-banksia/30 text-ink";
   if (status === "unavailable") return "bg-coral/10 text-coral";
+  return "bg-gumleaf/10 text-gumleaf";
+}
+
+function complianceItems(worker: WorkerRecord) {
+  return [
+    { label: "Police check", value: worker.policeCheckExpiry },
+    { label: "NDIS worker screening", value: worker.ndisWorkerScreeningExpiry },
+    { label: "First aid certificate", value: worker.firstAidExpiry },
+    { label: "CPR", value: worker.cprExpiry },
+    { label: "Driver's licence", value: worker.driversLicenceExpiry }
+  ];
+}
+
+function workerComplianceAlerts(worker: WorkerRecord) {
+  return complianceItems(worker)
+    .map((item) => {
+      const status = expiryStatus(item.value);
+      if (status !== "expired" && status !== "due_soon") return null;
+      const days = daysUntil(item.value);
+      return {
+        worker: worker.name || worker.email,
+        label: item.label,
+        status,
+        message: status === "expired" ? `expired ${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} ago` : `expires in ${days} day${days === 1 ? "" : "s"}`
+      };
+    })
+    .filter((alert): alert is { worker: string; label: string; status: "expired" | "due_soon"; message: string } => Boolean(alert));
+}
+
+function expiryStatus(value: string): "missing" | "expired" | "due_soon" | "current" {
+  if (!value) return "missing";
+  const days = daysUntil(value);
+  if (Number.isNaN(days)) return "missing";
+  if (days < 0) return "expired";
+  if (days <= 60) return "due_soon";
+  return "current";
+}
+
+function daysUntil(value: string) {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return Number.NaN;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.ceil((date.getTime() - today.getTime()) / 86400000);
+}
+
+function expiryLabel(status: string) {
+  if (status === "expired") return "Expired";
+  if (status === "due_soon") return "Due soon";
+  if (status === "missing") return "Missing";
+  return "Current";
+}
+
+function expiryBadgeClass(status: string) {
+  if (status === "expired") return "bg-coral/10 text-coral";
+  if (status === "due_soon") return "bg-banksia/30 text-ink";
+  if (status === "missing") return "bg-slate-100 text-slate-500";
   return "bg-gumleaf/10 text-gumleaf";
 }
 

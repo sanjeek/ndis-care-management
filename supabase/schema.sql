@@ -68,11 +68,35 @@ create table if not exists public.support_workers (
   availability text not null,
   qualifications text not null,
   compliance_status text not null,
+  police_check_expiry date,
+  ndis_worker_screening_expiry date,
+  first_aid_expiry date,
+  cpr_expiry date,
+  drivers_licence_expiry date,
+  training_certificates text,
   created_at timestamptz not null default now()
 );
 
 alter table public.support_workers
 add column if not exists email text;
+
+alter table public.support_workers
+add column if not exists police_check_expiry date;
+
+alter table public.support_workers
+add column if not exists ndis_worker_screening_expiry date;
+
+alter table public.support_workers
+add column if not exists first_aid_expiry date;
+
+alter table public.support_workers
+add column if not exists cpr_expiry date;
+
+alter table public.support_workers
+add column if not exists drivers_licence_expiry date;
+
+alter table public.support_workers
+add column if not exists training_certificates text;
 
 create table if not exists public.worker_invitations (
   id uuid primary key default gen_random_uuid(),
