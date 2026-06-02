@@ -1,9 +1,9 @@
 export type UserRole = "admin" | "support_worker" | "team_leader" | "family";
 
-const workerRoutes = ["/worker-portal", "/my-shifts", "/participants", "/care-plans", "/progress-notes", "/incident-reports", "/profile", "/unauthorised"];
-const workerNavOrder = ["/worker-portal", "/my-shifts", "/care-plans", "/progress-notes", "/incident-reports", "/profile"];
-const teamLeaderRoutes = ["/dashboard", "/timesheets", "/profile", "/unauthorised"];
-const teamLeaderNavOrder = ["/dashboard", "/timesheets", "/profile"];
+const workerRoutes = ["/worker-portal", "/my-shifts", "/participants", "/care-plans", "/medications", "/progress-notes", "/incident-reports", "/profile", "/unauthorised"];
+const workerNavOrder = ["/worker-portal", "/my-shifts", "/care-plans", "/medications", "/progress-notes", "/incident-reports", "/profile"];
+const teamLeaderRoutes = ["/dashboard", "/timesheets", "/medications", "/profile", "/unauthorised"];
+const teamLeaderNavOrder = ["/dashboard", "/timesheets", "/medications", "/profile"];
 const familyRoutes = ["/family-portal", "/profile", "/unauthorised"];
 const familyNavOrder = ["/family-portal", "/profile"];
 const adminEmails = ["sanjee@live.com"];

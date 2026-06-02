@@ -440,6 +440,44 @@ create table if not exists public.care_plans (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.medication_records (
+  id uuid primary key default gen_random_uuid(),
+  participant_name text not null,
+  medication_name text not null,
+  dosage text not null,
+  route text,
+  frequency text not null,
+  administration_time text,
+  administration_instructions text not null,
+  prescribing_doctor text,
+  start_date date,
+  end_date date,
+  status text not null default 'active' check (status in ('active', 'paused', 'ceased')),
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.medication_events (
+  id uuid primary key default gen_random_uuid(),
+  medication_id uuid references public.medication_records(id) on delete set null,
+  participant_name text not null,
+  medication_name text not null,
+  event_type text not null check (event_type in ('administered', 'missed', 'incident')),
+  event_date date not null,
+  event_time time not null,
+  dosage_given text,
+  reason text,
+  actions_taken text,
+  severity text,
+  recorded_by uuid references auth.users(id) on delete set null,
+  recorded_by_email text,
+  recorded_by_name text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.care_documents (
   id uuid primary key default gen_random_uuid(),
   title text not null,
@@ -522,6 +560,8 @@ alter table public.progress_notes enable row level security;
 alter table public.incident_reports enable row level security;
 alter table public.module_records enable row level security;
 alter table public.care_plans enable row level security;
+alter table public.medication_records enable row level security;
+alter table public.medication_events enable row level security;
 alter table public.care_documents enable row level security;
 alter table public.audit_logs enable row level security;
 alter table public.backup_logs enable row level security;
@@ -540,6 +580,8 @@ alter table public.progress_notes force row level security;
 alter table public.incident_reports force row level security;
 alter table public.module_records force row level security;
 alter table public.care_plans force row level security;
+alter table public.medication_records force row level security;
+alter table public.medication_events force row level security;
 alter table public.care_documents force row level security;
 alter table public.audit_logs force row level security;
 alter table public.backup_logs force row level security;
@@ -612,6 +654,7 @@ drop policy if exists "Admins can manage profiles" on public.profiles;
 drop policy if exists "Admins can manage family members" on public.family_members;
 drop policy if exists "Family can read own approved participant links" on public.family_members;
 drop policy if exists "Admins can manage participants" on public.participants;
+drop policy if exists "Team leaders can read participants" on public.participants;
 drop policy if exists "Workers can read assigned participants" on public.participants;
 drop policy if exists "Admins can manage support workers" on public.support_workers;
 drop policy if exists "Workers can read own support worker record" on public.support_workers;
@@ -638,6 +681,13 @@ drop policy if exists "Role based module records" on public.module_records;
 drop policy if exists "Admins can manage module records" on public.module_records;
 drop policy if exists "Admins can manage care plans" on public.care_plans;
 drop policy if exists "Workers can read assigned care plans" on public.care_plans;
+drop policy if exists "Admins can manage medication records" on public.medication_records;
+drop policy if exists "Team leaders can manage medication records" on public.medication_records;
+drop policy if exists "Workers can read assigned medication records" on public.medication_records;
+drop policy if exists "Admins can manage medication events" on public.medication_events;
+drop policy if exists "Team leaders can manage medication events" on public.medication_events;
+drop policy if exists "Workers can read assigned medication events" on public.medication_events;
+drop policy if exists "Workers can create assigned medication events" on public.medication_events;
 drop policy if exists "Admins can manage care documents" on public.care_documents;
 drop policy if exists "Workers can read assigned care documents" on public.care_documents;
 drop policy if exists "Admins can read audit logs" on public.audit_logs;
@@ -792,6 +842,11 @@ on public.participants for all
 to authenticated
 using (public.is_admin())
 with check (public.is_admin());
+
+create policy "Team leaders can read participants"
+on public.participants for select
+to authenticated
+using (public.is_team_leader());
 
 create policy "Workers can read assigned participants"
 on public.participants for select
@@ -980,6 +1035,55 @@ on public.care_plans for select
 to authenticated
 using (
   public.is_support_worker()
+  and public.worker_is_assigned_to_participant(participant_name)
+);
+
+create policy "Admins can manage medication records"
+on public.medication_records for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create policy "Team leaders can manage medication records"
+on public.medication_records for all
+to authenticated
+using (public.is_team_leader())
+with check (public.is_team_leader());
+
+create policy "Workers can read assigned medication records"
+on public.medication_records for select
+to authenticated
+using (
+  public.is_support_worker()
+  and public.worker_is_assigned_to_participant(participant_name)
+);
+
+create policy "Admins can manage medication events"
+on public.medication_events for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create policy "Team leaders can manage medication events"
+on public.medication_events for all
+to authenticated
+using (public.is_team_leader())
+with check (public.is_team_leader());
+
+create policy "Workers can read assigned medication events"
+on public.medication_events for select
+to authenticated
+using (
+  public.is_support_worker()
+  and public.worker_is_assigned_to_participant(participant_name)
+);
+
+create policy "Workers can create assigned medication events"
+on public.medication_events for insert
+to authenticated
+with check (
+  public.is_support_worker()
+  and lower(recorded_by_email) = public.current_app_email()
   and public.worker_is_assigned_to_participant(participant_name)
 );
 
