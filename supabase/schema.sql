@@ -62,6 +62,10 @@ create table if not exists public.shifts (
   ends_at timestamptz not null,
   status text not null default 'Draft',
   approval_status text not null default 'not_submitted',
+  clock_in_at timestamptz,
+  clock_out_at timestamptz,
+  clocked_by uuid references auth.users(id) on delete set null,
+  clocked_by_email text,
   submitted_at timestamptz,
   submitted_by uuid references auth.users(id) on delete set null,
   submitted_by_email text,
@@ -78,6 +82,18 @@ add column if not exists support_worker_email text;
 
 alter table public.shifts
 add column if not exists approval_status text not null default 'not_submitted';
+
+alter table public.shifts
+add column if not exists clock_in_at timestamptz;
+
+alter table public.shifts
+add column if not exists clock_out_at timestamptz;
+
+alter table public.shifts
+add column if not exists clocked_by uuid references auth.users(id) on delete set null;
+
+alter table public.shifts
+add column if not exists clocked_by_email text;
 
 alter table public.shifts
 add column if not exists submitted_at timestamptz;

@@ -62,6 +62,8 @@ type ShiftRecord = {
   startsAt?: string;
   endsAt?: string;
   approvalStatus: string;
+  clockInAt: string;
+  clockOutAt: string;
   submittedAt: string;
   submittedByEmail: string;
   approvedAt: string;
@@ -375,10 +377,9 @@ export function WorkerPortalPage() {
   const [workerNameFromSession, setWorkerNameFromSession] = useState("");
   const [visibleShifts, setVisibleShifts] = useState<ShiftRecord[]>([]);
   const [visibleParticipants, setVisibleParticipants] = useState<ParticipantRecord[]>([]);
+  const [notice, setNotice] = useState("Loading your worker portal.");
 
-  useEffect(() => {
-    let active = true;
-    async function load() {
+  const refresh = useCallback(async () => {
       if (!supabase) return;
       const { data } = await supabase.auth.getUser();
       const user = data.user;
@@ -386,38 +387,51 @@ export function WorkerPortalPage() {
       const name = String(user?.user_metadata?.full_name || user?.email || user?.id || "");
       const shifts = email ? await loadShifts(email) : [];
       const participants = await loadParticipantsForShifts(shifts);
-      if (!active) return;
       setWorkerEmail(email);
       setWorkerNameFromSession(name);
       setVisibleShifts(shifts);
       setVisibleParticipants(participants);
-    }
-    void load();
+      setNotice(shifts.length ? "Clock shifts, submit notes, and report incidents from your phone." : "No assigned shifts are linked to this login yet.");
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void refresh().then(() => {
+      if (!active) return;
+    });
     return () => {
       active = false;
     };
-  }, []);
+  }, [refresh]);
 
   const workerName = visibleShifts[0]?.worker || workerNameFromSession;
 
+  async function clockShift(shiftId: string, action: "in" | "out") {
+    const ok = await runShiftClock(shiftId, action, setNotice);
+    if (ok) await refresh();
+  }
+
   return (
-    <AppShell title="Worker Portal" eyebrow={`${workerName || "Worker"} schedule, client information, progress notes, and incidents.`}>
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+    <AppShell title="Worker Portal" eyebrow={`${workerName || "Worker"} | ${notice}`}>
+      <div className="mx-auto grid max-w-6xl gap-5 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="space-y-6">
-          <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="font-semibold text-ink">My assigned shifts</h2>
-            <p className="mt-1 text-sm text-slate-500">Workers only see shifts assigned to their login email.</p>
-            <div className="mt-4">
-              <ShiftTable title="My assigned shifts" shifts={visibleShifts} emptyMessage="You do not currently have any assigned shifts under this login." />
-            </div>
-          </section>
+          <WorkerShiftMobilePanel shifts={visibleShifts} onClock={clockShift} onSubmit={async (shiftId) => {
+            const ok = await runShiftWorkflow(shiftId, "submit", setNotice);
+            if (ok) await refresh();
+          }} />
 
           <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="font-semibold text-ink">Client information</h2>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-ink">Client information</h2>
+                <p className="mt-1 text-sm text-slate-500">Only participants linked to your assigned shifts are shown.</p>
+              </div>
+              <ShieldCheck className="h-5 w-5 text-gumleaf" />
+            </div>
             {visibleParticipants.length ? (
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {visibleParticipants.map((participant) => (
-                  <article key={`${participant.ndis}-${participant.name}`} className="rounded border border-slate-200 bg-slate-50 p-4">
+                  <article key={`${participant.ndis}-${participant.name}`} className="rounded border border-slate-200 bg-slate-50 p-4 text-sm">
                     <p className="font-semibold text-ink">{participant.name}</p>
                     <Info label="NDIS" value={participant.ndis || "Not recorded"} />
                     <Info label="Support needs" value={participant.needs || "Not recorded"} />
@@ -1135,14 +1149,16 @@ function WorkerProgressNoteForm({ workerName, workerEmail, participants }: { wor
 
   return (
     <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="font-semibold text-ink">Progress note</h2>
+      <h2 className="font-semibold text-ink">Quick progress note</h2>
       {participants.length === 0 ? (
         <EmptyWorkerState title="No assigned participant" message="You can add progress notes only for participants linked to your assigned shifts." />
       ) : (
         <RecordForm submitLabel="Add progress note" onSubmit={submit}>
-          <Select name="participant" label="Client" options={participants.map((participant) => participant.name)} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Select name="participant" label="Client" options={participants.map((participant) => participant.name)} />
+            <Select name="category" label="Support category" options={["Self care", "Community access", "Medication prompt", "Meal preparation", "Behaviour support", "Transport assistance"]} />
+          </div>
           <ReadOnlyField label="Worker" value={workerName || "Current worker"} />
-          <Select name="category" label="Support category" options={["Self care", "Community access", "Medication prompt", "Meal preparation", "Behaviour support", "Transport assistance"]} />
           <Select name="important" label="Priority" options={["Important", "Standard"]} />
           <Area name="note" label="Progress note details" placeholder="Write the support provided, outcomes, changes, and follow-up required." />
           <Area name="outcomes" label="Outcomes" placeholder="Record achieved goals, progress, risks, and follow-up actions." />
@@ -1186,14 +1202,16 @@ function WorkerIncidentForm({ workerName, workerEmail, participants }: { workerN
 
   return (
     <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="font-semibold text-ink">Incident report</h2>
+      <h2 className="font-semibold text-ink">Report incident</h2>
       {participants.length === 0 ? (
         <EmptyWorkerState title="No assigned participant" message="You can submit incidents only for participants linked to your assigned shifts." />
       ) : (
         <RecordForm submitLabel="Submit incident" onSubmit={submit}>
-          <Select name="participant" label="Client" options={participants.map((participant) => participant.name)} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Select name="participant" label="Client" options={participants.map((participant) => participant.name)} />
+            <Select name="priority" label="Priority" options={["High", "Medium", "Low"]} />
+          </div>
           <ReadOnlyField label="Worker" value={workerName || "Current worker"} />
-          <Select name="priority" label="Priority" options={["High", "Medium", "Low"]} />
           <Area name="summary" label="Incident details" placeholder="Describe what happened, actions taken, people notified, and follow-up required." />
         </RecordForm>
       )}
@@ -1203,6 +1221,84 @@ function WorkerIncidentForm({ workerName, workerEmail, participants }: { workerN
           <p key={report} className="rounded bg-coral/5 p-3 text-sm text-slate-700">{report}</p>
         ))}
       </div>
+    </section>
+  );
+}
+
+function WorkerShiftMobilePanel({ shifts, onClock, onSubmit }: { shifts: ShiftRecord[]; onClock: (shiftId: string, action: "in" | "out") => Promise<void>; onSubmit: (shiftId: string) => Promise<void> }) {
+  const nextShift = shifts.find((shift) => !shift.clockOutAt) ?? shifts[0];
+
+  return (
+    <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="font-semibold text-ink">Today&apos;s work</h2>
+          <p className="mt-1 text-sm text-slate-500">Clock in, clock out, then submit completed shifts for approval.</p>
+        </div>
+        <CalendarDays className="h-5 w-5 shrink-0 text-gumleaf" />
+      </div>
+
+      {nextShift ? (
+        <article className="mt-4 rounded border border-gumleaf/30 bg-gumleaf/5 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gumleaf">Current / next shift</p>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-ink">{nextShift.participantName || nextShift.participant}</h3>
+              <p className="text-sm text-slate-600">{nextShift.time || "Time not recorded"} | {nextShift.location || "Location not recorded"}</p>
+            </div>
+            <span className={`w-fit rounded px-2.5 py-1 text-xs font-semibold ${approvalBadgeClass(nextShift.approvalStatus)}`}>{approvalLabel(nextShift.approvalStatus)}</span>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              disabled={Boolean(nextShift.clockInAt)}
+              onClick={() => void onClock(nextShift.id, "in")}
+              className="min-h-12 rounded bg-[#354aa3] px-4 py-3 text-base font-semibold text-white hover:bg-[#283a82] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+            >
+              {nextShift.clockInAt ? `Clocked in ${timeOnly(nextShift.clockInAt)}` : "Clock in"}
+            </button>
+            <button
+              type="button"
+              disabled={!nextShift.clockInAt || Boolean(nextShift.clockOutAt)}
+              onClick={() => void onClock(nextShift.id, "out")}
+              className="min-h-12 rounded bg-gumleaf px-4 py-3 text-base font-semibold text-white hover:bg-[#1d625d] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+            >
+              {nextShift.clockOutAt ? `Clocked out ${timeOnly(nextShift.clockOutAt)}` : "Clock out"}
+            </button>
+          </div>
+          <button
+            type="button"
+            disabled={!canSubmitShift(nextShift) || !nextShift.clockOutAt}
+            onClick={() => void onSubmit(nextShift.id)}
+            className="mt-3 min-h-12 w-full rounded border border-gumleaf/30 bg-white px-4 py-3 text-base font-semibold text-gumleaf hover:bg-gumleaf/5 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+          >
+            Submit completed shift
+          </button>
+        </article>
+      ) : (
+        <EmptyWorkerState title="No assigned shifts" message="Assigned shifts will appear here when your coordinator adds them to the roster." />
+      )}
+
+      {shifts.length ? (
+        <div className="mt-4 grid gap-3">
+          {shifts.slice(0, 5).map((shift) => (
+            <article key={shift.id} className="rounded border border-slate-200 p-3 text-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-ink">{shift.participantName || shift.participant}</p>
+                  <p className="mt-1 text-slate-500">{dateOnly(shift.startsAt ?? "")} | {shift.time}</p>
+                  <p className="mt-1 text-slate-600">{shift.location || "Location not recorded"}</p>
+                </div>
+                <span className="rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{shift.status || "Draft"}</span>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500">
+                <span>In: {shift.clockInAt ? timeOnly(shift.clockInAt) : "Not clocked"}</span>
+                <span>Out: {shift.clockOutAt ? timeOnly(shift.clockOutAt) : "Not clocked"}</span>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -1487,7 +1583,7 @@ function RecordForm({ children, submitLabel, onSubmit }: { children: React.React
   return (
     <form onSubmit={handleSubmit} className="mb-6 rounded border border-slate-200 bg-white p-4 shadow-sm">
       <div className="grid gap-4">{children}</div>
-      <button className="mt-4 inline-flex items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d625d]">
+      <button className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d625d] sm:w-auto">
         <Plus className="h-4 w-4" />
         {submitLabel}
       </button>
@@ -1712,6 +1808,8 @@ async function loadShifts(workerEmail?: string): Promise<ShiftRecord[]> {
       startsAt,
       endsAt,
       approvalStatus: String(row.approval_status ?? "not_submitted"),
+      clockInAt: String(row.clock_in_at ?? ""),
+      clockOutAt: String(row.clock_out_at ?? ""),
       submittedAt: String(row.submitted_at ?? ""),
       submittedByEmail: String(row.submitted_by_email ?? ""),
       approvedAt: String(row.approved_at ?? ""),
@@ -1812,6 +1910,29 @@ async function runShiftWorkflow(shiftId: string, action: "submit" | "approve" | 
   });
   const result = await response.json().catch(() => ({ message: "Shift workflow update failed." }));
   setNotice(response.ok ? result.message : result.message);
+  return response.ok;
+}
+
+async function runShiftClock(shiftId: string, action: "in" | "out", setNotice: (message: string) => void) {
+  if (!supabase) {
+    setNotice("Supabase is not connected, so clocking was not saved.");
+    return false;
+  }
+  const token = (await supabase.auth.getSession()).data.session?.access_token;
+  if (!token) {
+    setNotice("Please sign in again before clocking this shift.");
+    return false;
+  }
+  const response = await fetch(`/api/shifts/${shiftId}/clock`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ action })
+  });
+  const result = await response.json().catch(() => ({ message: "Clock action failed." }));
+  setNotice(result.message);
   return response.ok;
 }
 
