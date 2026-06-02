@@ -1632,7 +1632,7 @@ function WorkerAvailabilityForm({
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <h2 className="font-semibold text-ink">My availability</h2>
-          <p className="mt-1 text-sm text-slate-500">Submit the dates and times you can work.</p>
+          <p className="mt-1 text-sm text-slate-500">Submit available days and unavailable periods. The scheduler blocks shifts that overlap unavailable time.</p>
         </div>
         <CalendarDays className="h-5 w-5 text-gumleaf" />
       </div>
@@ -1642,8 +1642,8 @@ function WorkerAvailabilityForm({
           <Field name="startTime" label="Start time" type="time" />
           <Field name="endTime" label="End time" type="time" />
         </div>
-        <Select name="status" label="Status" options={availabilityStatuses} />
-        <OptionalArea name="notes" label="Notes" placeholder="Preferred locations, transport limits, sleepover notes, or leave details" />
+        <Select name="status" label="Availability type" options={availabilityStatuses} />
+        <OptionalArea name="notes" label="Notes" placeholder="Available day, unavailable appointment, preferred locations, transport limits, or leave details" />
       </RecordForm>
       {availability.length ? (
         <div className="grid gap-2">
@@ -2122,6 +2122,7 @@ function ShiftCreateModal({
                   <p className="text-sm font-semibold text-ink">Submitted availability</p>
                   <span className="text-xs text-slate-500">{selectedWorker || "Select worker"}</span>
                 </div>
+                <p className="mt-1 text-xs text-slate-500">Unavailable periods are enforced when saving single or recurring shifts.</p>
                 {workerAvailability.length ? (
                   <div className="mt-3 grid gap-2">
                     {workerAvailability.map((slot) => (

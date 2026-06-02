@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireApiUser, requireRole } from "@/lib/api-auth";
 import { appUrl, getAdminNotificationRecipients, sendCareNotification } from "@/lib/email-notifications";
 import { recordServerAudit } from "@/lib/server-audit";
@@ -65,6 +66,16 @@ export async function POST(request: Request) {
       recurrence_position: index + 1
     };
   });
+
+  const unavailableConflict = await findUnavailableConflict(auth.client, workerEmail, rows);
+  if (unavailableConflict) {
+    return NextResponse.json(
+      {
+        message: `${workerName} is unavailable on ${formatDate(unavailableConflict.shiftStart)} from ${unavailableConflict.startTime} to ${unavailableConflict.endTime}. Shift booking blocked.`
+      },
+      { status: 409 }
+    );
+  }
 
   const { data: shifts, error } = await auth.client
     .from("shifts")
@@ -151,4 +162,45 @@ function recurrenceLabel(type: string, intervalDays: number, count: number) {
   if (type === "single") return "Single shift";
   if (type === "custom") return `Every ${intervalDays} day${intervalDays === 1 ? "" : "s"} for ${count} shifts`;
   return `${type} for ${count} shifts`;
+}
+
+async function findUnavailableConflict(client: SupabaseClient, workerEmail: string, rows: Array<{ starts_at: string; ends_at: string }>) {
+  const dates = Array.from(new Set(rows.map((row) => row.starts_at.slice(0, 10))));
+  const { data, error } = await client
+    .from("worker_availability")
+    .select("available_date, start_time, end_time, availability_status, notes")
+    .eq("worker_email", workerEmail)
+    .eq("availability_status", "unavailable")
+    .in("available_date", dates);
+
+  if (error || !data?.length) return null;
+
+  for (const row of rows) {
+    const shiftStart = new Date(row.starts_at);
+    const shiftEnd = new Date(row.ends_at);
+    const dateKey = row.starts_at.slice(0, 10);
+    for (const unavailable of data) {
+      if (String(unavailable.available_date) !== dateKey) continue;
+      const unavailableStart = new Date(`${dateKey}T${normalizeTime(String(unavailable.start_time))}`);
+      const unavailableEnd = new Date(`${dateKey}T${normalizeTime(String(unavailable.end_time))}`);
+      if (shiftStart < unavailableEnd && shiftEnd > unavailableStart) {
+        return {
+          shiftStart: row.starts_at,
+          startTime: normalizeTime(String(unavailable.start_time)),
+          endTime: normalizeTime(String(unavailable.end_time)),
+          notes: String(unavailable.notes ?? "")
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+function normalizeTime(value: string) {
+  return value.slice(0, 5);
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
 }
