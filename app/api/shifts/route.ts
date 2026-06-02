@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireApiUser, requireRole } from "@/lib/api-auth";
-import { appUrl, getAdminNotificationRecipients, sendCareNotification } from "@/lib/email-notifications";
+import { notifyCareEvent } from "@/lib/care-notifications";
+import { appUrl, getAdminNotificationRecipients } from "@/lib/email-notifications";
 import { recordServerAudit } from "@/lib/server-audit";
 
 export async function POST(request: Request) {
@@ -110,9 +111,12 @@ export async function POST(request: Request) {
   });
 
   const adminRecipients = await getAdminNotificationRecipients(auth.client, { fallback: [auth.user.email] });
-  await sendCareNotification(auth.client, {
+  await notifyCareEvent(auth.client, {
     type: "new_shift",
     to: [workerEmail],
+    title: rows.length > 1 ? `${rows.length} new recurring shifts` : "New shift assigned",
+    body: rows.length > 1 ? `${participantName} recurring shifts have been assigned to you.` : `${participantName} shift has been assigned to you.`,
+    linkUrl: "/worker-portal",
     subject: rows.length > 1 ? `New recurring shifts assigned: ${participantName}` : `New shift assigned: ${participantName}`,
     text: [
       rows.length > 1 ? `${rows.length} recurring shifts have been assigned to you.` : `A new shift has been assigned to you.`,
@@ -126,9 +130,12 @@ export async function POST(request: Request) {
     ].join("\n"),
     metadata: { shiftId: firstShiftId, seriesId, participantName, workerName, workerEmail, startsAt, endsAt, status, allowedLatitude, allowedLongitude, allowedRadiusM, recurrence, createdCount: rows.length }
   });
-  await sendCareNotification(auth.client, {
+  await notifyCareEvent(auth.client, {
     type: "new_shift",
     to: adminRecipients,
+    title: rows.length > 1 ? "Recurring shift series created" : "Shift created",
+    body: rows.length > 1 ? `${rows.length} shifts created for ${participantName}.` : `${participantName} shift created for ${workerName}.`,
+    linkUrl: "/rostering",
     subject: rows.length > 1 ? `Recurring shift series created for ${participantName}` : `Shift created for ${participantName}`,
     text: [
       rows.length > 1 ? `${rows.length} shifts created by ${auth.user.name} (${auth.user.email}).` : `Shift created by ${auth.user.name} (${auth.user.email}).`,

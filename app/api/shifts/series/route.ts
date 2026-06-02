@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiUser, requireRole } from "@/lib/api-auth";
+import { notifyCareEvent } from "@/lib/care-notifications";
+import { appUrl, getAdminNotificationRecipients } from "@/lib/email-notifications";
 import { recordServerAudit } from "@/lib/server-audit";
 
 export async function PATCH(request: Request) {
@@ -37,6 +39,17 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ message: "Add at least one field to update." }, { status: 400 });
   }
 
+  const existingRows = await auth.client
+    .from("shifts")
+    .select("id, participant_name, support_worker_name, support_worker_email, starts_at, ends_at, location, status")
+    .eq("recurrence_series_id", seriesId)
+    .is("clock_in_at", null)
+    .neq("approval_status", "approved");
+
+  if (existingRows.error) {
+    return NextResponse.json({ message: existingRows.error.message }, { status: 400 });
+  }
+
   const { data: updatedRows, error } = await auth.client
     .from("shifts")
     .update(update)
@@ -59,6 +72,46 @@ export async function PATCH(request: Request) {
     recordId: seriesId,
     recordLabel: "Recurring shift series",
     metadata: { workflow: "bulk_edit_recurring_series", seriesId, updatedCount: updatedRows?.length ?? 0, update }
+  });
+
+  const isCancellation = String(update.status ?? "").toLowerCase() === "cancelled";
+  const eventType = isCancellation ? "shift_cancellation" : "shift_change";
+  const recipients = Array.from(new Set((existingRows.data ?? []).map((shift) => String(shift.support_worker_email ?? "").toLowerCase()).filter(Boolean)));
+  const first = existingRows.data?.[0];
+  if (recipients.length && first) {
+    await notifyCareEvent(auth.client, {
+      type: eventType,
+      to: recipients,
+      title: isCancellation ? "Shift cancelled" : "Shift updated",
+      body: isCancellation
+        ? `${first.participant_name} shift series was cancelled.`
+        : `${first.participant_name} shift series was updated. Please review your worker portal.`,
+      linkUrl: "/worker-portal",
+      subject: isCancellation ? `Shift cancelled: ${first.participant_name}` : `Shift updated: ${first.participant_name}`,
+      text: [
+        isCancellation ? "A shift series assigned to you was cancelled." : "A shift series assigned to you was updated.",
+        `Participant: ${first.participant_name}`,
+        location ? `New location: ${location}` : "",
+        status ? `New status: ${status}` : "",
+        `Open worker portal: ${appUrl("/worker-portal")}`
+      ].filter(Boolean).join("\n"),
+      metadata: { seriesId, update, updatedCount: updatedRows?.length ?? 0 }
+    });
+  }
+
+  const admins = await getAdminNotificationRecipients(auth.client, { fallback: [auth.user.email] });
+  await notifyCareEvent(auth.client, {
+    type: eventType,
+    to: admins,
+    title: isCancellation ? "Recurring shifts cancelled" : "Recurring shifts changed",
+    body: `${updatedRows?.length ?? 0} recurring shifts were ${isCancellation ? "cancelled" : "updated"}.`,
+    linkUrl: "/rostering",
+    subject: isCancellation ? "Recurring shift cancellation recorded" : "Recurring shift change recorded",
+    text: [
+      `${updatedRows?.length ?? 0} recurring shifts were ${isCancellation ? "cancelled" : "updated"} by ${auth.user.name} (${auth.user.email}).`,
+      `Open roster: ${appUrl("/rostering")}`
+    ].join("\n"),
+    metadata: { seriesId, update, updatedCount: updatedRows?.length ?? 0 }
   });
 
   return NextResponse.json({ message: `${updatedRows?.length ?? 0} unclocked recurring shifts updated.` });

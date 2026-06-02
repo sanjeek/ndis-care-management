@@ -479,6 +479,19 @@ create table if not exists public.email_notifications (
   metadata jsonb not null default '{}'::jsonb
 );
 
+create table if not exists public.app_notifications (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  user_id uuid references auth.users(id) on delete cascade,
+  recipient_email text not null,
+  notification_type text not null,
+  title text not null,
+  body text not null,
+  link_url text,
+  read_at timestamptz,
+  metadata jsonb not null default '{}'::jsonb
+);
+
 alter table public.participants enable row level security;
 alter table public.profiles enable row level security;
 alter table public.support_workers enable row level security;
@@ -494,6 +507,7 @@ alter table public.care_documents enable row level security;
 alter table public.audit_logs enable row level security;
 alter table public.backup_logs enable row level security;
 alter table public.email_notifications enable row level security;
+alter table public.app_notifications enable row level security;
 
 alter table public.participants force row level security;
 alter table public.profiles force row level security;
@@ -510,6 +524,7 @@ alter table public.care_documents force row level security;
 alter table public.audit_logs force row level security;
 alter table public.backup_logs force row level security;
 alter table public.email_notifications force row level security;
+alter table public.app_notifications force row level security;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
@@ -608,6 +623,9 @@ drop policy if exists "Users can create own audit logs" on public.audit_logs;
 drop policy if exists "Admins can read backup logs" on public.backup_logs;
 drop policy if exists "Admins can manage backup logs" on public.backup_logs;
 drop policy if exists "Admins can read email notifications" on public.email_notifications;
+drop policy if exists "Users can read own app notifications" on public.app_notifications;
+drop policy if exists "Users can update own app notifications" on public.app_notifications;
+drop policy if exists "Admins can read app notifications" on public.app_notifications;
 drop policy if exists "No public storage access to care documents" on storage.objects;
 drop policy if exists "No public storage access to incident attachments" on storage.objects;
 drop policy if exists "No public storage access to database backups" on storage.objects;
@@ -969,5 +987,30 @@ using (public.is_admin());
 
 create policy "Admins can read email notifications"
 on public.email_notifications for select
+to authenticated
+using (public.is_admin());
+
+create policy "Users can read own app notifications"
+on public.app_notifications for select
+to authenticated
+using (
+  lower(recipient_email) = public.current_app_email()
+  or user_id = auth.uid()
+);
+
+create policy "Users can update own app notifications"
+on public.app_notifications for update
+to authenticated
+using (
+  lower(recipient_email) = public.current_app_email()
+  or user_id = auth.uid()
+)
+with check (
+  lower(recipient_email) = public.current_app_email()
+  or user_id = auth.uid()
+);
+
+create policy "Admins can read app notifications"
+on public.app_notifications for select
 to authenticated
 using (public.is_admin());

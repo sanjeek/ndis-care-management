@@ -16,6 +16,8 @@ const backupTables = [
   "module_records",
   "care_plans",
   "care_documents",
+  "app_notifications",
+  "email_notifications",
   "audit_logs"
 ];
 

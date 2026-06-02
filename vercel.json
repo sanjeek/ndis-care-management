@@ -3,6 +3,10 @@
     {
       "path": "/api/admin/backups/run",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/notifications/shifts?cron=1",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

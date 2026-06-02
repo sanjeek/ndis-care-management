@@ -7,7 +7,11 @@ export type EmailNotificationType =
   | "participant_update"
   | "document_upload"
   | "worker_availability"
-  | "worker_leave";
+  | "worker_leave"
+  | "shift_change"
+  | "shift_cancellation"
+  | "shift_reminder"
+  | "missed_clock_in";
 
 type EmailInput = {
   type: EmailNotificationType;

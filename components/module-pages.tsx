@@ -207,7 +207,7 @@ type DashboardMetrics = {
   outstandingInvoices: number;
 };
 
-const statuses = ["Draft", "Offered", "Confirmed", "In progress", "Completed"];
+const statuses = ["Draft", "Offered", "Confirmed", "In progress", "Completed", "Cancelled"];
 const availabilityStatuses = ["available", "preferred", "unavailable"];
 const leaveTypes = ["Annual leave", "Sick leave", "Unavailable period"];
 const recurrenceTypes = ["single", "daily", "weekly", "fortnightly", "custom"];

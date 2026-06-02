@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, Menu, Search, UserCircle } from "lucide-react";
+import { Bell, LogOut, Menu, Search, UserCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { navItems } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
@@ -14,6 +14,15 @@ const inactivityLimitMs = 30 * 60 * 1000;
 const warningBeforeLogoutMs = 5 * 60 * 1000;
 const lastActivityKey = "careos:last-activity";
 
+type AppNotification = {
+  id: string;
+  title: string;
+  body: string;
+  linkUrl: string;
+  readAt: string;
+  createdAt: string;
+};
+
 export function AppShell({ title, eyebrow, children }: { title: string; eyebrow: string; children: React.ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -24,6 +33,8 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
   const [authChecked, setAuthChecked] = useState(false);
   const [showIdleWarning, setShowIdleWarning] = useState(false);
   const [secondsUntilLogout, setSecondsUntilLogout] = useState(warningBeforeLogoutMs / 1000);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -166,7 +177,39 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
     };
   }, [authChecked, userEmail]);
 
+  useEffect(() => {
+    if (!authChecked || !supabase || !userEmail) return;
+
+    let active = true;
+    const client = supabase;
+    async function loadNotifications() {
+      const { data } = await client
+        .from("app_notifications")
+        .select("id, title, body, link_url, read_at, created_at")
+        .eq("recipient_email", userEmail.toLowerCase())
+        .order("created_at", { ascending: false })
+        .limit(8);
+      if (!active) return;
+      setNotifications((data ?? []).map((row) => ({
+        id: String(row.id ?? ""),
+        title: String(row.title ?? ""),
+        body: String(row.body ?? ""),
+        linkUrl: String(row.link_url ?? ""),
+        readAt: String(row.read_at ?? ""),
+        createdAt: String(row.created_at ?? "")
+      })));
+    }
+
+    void loadNotifications();
+    const interval = window.setInterval(loadNotifications, 60_000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [authChecked, userEmail]);
+
   const visibleNavItems = useMemo(() => visibleNavForRole(userRole, navItems), [userRole]);
+  const unreadCount = notifications.filter((notification) => !notification.readAt).length;
 
   const initials = useMemo(() => {
     return userName
@@ -194,6 +237,16 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
     window.localStorage.setItem(lastActivityKey, String(Date.now()));
     setShowIdleWarning(false);
     setSecondsUntilLogout(warningBeforeLogoutMs / 1000);
+  }
+
+  async function openNotification(notification: AppNotification) {
+    if (supabase && !notification.readAt) {
+      const readAt = new Date().toISOString();
+      await supabase.from("app_notifications").update({ read_at: readAt }).eq("id", notification.id);
+      setNotifications((items) => items.map((item) => item.id === notification.id ? { ...item, readAt } : item));
+    }
+    setNotificationsOpen(false);
+    if (notification.linkUrl) window.location.href = notification.linkUrl;
   }
 
   if (!authChecked) {
@@ -278,6 +331,49 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                   <span className="hidden max-w-32 truncate md:inline">{userName}</span>
                   <UserCircle className="h-4 w-4 text-slate-400" />
                 </Link>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setNotificationsOpen(!notificationsOpen)}
+                    className="relative inline-flex items-center justify-center rounded border border-slate-200 bg-white p-2.5 text-slate-700 shadow-sm hover:bg-slate-50"
+                    aria-label="Open notifications"
+                  >
+                    <Bell className="h-4 w-4" />
+                    {unreadCount ? (
+                      <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-coral px-1 text-[10px] font-bold text-white">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    ) : null}
+                  </button>
+                  {notificationsOpen ? (
+                    <div className="absolute right-0 z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded border border-slate-200 bg-white shadow-2xl">
+                      <div className="border-b border-slate-200 px-4 py-3">
+                        <p className="font-semibold text-ink">Notifications</p>
+                        <p className="text-xs text-slate-500">{unreadCount ? `${unreadCount} unread` : "No unread notifications"}</p>
+                      </div>
+                      <div className="max-h-96 overflow-y-auto">
+                        {notifications.length ? notifications.map((notification) => (
+                          <button
+                            key={notification.id}
+                            type="button"
+                            onClick={() => void openNotification(notification)}
+                            className="block w-full border-b border-slate-100 px-4 py-3 text-left hover:bg-slate-50"
+                          >
+                            <div className="flex items-start gap-2">
+                              {!notification.readAt ? <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-gumleaf" /> : <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-slate-200" />}
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-ink">{notification.title}</p>
+                                <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-600">{notification.body}</p>
+                              </div>
+                            </div>
+                          </button>
+                        )) : (
+                          <p className="px-4 py-6 text-sm text-slate-500">No notifications yet.</p>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
                 <button onClick={signOut} className="inline-flex items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
                   <LogOut className="h-4 w-4" />
                   Sign out
