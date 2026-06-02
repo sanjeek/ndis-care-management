@@ -85,6 +85,8 @@ export async function POST(request: Request) {
   const staffEmail = read(form, "staffEmail") || auth.user.email;
   const severity = read(form, "severity");
   const summary = read(form, "summary");
+  const reportableIncidentType = read(form, "reportableType");
+  const reportableToCommission = reportableIncidentType !== "" && reportableIncidentType !== "Not reportable";
 
   if (!incidentNumber || !participantName || !severity || !summary) {
     return NextResponse.json({ message: "Incident number, participant, severity, and incident details are required." }, { status: 400 });
@@ -132,6 +134,14 @@ export async function POST(request: Request) {
       location: read(form, "location"),
       summary,
       investigation_notes: read(form, "investigationNotes"),
+      reportable_to_commission: reportableToCommission,
+      reportable_incident_type: reportableToCommission ? reportableIncidentType : null,
+      notification_due_at: read(form, "notificationDueAt") || null,
+      immediate_actions: read(form, "immediateActions"),
+      impacted_person_supported: read(form, "impactedPersonSupported"),
+      participant_informed: read(form, "participantInformed"),
+      guardian_notified: read(form, "guardianNotified"),
+      corrective_actions: read(form, "correctiveActions"),
       status: normaliseStatus(read(form, "status")),
       attachment_names: attachmentNames,
       attachment_paths: uploadedPaths
@@ -157,6 +167,9 @@ export async function POST(request: Request) {
       participantName,
       staffName,
       severity,
+      reportableToCommission,
+      reportableIncidentType: reportableToCommission ? reportableIncidentType : null,
+      notificationDueAt: read(form, "notificationDueAt") || null,
       status: normaliseStatus(read(form, "status")),
       attachmentCount: uploadedPaths.length
     }

@@ -32,6 +32,7 @@ export const navItems = [
   { label: "My Shifts", href: "/my-shifts", icon: ListChecks },
   { label: "User Management", href: "/admin/users", icon: UserCog },
   { label: "Database Backups", href: "/admin/backups", icon: Database },
+  { label: "NDIS Compliance", href: "/admin/compliance", icon: ShieldCheck },
   { label: "Audit Logs", href: "/admin/audit", icon: History },
   { label: "Profile", href: "/profile", icon: UserCircle },
   { label: "Settings", href: "/settings", icon: Settings }

@@ -17,7 +17,12 @@ const backupTables = [
 ];
 
 async function authoriseBackupRun(request: Request) {
+  const cronSecret = process.env.CRON_SECRET;
+  const suppliedSecret = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || new URL(request.url).searchParams.get("secret");
   if (request.headers.get("x-vercel-cron") === "1") {
+    if (cronSecret && suppliedSecret !== cronSecret) {
+      return { error: "Invalid cron secret.", status: 401 };
+    }
     return {
       userId: null,
       userEmail: "vercel-cron",

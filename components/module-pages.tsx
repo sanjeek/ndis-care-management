@@ -108,6 +108,15 @@ type IncidentManagementRecord = {
   location: string;
   summary: string;
   investigationNotes: string;
+  reportableToCommission: boolean;
+  reportableIncidentType: string;
+  notificationDueAt: string;
+  ndisNotifiedAt: string;
+  immediateActions: string;
+  impactedPersonSupported: string;
+  participantInformed: string;
+  guardianNotified: string;
+  correctiveActions: string;
   status: string;
   attachmentNames: string[];
   createdAt: string;
@@ -124,6 +133,7 @@ type DashboardMetrics = {
 const statuses = ["Draft", "Offered", "Confirmed", "In progress", "Completed"];
 const incidentSeverities = ["Low", "Medium", "High", "Critical"];
 const incidentStatuses = ["Submitted", "Under review", "Investigation", "Action required", "Closed"];
+const reportableIncidentTypes = ["Not reportable", "Death", "Serious injury", "Abuse or neglect", "Unlawful sexual or physical contact", "Sexual misconduct", "Unauthorised restrictive practice"];
 type ModuleKind = "timesheets" | "notes" | "incidents" | "invoices" | "documents" | "settings";
 
 export function DashboardPage() {
@@ -942,11 +952,28 @@ export function IncidentManagementPage() {
               <Field name="incidentTime" label="Incident time" type="time" />
               <Field name="location" label="Location" placeholder="Where the incident occurred" />
               <Select name="status" label="Status" options={incidentStatuses} />
+              <Select name="reportableType" label="Reportable incident type" options={reportableIncidentTypes} />
+              <Field name="notificationDueAt" label="NDIS notification due" type="datetime-local" />
               <div className="lg:col-span-2">
                 <Area name="summary" label="Incident details" placeholder="Describe what happened, immediate response, people notified, and current risk." />
               </div>
               <div className="lg:col-span-2">
+                <Area name="immediateActions" label="Immediate actions and safety response" placeholder="Record first aid, emergency services, risk controls, separation, supervision, and other immediate supports." />
+              </div>
+              <div className="lg:col-span-2">
+                <Area name="impactedPersonSupported" label="Support provided to impacted person" placeholder="Record how the participant was made safe, respected, informed, and supported, including advocate access if relevant." />
+              </div>
+              <div className="lg:col-span-2">
+                <Area name="participantInformed" label="Participant involvement and communication" placeholder="Record how the participant was involved in incident management and resolution." />
+              </div>
+              <div className="lg:col-span-2">
+                <Area name="guardianNotified" label="Guardian/nominee/key contact notification" placeholder="Record who was notified, when, and by whom." />
+              </div>
+              <div className="lg:col-span-2">
                 <Area name="investigationNotes" label="Investigation notes" placeholder="Record investigation findings, follow-up actions, and manager review notes." />
+              </div>
+              <div className="lg:col-span-2">
+                <Area name="correctiveActions" label="Corrective actions" placeholder="Record actions required, responsible person, timeframe, and prevention measures." />
               </div>
               <div className="lg:col-span-2">
                 <FileField name="attachments" label="Attachments" />
@@ -982,7 +1009,13 @@ export function IncidentManagementPage() {
                 <Info label="Location" value={incident.location || "Not recorded"} />
               </div>
               <Info label="Incident details" value={incident.summary || "Not recorded"} />
+              <Info label="Reportable incident" value={incident.reportableToCommission ? `${incident.reportableIncidentType || "Reportable"} | Due ${dateTimeOrFallback(incident.notificationDueAt)}` : "Not marked as reportable"} />
+              <Info label="Immediate actions" value={incident.immediateActions || "Not recorded"} />
+              <Info label="Support provided" value={incident.impactedPersonSupported || "Not recorded"} />
+              <Info label="Participant communication" value={incident.participantInformed || "Not recorded"} />
+              <Info label="Guardian/key contact notification" value={incident.guardianNotified || "Not recorded"} />
               <Info label="Investigation notes" value={incident.investigationNotes || "Not recorded"} />
+              <Info label="Corrective actions" value={incident.correctiveActions || "Not recorded"} />
               <div className="mt-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Attachments</p>
                 {incident.attachmentNames.length ? (
@@ -1825,6 +1858,15 @@ async function loadIncidentRecords(workerEmail?: string): Promise<IncidentManage
     location: String(row.location ?? ""),
     summary: String(row.summary ?? ""),
     investigationNotes: String(row.investigation_notes ?? ""),
+    reportableToCommission: Boolean(row.reportable_to_commission),
+    reportableIncidentType: String(row.reportable_incident_type ?? ""),
+    notificationDueAt: String(row.notification_due_at ?? ""),
+    ndisNotifiedAt: String(row.ndis_notified_at ?? ""),
+    immediateActions: String(row.immediate_actions ?? ""),
+    impactedPersonSupported: String(row.impacted_person_supported ?? ""),
+    participantInformed: String(row.participant_informed ?? ""),
+    guardianNotified: String(row.guardian_notified ?? ""),
+    correctiveActions: String(row.corrective_actions ?? ""),
     status: String(row.status ?? "Submitted"),
     attachmentNames: Array.isArray(row.attachment_names) ? (row.attachment_names as unknown[]).map((name) => String(name)) : [],
     createdAt: String(row.created_at ?? "")
@@ -2096,6 +2138,13 @@ function dateOnly(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function dateTimeOrFallback(value: string) {
+  if (!value) return "not recorded";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short" });
 }
 
 function normalizeTime(value: string) {

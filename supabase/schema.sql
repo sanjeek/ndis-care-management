@@ -164,6 +164,15 @@ create table if not exists public.incident_reports (
   location text,
   summary text not null,
   investigation_notes text,
+  reportable_to_commission boolean not null default false,
+  reportable_incident_type text,
+  notification_due_at timestamptz,
+  ndis_notified_at timestamptz,
+  immediate_actions text,
+  impacted_person_supported text,
+  participant_informed text,
+  guardian_notified text,
+  corrective_actions text,
   attachment_names text[] not null default '{}'::text[],
   attachment_paths text[] not null default '{}'::text[],
   status text not null default 'submitted',
@@ -194,6 +203,33 @@ add column if not exists location text;
 
 alter table public.incident_reports
 add column if not exists investigation_notes text;
+
+alter table public.incident_reports
+add column if not exists reportable_to_commission boolean not null default false;
+
+alter table public.incident_reports
+add column if not exists reportable_incident_type text;
+
+alter table public.incident_reports
+add column if not exists notification_due_at timestamptz;
+
+alter table public.incident_reports
+add column if not exists ndis_notified_at timestamptz;
+
+alter table public.incident_reports
+add column if not exists immediate_actions text;
+
+alter table public.incident_reports
+add column if not exists impacted_person_supported text;
+
+alter table public.incident_reports
+add column if not exists participant_informed text;
+
+alter table public.incident_reports
+add column if not exists guardian_notified text;
+
+alter table public.incident_reports
+add column if not exists corrective_actions text;
 
 alter table public.incident_reports
 add column if not exists attachment_names text[] not null default '{}'::text[];
