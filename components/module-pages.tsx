@@ -113,6 +113,14 @@ type IncidentManagementRecord = {
   createdAt: string;
 };
 
+type DashboardMetrics = {
+  activeParticipants: number;
+  activeStaff: number;
+  completedShifts: number;
+  pendingIncidents: number;
+  outstandingInvoices: number;
+};
+
 const statuses = ["Draft", "Offered", "Confirmed", "In progress", "Completed"];
 const incidentSeverities = ["Low", "Medium", "High", "Critical"];
 const incidentStatuses = ["Submitted", "Under review", "Investigation", "Action required", "Closed"];
@@ -120,10 +128,13 @@ type ModuleKind = "timesheets" | "notes" | "incidents" | "invoices" | "documents
 
 export function DashboardPage() {
   const [shifts, setShifts] = useState<ShiftRecord[]>([]);
-  const [participants, setParticipants] = useState<ParticipantRecord[]>([]);
-  const [workers, setWorkers] = useState<WorkerRecord[]>([]);
-  const [pendingTimesheets, setPendingTimesheets] = useState(0);
-  const [incidentCount, setIncidentCount] = useState(0);
+  const [metrics, setMetrics] = useState<DashboardMetrics>({
+    activeParticipants: 0,
+    activeStaff: 0,
+    completedShifts: 0,
+    pendingIncidents: 0,
+    outstandingInvoices: 0
+  });
   const [notice, setNotice] = useState("Database records only.");
 
   useEffect(() => {
@@ -133,19 +144,13 @@ export function DashboardPage() {
         setNotice("Connect Supabase to show live records.");
         return;
       }
-      const [loadedShifts, loadedParticipants, loadedWorkers, timesheets, incidents] = await Promise.all([
+      const [loadedShifts, loadedMetrics] = await Promise.all([
         loadShifts(),
-        loadParticipants(),
-        loadWorkers(),
-        loadModuleItems("timesheets"),
-        loadModuleItems("incidents")
+        loadDashboardMetrics()
       ]);
       if (!active) return;
       setShifts(loadedShifts);
-      setParticipants(loadedParticipants);
-      setWorkers(loadedWorkers);
-      setPendingTimesheets(timesheets.length);
-      setIncidentCount(incidents.length);
+      setMetrics(loadedMetrics);
       setNotice("Showing records from Supabase.");
     }
     void load();
@@ -155,30 +160,25 @@ export function DashboardPage() {
   }, []);
 
   const todaysShifts = useMemo(() => shifts.filter(isTodayShift), [shifts]);
-  const metrics = [
+  const metricCards = [
     { label: "Today's shifts", value: String(todaysShifts.length), delta: todaysShifts.length ? "Scheduled for today" : "No shifts scheduled today", tone: "gumleaf", icon: CalendarDays },
-    { label: "Active participants", value: String(participants.length), delta: participants.length ? "Participant records in database" : "No participants yet", tone: "harbour", icon: ShieldCheck },
-    { label: "Staff on duty", value: String(workers.length), delta: workers.length ? "Support worker records" : "No workers yet", tone: "banksia", icon: CalendarPlus },
-    { label: "Pending timesheets", value: String(pendingTimesheets), delta: pendingTimesheets ? "Timesheet records waiting" : "No pending timesheets", tone: "coral", icon: CheckCircle2 }
+    { label: "Active participants", value: String(metrics.activeParticipants), delta: metrics.activeParticipants ? "Participant records in database" : "No active participants", tone: "harbour", icon: ShieldCheck },
+    { label: "Active staff", value: String(metrics.activeStaff), delta: metrics.activeStaff ? "Support worker records in database" : "No active staff", tone: "banksia", icon: CalendarPlus },
+    { label: "Completed shifts", value: String(metrics.completedShifts), delta: metrics.completedShifts ? "Completed or approved shifts" : "No completed shifts", tone: "gumleaf", icon: CheckCircle2 },
+    { label: "Pending incidents", value: String(metrics.pendingIncidents), delta: metrics.pendingIncidents ? "Open incident records" : "No pending incidents", tone: "coral", icon: AlertTriangle },
+    { label: "Outstanding invoices", value: String(metrics.outstandingInvoices), delta: metrics.outstandingInvoices ? "Invoices not paid or closed" : "No outstanding invoices", tone: "harbour", icon: ClipboardPlus }
   ];
 
   return (
     <AppShell title="Dashboard" eyebrow={`${formatToday()} | ${notice}`}>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {metrics.map((metric) => (
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        {metricCards.map((metric) => (
           <StatCard key={metric.label} {...metric} />
         ))}
       </div>
       <div className="mt-6 grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
         <ShiftTable title="Today's shifts" shifts={todaysShifts} emptyMessage="No shifts are scheduled for today." />
-        <div className="space-y-6">
-          <QuickActions />
-          <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="font-semibold text-ink">Incident reports</h2>
-            <p className="mt-3 text-3xl font-semibold text-ink">{incidentCount}</p>
-            <p className="mt-1 text-sm text-slate-500">{incidentCount ? "Incident report records in database" : "No incident reports recorded"}</p>
-          </section>
-        </div>
+        <QuickActions />
       </div>
     </AppShell>
   );
@@ -1737,6 +1737,50 @@ async function loadWorkers(): Promise<WorkerRecord[]> {
       assigned: shifts.filter((shift) => shift.worker === name).length
     };
   });
+}
+
+async function loadDashboardMetrics(): Promise<DashboardMetrics> {
+  if (!isSupabaseConfigured || !supabase) {
+    return {
+      activeParticipants: 0,
+      activeStaff: 0,
+      completedShifts: 0,
+      pendingIncidents: 0,
+      outstandingInvoices: 0
+    };
+  }
+
+  const [participantCount, staffCount, shiftRows, incidentRows, invoiceRows] = await Promise.all([
+    supabase.from("participants").select("id", { count: "exact", head: true }),
+    supabase.from("support_workers").select("id", { count: "exact", head: true }),
+    supabase.from("shifts").select("status, approval_status, clock_out_at"),
+    supabase.from("incident_reports").select("status"),
+    supabase.from("module_records").select("status").eq("module", "invoices")
+  ]);
+
+  const completedShifts = shiftRows.data?.filter((shift) => {
+    const status = String(shift.status ?? "").toLowerCase();
+    const approvalStatus = String(shift.approval_status ?? "").toLowerCase();
+    return Boolean(shift.clock_out_at) || status === "completed" || status === "approved for payroll" || approvalStatus === "approved";
+  }).length ?? 0;
+
+  const pendingIncidents = incidentRows.data?.filter((incident) => {
+    const status = String(incident.status ?? "").toLowerCase();
+    return !["closed", "resolved", "complete", "completed"].includes(status);
+  }).length ?? 0;
+
+  const outstandingInvoices = invoiceRows.data?.filter((invoice) => {
+    const status = String(invoice.status ?? "").toLowerCase();
+    return !["paid", "closed", "void", "cancelled", "canceled"].includes(status);
+  }).length ?? 0;
+
+  return {
+    activeParticipants: participantCount.count ?? 0,
+    activeStaff: staffCount.count ?? 0,
+    completedShifts,
+    pendingIncidents,
+    outstandingInvoices
+  };
 }
 
 async function loadProgressNotes(workerEmail?: string): Promise<ProgressNoteRecord[]> {
