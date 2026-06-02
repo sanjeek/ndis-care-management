@@ -161,6 +161,9 @@ type ProgressNoteRecord = {
   participantName: string;
   workerName: string;
   workerEmail: string;
+  templateName: string;
+  templateValues: Record<string, string>;
+  outcomeTracking: Record<string, string>;
   serviceDate: string;
   startTime: string;
   endTime: string;
@@ -170,6 +173,25 @@ type ProgressNoteRecord = {
   signature: string;
   isImportant: boolean;
   createdAt: string;
+};
+
+type ProgressTemplateField = {
+  id: string;
+  label: string;
+  type: string;
+  required: boolean;
+  options?: string[];
+};
+
+type ProgressNoteTemplate = {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  fieldSchema: ProgressTemplateField[];
+  outcomeSchema: ProgressTemplateField[];
+  requiresSignature: boolean;
+  status: string;
 };
 
 type IncidentManagementRecord = {
@@ -1065,6 +1087,8 @@ export function ProgressNotesPage() {
   const [notes, setNotes] = useState<ProgressNoteRecord[]>([]);
   const [participants, setParticipants] = useState<ParticipantRecord[]>([]);
   const [workers, setWorkers] = useState<WorkerRecord[]>([]);
+  const [templates, setTemplates] = useState<ProgressNoteTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [context, setContext] = useState<{ role: UserRole; email: string; name: string }>({ role: "support_worker", email: "", name: "" });
   const [notice, setNotice] = useState("Loading progress notes from Supabase.");
 
@@ -1072,15 +1096,18 @@ export function ProgressNotesPage() {
     const userContext = await getCurrentUserContext();
     const userName = await getCurrentUserName();
     const assignedShifts = userContext.role === "support_worker" && userContext.email ? await loadShifts(userContext.email) : [];
-    const [loadedNotes, loadedParticipants, loadedWorkers] = await Promise.all([
+    const [loadedNotes, loadedParticipants, loadedWorkers, loadedTemplates] = await Promise.all([
       loadProgressNotes(userContext.role === "support_worker" ? userContext.email : undefined),
       userContext.role === "support_worker" ? loadParticipantsForShifts(assignedShifts) : loadParticipants(),
-      userContext.role === "support_worker" ? Promise.resolve([]) : loadWorkers()
+      userContext.role === "support_worker" ? Promise.resolve([]) : loadWorkers(),
+      loadProgressNoteTemplates()
     ]);
     setContext({ ...userContext, name: assignedShifts[0]?.worker || userName || userContext.email });
     setNotes(loadedNotes);
     setParticipants(loadedParticipants);
     setWorkers(loadedWorkers);
+    setTemplates(loadedTemplates);
+    if (!selectedTemplateId && loadedTemplates[0]?.id) setSelectedTemplateId(loadedTemplates[0].id);
     setNotice(
       loadedNotes.length
         ? userContext.role === "support_worker"
@@ -1088,7 +1115,7 @@ export function ProgressNotesPage() {
           : "Showing all progress notes from the database."
         : "No progress notes recorded yet."
     );
-  }, []);
+  }, [selectedTemplateId]);
 
   useEffect(() => {
     void refresh();
@@ -1098,19 +1125,27 @@ export function ProgressNotesPage() {
     const workerName = context.role === "support_worker" ? context.name : get(form, "worker");
     const workerEmail = context.role === "support_worker" ? context.email : workers.find((worker) => worker.name === workerName)?.email ?? "";
     const participant = get(form, "participant");
+    const template = templates.find((item) => item.id === get(form, "templateId"));
+    const templateValues = readTemplateValues(form, template?.fieldSchema ?? [], "template");
+    const outcomeTracking = readTemplateValues(form, template?.outcomeSchema ?? [], "outcome");
+    const templateSignature = templateValues.digital_signature || get(form, "signature");
     const ok = await persist(
       "progress_notes",
       {
         participant_name: participant,
         worker_name: workerName,
         worker_email: workerEmail,
+        template_id: template?.id || null,
+        template_name: template?.name || "",
+        template_values: templateValues,
+        outcome_tracking: outcomeTracking,
         service_date: get(form, "serviceDate"),
         start_time: get(form, "startTime"),
         end_time: get(form, "endTime"),
-        category: get(form, "category"),
+        category: template?.category || get(form, "category"),
         note: get(form, "note"),
         outcomes: get(form, "outcomes"),
-        digital_signature: get(form, "signature"),
+        digital_signature: templateSignature,
         is_important: get(form, "important") === "Important"
       },
       setNotice,
@@ -1120,6 +1155,7 @@ export function ProgressNotesPage() {
         metadata: {
           serviceDate: get(form, "serviceDate"),
           workerName,
+          templateName: template?.name || "Standard progress note",
           operation: "create"
         }
       }
@@ -1128,17 +1164,35 @@ export function ProgressNotesPage() {
   }
 
   const canSubmit = participants.length > 0 && (context.role === "support_worker" || workers.length > 0);
+  const selectedTemplate = templates.find((template) => template.id === selectedTemplateId);
 
   return (
     <AppShell title="Progress Notes" eyebrow={notice}>
+      {context.role === "admin" ? <ProgressTemplateManager templates={templates} setNotice={setNotice} onSaved={refresh} /> : null}
       <section className="mb-6 rounded border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-5 flex flex-col gap-2">
           <h2 className="text-lg font-semibold text-ink">New progress note</h2>
-          <p className="text-sm text-slate-500">Record service delivery, outcomes, and a digital worker signature.</p>
+          <p className="text-sm text-slate-500">Record service delivery, template-required fields, outcomes, and a digital worker signature.</p>
         </div>
         {canSubmit ? (
           <RecordForm submitLabel="Save progress note" onSubmit={submit}>
             <div className="grid gap-4 lg:grid-cols-2">
+              {templates.length ? (
+                <label className="lg:col-span-2">
+                  <span className="mb-2 block text-sm font-medium text-slate-700">Progress note template</span>
+                  <select
+                    name="templateId"
+                    value={selectedTemplateId}
+                    onChange={(event) => setSelectedTemplateId(event.target.value)}
+                    className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15"
+                  >
+                    {templates.map((template) => (
+                      <option key={template.id} value={template.id}>{template.name}</option>
+                    ))}
+                  </select>
+                  {selectedTemplate?.description ? <p className="mt-1 text-xs text-slate-500">{selectedTemplate.description}</p> : null}
+                </label>
+              ) : null}
               <Select name="participant" label="Participant" options={participants.map((participant) => participant.name)} />
               {context.role === "support_worker" ? (
                 <ReadOnlyField label="Support worker" value={context.name || context.email || "Current worker"} />
@@ -1152,15 +1206,19 @@ export function ProgressNotesPage() {
               </div>
               <Select name="category" label="Support category" options={["Self care", "Community access", "Medication prompt", "Meal preparation", "Behaviour support", "Transport assistance", "Domestic assistance"]} />
               <Select name="important" label="Priority" options={["Standard", "Important"]} />
+              {selectedTemplate ? <TemplateFields template={selectedTemplate} /> : null}
               <div className="lg:col-span-2">
                 <Area name="note" label="Notes" placeholder="Write what support was provided, observations, and participant response." />
               </div>
               <div className="lg:col-span-2">
                 <Area name="outcomes" label="Outcomes" placeholder="Record achieved goals, progress, risks, follow-up, or coordinator actions." />
               </div>
-              <div className="lg:col-span-2">
-                <Field name="signature" label="Digital signature" placeholder="Type full name as signature" />
-              </div>
+              {selectedTemplate?.outcomeSchema.length ? <OutcomeTemplateFields template={selectedTemplate} /> : null}
+              {!selectedTemplate?.requiresSignature ? (
+                <div className="lg:col-span-2">
+                  <Field name="signature" label="Digital signature" placeholder="Type full name as signature" />
+                </div>
+              ) : null}
             </div>
           </RecordForm>
         ) : (
@@ -1178,7 +1236,7 @@ export function ProgressNotesPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-ink">{note.participantName}</h2>
-                  <p className="text-sm text-slate-500">{note.category || "Progress note"} by {note.workerName || note.workerEmail || "Worker"}</p>
+                  <p className="text-sm text-slate-500">{note.templateName || note.category || "Progress note"} by {note.workerName || note.workerEmail || "Worker"}</p>
                 </div>
                 <span className="rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{note.isImportant ? "Important" : "Standard"}</span>
               </div>
@@ -1189,6 +1247,8 @@ export function ProgressNotesPage() {
               </div>
               <Info label="Notes" value={note.note || "Not recorded"} />
               <Info label="Outcomes" value={note.outcomes || "Not recorded"} />
+              {Object.keys(note.templateValues).length ? <JsonInfo title="Template fields" values={note.templateValues} /> : null}
+              {Object.keys(note.outcomeTracking).length ? <JsonInfo title="Outcome tracking" values={note.outcomeTracking} /> : null}
               <Info label="Digital signature" value={note.signature || "Not signed"} />
             </article>
           ))}
@@ -1197,6 +1257,156 @@ export function ProgressNotesPage() {
         <EmptyState title="No progress notes yet" message="Structured progress notes will appear here after they are saved." />
       )}
     </AppShell>
+  );
+}
+
+function ProgressTemplateManager({
+  templates,
+  setNotice,
+  onSaved
+}: {
+  templates: ProgressNoteTemplate[];
+  setNotice: (message: string) => void;
+  onSaved: () => Promise<void>;
+}) {
+  async function submit(form: FormData) {
+    const ok = await postJson(
+      "/api/progress-note-templates",
+      {
+        name: get(form, "name"),
+        description: get(form, "description"),
+        category: get(form, "category"),
+        required_fields: get(form, "requiredFields"),
+        dropdown_label: get(form, "dropdownLabel"),
+        dropdown_options: get(form, "dropdownOptions"),
+        outcome_fields: get(form, "outcomeFields"),
+        requires_signature: get(form, "requiresSignature") === "Yes",
+        status: get(form, "status")
+      },
+      setNotice
+    );
+    if (ok) await onSaved();
+  }
+
+  return (
+    <section className="mb-6 rounded border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-5 flex flex-col gap-2">
+        <h2 className="text-lg font-semibold text-ink">Progress note templates</h2>
+        <p className="text-sm text-slate-500">Create required fields, dropdown choices, signatures, and participant outcome tracking for consistent NDIS notes.</p>
+      </div>
+      <RecordForm submitLabel="Create template" onSubmit={submit}>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Field name="name" label="Template name" placeholder="Community access progress note" />
+          <Select name="category" label="Support category" options={["Self care", "Community access", "Medication prompt", "Meal preparation", "Behaviour support", "Transport assistance", "Domestic assistance", "General"]} />
+          <OptionalArea name="description" label="Template description" placeholder="When this template should be used." />
+          <OptionalArea name="requiredFields" label="Required fields" placeholder={"Enter one field per line, e.g.\nParticipant mood\nSupport provided\nObserved risks"} />
+          <Field name="dropdownLabel" label="Dropdown label" required={false} placeholder="Participant engagement" />
+          <OptionalArea name="dropdownOptions" label="Dropdown options" placeholder={"One option per line, e.g.\nIndependent\nPrompted\nAssisted\nDeclined"} />
+          <OptionalArea name="outcomeFields" label="Outcome tracking fields" placeholder={"One outcome per line, e.g.\nNDIS goal progress\nFollow-up required"} />
+          <Select name="requiresSignature" label="Require worker signature" options={["Yes", "No"]} />
+          <Select name="status" label="Template status" options={["active", "archived"]} />
+        </div>
+      </RecordForm>
+      {templates.length ? (
+        <div className="grid gap-3 lg:grid-cols-3">
+          {templates.map((template) => (
+            <article key={template.id} className="rounded border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold text-ink">{template.name}</h3>
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-gumleaf">{template.category}</p>
+                </div>
+                <span className="rounded bg-white px-2 py-1 text-xs font-semibold text-slate-600">{template.status}</span>
+              </div>
+              <p className="mt-3 text-sm text-slate-600">{template.description || "No description recorded."}</p>
+              <p className="mt-3 text-xs text-slate-500">
+                {template.fieldSchema.length} fields, {template.outcomeSchema.length} outcome trackers
+              </p>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <EmptyState title="No templates yet" message="Create a template to standardise required progress note fields." />
+      )}
+    </section>
+  );
+}
+
+function TemplateFields({ template }: { template: ProgressNoteTemplate }) {
+  if (!template.fieldSchema.length) return null;
+  return (
+    <div className="lg:col-span-2 rounded border border-slate-200 bg-slate-50 p-4">
+      <h3 className="font-semibold text-ink">{template.name} required fields</h3>
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        {template.fieldSchema.map((field) => (
+          <TemplateInput key={field.id} field={field} name={`template_${field.id}`} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OutcomeTemplateFields({ template }: { template: ProgressNoteTemplate }) {
+  if (!template.outcomeSchema.length) return null;
+  return (
+    <div className="lg:col-span-2 rounded border border-slate-200 bg-slate-50 p-4">
+      <h3 className="font-semibold text-ink">Participant outcome tracking</h3>
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        {template.outcomeSchema.map((field) => (
+          <TemplateInput key={field.id} field={field} name={`outcome_${field.id}`} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TemplateInput({ field, name }: { field: ProgressTemplateField; name: string }) {
+  if (field.type === "dropdown") {
+    return (
+      <label>
+        <span className="mb-2 block text-sm font-medium text-slate-700">{field.label}</span>
+        <select name={name} required={field.required} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15">
+          <option value="">Select {field.label}</option>
+          {(field.options ?? []).map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+      </label>
+    );
+  }
+
+  if (field.type === "textarea") {
+    return (
+      <label className="lg:col-span-2">
+        <span className="mb-2 block text-sm font-medium text-slate-700">{field.label}</span>
+        <textarea name={name} required={field.required} rows={3} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
+      </label>
+    );
+  }
+
+  return (
+    <label>
+      <span className="mb-2 block text-sm font-medium text-slate-700">{field.label}</span>
+      <input name={name} required={field.required} placeholder={field.type === "signature" ? "Type full name as signature" : undefined} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
+    </label>
+  );
+}
+
+function JsonInfo({ title, values }: { title: string; values: Record<string, string> }) {
+  const entries = Object.entries(values).filter(([, value]) => value);
+  if (!entries.length) return null;
+  return (
+    <div className="mt-4 rounded border border-slate-200 bg-slate-50 p-4 text-sm">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</p>
+      <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+        {entries.map(([key, value]) => (
+          <div key={key}>
+            <dt className="text-xs font-semibold text-slate-500">{humaniseKey(key)}</dt>
+            <dd className="mt-1 whitespace-pre-wrap leading-6 text-slate-700">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }
 
@@ -2789,8 +2999,31 @@ async function loadProgressNotes(workerEmail?: string): Promise<ProgressNoteReco
     note: String(row.note ?? ""),
     outcomes: String(row.outcomes ?? ""),
     signature: String(row.digital_signature ?? ""),
+    templateName: String(row.template_name ?? ""),
+    templateValues: asStringRecord(row.template_values),
+    outcomeTracking: asStringRecord(row.outcome_tracking),
     isImportant: Boolean(row.is_important),
     createdAt: String(row.created_at ?? "")
+  }));
+}
+
+async function loadProgressNoteTemplates(): Promise<ProgressNoteTemplate[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  const { data, error } = await supabase
+    .from("progress_note_templates")
+    .select("*")
+    .eq("status", "active")
+    .order("name", { ascending: true });
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: String(row.id ?? ""),
+    name: String(row.name ?? ""),
+    description: String(row.description ?? ""),
+    category: String(row.category ?? "General"),
+    fieldSchema: normaliseTemplateFields(row.field_schema),
+    outcomeSchema: normaliseTemplateFields(row.outcome_schema),
+    requiresSignature: Boolean(row.requires_signature),
+    status: String(row.status ?? "active")
   }));
 }
 
@@ -3152,6 +3385,49 @@ function detailsPlaceholderForKind(kind: ModuleKind) {
 
 function get(form: FormData, name: string) {
   return String(form.get(name) ?? "").trim();
+}
+
+function readTemplateValues(form: FormData, fields: ProgressTemplateField[], prefix: "template" | "outcome") {
+  return fields.reduce<Record<string, string>>((values, field) => {
+    values[field.id] = get(form, `${prefix}_${field.id}`);
+    return values;
+  }, {});
+}
+
+function normaliseTemplateFields(value: unknown): ProgressTemplateField[] {
+  if (!Array.isArray(value)) return [];
+  return value.reduce<ProgressTemplateField[]>((fields, item) => {
+      if (!item || typeof item !== "object") return fields;
+      const field = item as Record<string, unknown>;
+      const id = String(field.id ?? "").trim();
+      const label = String(field.label ?? "").trim();
+      if (!id || !label) return fields;
+      const options = Array.isArray(field.options) ? field.options.map((option) => String(option)).filter(Boolean) : undefined;
+      fields.push({
+        id,
+        label,
+        type: String(field.type ?? "text").trim() || "text",
+        required: Boolean(field.required),
+        options
+      });
+      return fields;
+    }, []);
+}
+
+function asStringRecord(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.entries(value as Record<string, unknown>).reduce<Record<string, string>>((record, [key, entry]) => {
+    record[key] = String(entry ?? "");
+    return record;
+  }, {});
+}
+
+function humaniseKey(key: string) {
+  return key
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function timeOnly(value: string) {

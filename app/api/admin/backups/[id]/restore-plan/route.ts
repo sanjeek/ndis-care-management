@@ -9,6 +9,7 @@ const restoreOrder = [
   "worker_invitations",
   "shifts",
   "progress_notes",
+  "progress_note_templates",
   "incident_reports",
   "module_records",
   "care_plans",

@@ -320,6 +320,33 @@ add column if not exists outcomes text;
 alter table public.progress_notes
 add column if not exists digital_signature text;
 
+alter table public.progress_notes
+add column if not exists template_id uuid;
+
+alter table public.progress_notes
+add column if not exists template_name text;
+
+alter table public.progress_notes
+add column if not exists template_values jsonb not null default '{}'::jsonb;
+
+alter table public.progress_notes
+add column if not exists outcome_tracking jsonb not null default '{}'::jsonb;
+
+create table if not exists public.progress_note_templates (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  description text,
+  category text not null default 'General',
+  field_schema jsonb not null default '[]'::jsonb,
+  outcome_schema jsonb not null default '[]'::jsonb,
+  requires_signature boolean not null default true,
+  status text not null default 'active' check (status in ('active', 'archived')),
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.incident_reports (
   id uuid primary key default gen_random_uuid(),
   incident_number text unique,
@@ -557,6 +584,7 @@ alter table public.worker_availability enable row level security;
 alter table public.worker_leave_requests enable row level security;
 alter table public.shifts enable row level security;
 alter table public.progress_notes enable row level security;
+alter table public.progress_note_templates enable row level security;
 alter table public.incident_reports enable row level security;
 alter table public.module_records enable row level security;
 alter table public.care_plans enable row level security;
@@ -577,6 +605,7 @@ alter table public.worker_availability force row level security;
 alter table public.worker_leave_requests force row level security;
 alter table public.shifts force row level security;
 alter table public.progress_notes force row level security;
+alter table public.progress_note_templates force row level security;
 alter table public.incident_reports force row level security;
 alter table public.module_records force row level security;
 alter table public.care_plans force row level security;
@@ -672,6 +701,8 @@ drop policy if exists "Admins can manage progress notes" on public.progress_note
 drop policy if exists "Workers can read own progress notes" on public.progress_notes;
 drop policy if exists "Workers can create own assigned progress notes" on public.progress_notes;
 drop policy if exists "Workers can update own progress notes" on public.progress_notes;
+drop policy if exists "Admins can manage progress note templates" on public.progress_note_templates;
+drop policy if exists "Staff can read active progress note templates" on public.progress_note_templates;
 drop policy if exists "Role based incident reports" on public.incident_reports;
 drop policy if exists "Admins can manage incident reports" on public.incident_reports;
 drop policy if exists "Workers can read own incident reports" on public.incident_reports;
@@ -978,6 +1009,21 @@ with check (
   public.is_support_worker()
   and lower(worker_email) = public.current_app_email()
   and public.worker_is_assigned_to_participant(participant_name)
+);
+
+create policy "Admins can manage progress note templates"
+on public.progress_note_templates for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create policy "Staff can read active progress note templates"
+on public.progress_note_templates for select
+to authenticated
+using (
+  public.current_user_is_active()
+  and public.current_app_role() in ('admin', 'team_leader', 'support_worker')
+  and status = 'active'
 );
 
 create policy "Admins can manage incident reports"

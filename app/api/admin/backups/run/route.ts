@@ -13,6 +13,7 @@ const backupTables = [
   "worker_leave_requests",
   "shifts",
   "progress_notes",
+  "progress_note_templates",
   "incident_reports",
   "module_records",
   "care_plans",
