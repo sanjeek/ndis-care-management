@@ -299,6 +299,23 @@ create table if not exists public.module_records (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.care_plans (
+  id uuid primary key default gen_random_uuid(),
+  participant_name text not null,
+  title text not null,
+  goals text not null,
+  support_instructions text not null,
+  medication_information text,
+  mobility_requirements text,
+  participant_preferences text,
+  review_date date,
+  status text not null default 'active',
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.care_documents (
   id uuid primary key default gen_random_uuid(),
   title text not null,
@@ -365,6 +382,7 @@ alter table public.shifts enable row level security;
 alter table public.progress_notes enable row level security;
 alter table public.incident_reports enable row level security;
 alter table public.module_records enable row level security;
+alter table public.care_plans enable row level security;
 alter table public.care_documents enable row level security;
 alter table public.audit_logs enable row level security;
 alter table public.backup_logs enable row level security;
@@ -379,6 +397,7 @@ alter table public.shifts force row level security;
 alter table public.progress_notes force row level security;
 alter table public.incident_reports force row level security;
 alter table public.module_records force row level security;
+alter table public.care_plans force row level security;
 alter table public.care_documents force row level security;
 alter table public.audit_logs force row level security;
 alter table public.backup_logs force row level security;
@@ -469,6 +488,8 @@ drop policy if exists "Workers can create own assigned incident reports" on publ
 drop policy if exists "Workers can update own incident reports" on public.incident_reports;
 drop policy if exists "Role based module records" on public.module_records;
 drop policy if exists "Admins can manage module records" on public.module_records;
+drop policy if exists "Admins can manage care plans" on public.care_plans;
+drop policy if exists "Workers can read assigned care plans" on public.care_plans;
 drop policy if exists "Admins can manage care documents" on public.care_documents;
 drop policy if exists "Workers can read assigned care documents" on public.care_documents;
 drop policy if exists "Admins can read audit logs" on public.audit_logs;
@@ -747,6 +768,20 @@ on public.module_records for all
 to authenticated
 using (public.is_admin())
 with check (public.is_admin());
+
+create policy "Admins can manage care plans"
+on public.care_plans for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create policy "Workers can read assigned care plans"
+on public.care_plans for select
+to authenticated
+using (
+  public.is_support_worker()
+  and public.worker_is_assigned_to_participant(participant_name)
+);
 
 create policy "Admins can manage care documents"
 on public.care_documents for all

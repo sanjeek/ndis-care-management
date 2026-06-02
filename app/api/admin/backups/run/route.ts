@@ -13,6 +13,7 @@ const backupTables = [
   "progress_notes",
   "incident_reports",
   "module_records",
+  "care_plans",
   "care_documents",
   "audit_logs"
 ];

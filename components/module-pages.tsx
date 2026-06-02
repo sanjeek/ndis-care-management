@@ -58,6 +58,20 @@ type ParticipantDocument = {
   createdAt: string;
 };
 
+type CarePlanRecord = {
+  id: string;
+  participantName: string;
+  title: string;
+  goals: string;
+  supportInstructions: string;
+  medicationInformation: string;
+  mobilityRequirements: string;
+  participantPreferences: string;
+  reviewDate: string;
+  status: string;
+  createdAt: string;
+};
+
 type WorkerRecord = {
   name: string;
   email: string;
@@ -430,6 +444,107 @@ export function ParticipantProfilePage({ participantId }: { participantId: strin
         </div>
       ) : (
         <EmptyState title="Participant profile unavailable" message="This participant could not be found, or your login does not have permission to view it." />
+      )}
+    </AppShell>
+  );
+}
+
+export function CarePlansPage() {
+  const [carePlans, setCarePlans] = useState<CarePlanRecord[]>([]);
+  const [participants, setParticipants] = useState<ParticipantRecord[]>([]);
+  const [context, setContext] = useState<{ role: UserRole; email: string }>({ role: "support_worker", email: "" });
+  const [notice, setNotice] = useState("Loading care plans from Supabase.");
+
+  const refresh = useCallback(async () => {
+    const userContext = await getCurrentUserContext();
+    const assignedShifts = userContext.role === "support_worker" && userContext.email ? await loadShifts(userContext.email) : [];
+    const [loadedPlans, loadedParticipants] = await Promise.all([
+      loadCarePlans(),
+      userContext.role === "support_worker" ? loadParticipantsForShifts(assignedShifts) : loadParticipants()
+    ]);
+    setContext(userContext);
+    setCarePlans(loadedPlans);
+    setParticipants(loadedParticipants);
+    setNotice(
+      loadedPlans.length
+        ? userContext.role === "support_worker"
+          ? "Showing read-only care plans for your assigned participants."
+          : "Showing provider care plans from the database."
+        : "No care plans have been created yet."
+    );
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  async function submit(form: FormData) {
+    const ok = await postJson(
+      "/api/care-plans",
+      {
+        participant_name: get(form, "participant"),
+        title: get(form, "title"),
+        goals: get(form, "goals"),
+        support_instructions: get(form, "supportInstructions"),
+        medication_information: get(form, "medicationInformation"),
+        mobility_requirements: get(form, "mobilityRequirements"),
+        participant_preferences: get(form, "participantPreferences"),
+        review_date: get(form, "reviewDate"),
+        status: get(form, "status")
+      },
+      setNotice
+    );
+    if (ok) await refresh();
+  }
+
+  const canManage = context.role === "admin";
+
+  return (
+    <AppShell title="Care Plans" eyebrow={notice}>
+      {canManage ? (
+        <RecordForm submitLabel="Create care plan" onSubmit={submit}>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Select name="participant" label="Participant" options={participants.map((participant) => participant.name)} />
+            <Field name="title" label="Care plan title" placeholder="Daily support plan, community access plan, medication support plan" />
+          </div>
+          <Area name="goals" label="Goals" placeholder="Participant goals, NDIS outcomes, short-term objectives, and progress measures" />
+          <Area name="supportInstructions" label="Support instructions" placeholder="Step-by-step support instructions, routines, prompts, behaviour supports, and safeguarding instructions" />
+          <Area name="medicationInformation" label="Medication information" placeholder="Medication prompts, administration boundaries, allergies, escalation instructions, and medication chart notes" />
+          <Area name="mobilityRequirements" label="Mobility requirements" placeholder="Transfers, equipment, mobility aids, manual handling, transport, and access needs" />
+          <Area name="participantPreferences" label="Participant preferences" placeholder="Communication, cultural, personal care, meal, activity, and routine preferences" />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field name="reviewDate" label="Review date" type="date" />
+            <Select name="status" label="Status" options={["active", "draft", "review_due", "archived"]} />
+          </div>
+        </RecordForm>
+      ) : (
+        <div className="mb-5 rounded border border-gumleaf/25 bg-gumleaf/5 p-4 text-sm text-slate-700">
+          Support worker access is read-only and limited to care plans for participants assigned to your shifts.
+        </div>
+      )}
+
+      {carePlans.length ? (
+        <div className="grid gap-4 xl:grid-cols-2">
+          {carePlans.map((plan) => (
+            <article key={plan.id} className="rounded border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-gumleaf">{plan.participantName}</p>
+                  <h2 className="mt-1 text-xl font-semibold text-ink">{plan.title}</h2>
+                </div>
+                <span className="w-fit rounded bg-harbour/10 px-3 py-1 text-xs font-semibold uppercase text-harbour">{plan.status}</span>
+              </div>
+              <Info label="Review date" value={plan.reviewDate ? dateOnly(plan.reviewDate) : "Not recorded"} />
+              <CarePlanDetail title="Goals" value={plan.goals} />
+              <CarePlanDetail title="Support instructions" value={plan.supportInstructions} />
+              <CarePlanDetail title="Medication information" value={plan.medicationInformation} tone="risk" />
+              <CarePlanDetail title="Mobility requirements" value={plan.mobilityRequirements} />
+              <CarePlanDetail title="Participant preferences" value={plan.participantPreferences} />
+            </article>
+          ))}
+        </div>
+      ) : (
+        <EmptyState title="No care plans yet" message={canManage ? "Create a care plan for a participant to guide support delivery." : "Care plans for your assigned participants will appear here."} />
       )}
     </AppShell>
   );
@@ -2030,6 +2145,15 @@ function ProfileSection({ title, value, tone = "default" }: { title: string; val
   );
 }
 
+function CarePlanDetail({ title, value, tone = "default" }: { title: string; value: string; tone?: "default" | "risk" }) {
+  return (
+    <div className={`mt-4 border-t pt-4 ${tone === "risk" ? "border-coral/20" : "border-slate-100"}`}>
+      <p className={`text-xs font-semibold uppercase tracking-wide ${tone === "risk" ? "text-coral" : "text-slate-400"}`}>{title}</p>
+      <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">{value || "Not recorded"}</p>
+    </div>
+  );
+}
+
 async function loadParticipants(): Promise<ParticipantRecord[]> {
   if (!isSupabaseConfigured || !supabase) return [];
   const { data, error } = await supabase.from("participants").select("*").order("created_at", { ascending: false });
@@ -2058,6 +2182,25 @@ async function loadParticipantDocuments(participantName: string): Promise<Partic
     fileName: String(row.file_name ?? ""),
     contentType: String(row.content_type ?? ""),
     sizeBytes: Number(row.size_bytes ?? 0),
+    createdAt: String(row.created_at ?? "")
+  }));
+}
+
+async function loadCarePlans(): Promise<CarePlanRecord[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  const { data, error } = await supabase.from("care_plans").select("*").order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: String(row.id ?? ""),
+    participantName: String(row.participant_name ?? ""),
+    title: String(row.title ?? ""),
+    goals: String(row.goals ?? ""),
+    supportInstructions: String(row.support_instructions ?? ""),
+    medicationInformation: String(row.medication_information ?? ""),
+    mobilityRequirements: String(row.mobility_requirements ?? ""),
+    participantPreferences: String(row.participant_preferences ?? ""),
+    reviewDate: String(row.review_date ?? ""),
+    status: String(row.status ?? "active"),
     createdAt: String(row.created_at ?? "")
   }));
 }

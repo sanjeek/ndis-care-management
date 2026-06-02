@@ -4,6 +4,7 @@ import {
   Clock3,
   Database,
   FileText,
+  HeartPulse,
   HeartHandshake,
   LayoutDashboard,
   ListChecks,
@@ -21,6 +22,7 @@ import {
 export const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Participants", href: "/participants", icon: HeartHandshake },
+  { label: "Care Plans", href: "/care-plans", icon: HeartPulse },
   { label: "Support Workers", href: "/support-workers", icon: Users },
   { label: "Rostering", href: "/rostering", icon: Clock3 },
   { label: "Timesheets", href: "/timesheets", icon: ClipboardCheck },
