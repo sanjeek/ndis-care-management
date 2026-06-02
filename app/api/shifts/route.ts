@@ -18,9 +18,15 @@ export async function POST(request: Request) {
   const endsAt = String(body.ends_at ?? "").trim();
   const location = String(body.location ?? "").trim();
   const status = String(body.status ?? "Draft").trim() || "Draft";
+  const allowedLatitude = Number(body.allowed_latitude);
+  const allowedLongitude = Number(body.allowed_longitude);
+  const allowedRadiusM = Number(body.allowed_radius_m ?? 250);
 
   if (!participantName || !workerName || !workerEmail || !startsAt || !endsAt) {
     return NextResponse.json({ message: "Participant, support worker, worker email, start time, and end time are required." }, { status: 400 });
+  }
+  if (!isValidLatitude(allowedLatitude) || !isValidLongitude(allowedLongitude) || !isValidRadius(allowedRadiusM)) {
+    return NextResponse.json({ message: "Valid GPS latitude, longitude, and an allowed radius between 25 and 5000 metres are required." }, { status: 400 });
   }
 
   const { data: shift, error } = await auth.client
@@ -32,7 +38,10 @@ export async function POST(request: Request) {
       location,
       starts_at: startsAt,
       ends_at: endsAt,
-      status
+      status,
+      allowed_latitude: allowedLatitude,
+      allowed_longitude: allowedLongitude,
+      allowed_radius_m: Math.round(allowedRadiusM)
     })
     .select("id")
     .single();
@@ -50,7 +59,7 @@ export async function POST(request: Request) {
     tableName: "shifts",
     recordId: shift.id,
     recordLabel: `${participantName} shift`,
-    metadata: { participantName, workerName, workerEmail, startsAt, endsAt, status }
+    metadata: { participantName, workerName, workerEmail, startsAt, endsAt, status, allowedLatitude, allowedLongitude, allowedRadiusM }
   });
 
   const adminRecipients = await getAdminNotificationRecipients(auth.client, { fallback: [auth.user.email] });
@@ -67,7 +76,7 @@ export async function POST(request: Request) {
       `Status: ${status}`,
       `Open worker portal: ${appUrl("/worker-portal")}`
     ].join("\n"),
-    metadata: { shiftId: shift.id, participantName, workerName, workerEmail, startsAt, endsAt, status }
+    metadata: { shiftId: shift.id, participantName, workerName, workerEmail, startsAt, endsAt, status, allowedLatitude, allowedLongitude, allowedRadiusM }
   });
   await sendCareNotification(auth.client, {
     type: "new_shift",
@@ -81,8 +90,20 @@ export async function POST(request: Request) {
       `End: ${endsAt}`,
       `Open roster: ${appUrl("/rostering")}`
     ].join("\n"),
-    metadata: { shiftId: shift.id, participantName, workerName, workerEmail, startsAt, endsAt, status }
+    metadata: { shiftId: shift.id, participantName, workerName, workerEmail, startsAt, endsAt, status, allowedLatitude, allowedLongitude, allowedRadiusM }
   });
 
   return NextResponse.json({ message: "Shift saved and notifications recorded.", id: shift.id });
+}
+
+function isValidLatitude(value: number) {
+  return Number.isFinite(value) && value >= -90 && value <= 90;
+}
+
+function isValidLongitude(value: number) {
+  return Number.isFinite(value) && value >= -180 && value <= 180;
+}
+
+function isValidRadius(value: number) {
+  return Number.isFinite(value) && value >= 25 && value <= 5000;
 }

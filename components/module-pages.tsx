@@ -113,6 +113,15 @@ type ShiftRecord = {
   approvalStatus: string;
   clockInAt: string;
   clockOutAt: string;
+  allowedLatitude: string;
+  allowedLongitude: string;
+  allowedRadiusM: string;
+  clockInLatitude: string;
+  clockInLongitude: string;
+  clockInDistanceM: string;
+  clockOutLatitude: string;
+  clockOutLongitude: string;
+  clockOutDistanceM: string;
   submittedAt: string;
   submittedByEmail: string;
   approvedAt: string;
@@ -1001,7 +1010,10 @@ export function RosteringPage() {
         location: get(form, "location"),
         starts_at: start,
         ends_at: end,
-        status: get(form, "status")
+        status: get(form, "status"),
+        allowed_latitude: get(form, "allowedLatitude"),
+        allowed_longitude: get(form, "allowedLongitude"),
+        allowed_radius_m: get(form, "allowedRadius")
       },
       setNotice
     );
@@ -1663,6 +1675,9 @@ function WorkerShiftMobilePanel({ shifts, onClock, onSubmit }: { shifts: ShiftRe
             <div>
               <h3 className="text-lg font-semibold text-ink">{nextShift.participantName || nextShift.participant}</h3>
               <p className="text-sm text-slate-600">{nextShift.time || "Time not recorded"} | {nextShift.location || "Location not recorded"}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                GPS radius: {nextShift.allowedRadiusM ? `${nextShift.allowedRadiusM}m` : "not configured"}
+              </p>
             </div>
             <span className={`w-fit rounded px-2.5 py-1 text-xs font-semibold ${approvalBadgeClass(nextShift.approvalStatus)}`}>{approvalLabel(nextShift.approvalStatus)}</span>
           </div>
@@ -1709,9 +1724,9 @@ function WorkerShiftMobilePanel({ shifts, onClock, onSubmit }: { shifts: ShiftRe
                 </div>
                 <span className="rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{shift.status || "Draft"}</span>
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500">
-                <span>In: {shift.clockInAt ? timeOnly(shift.clockInAt) : "Not clocked"}</span>
-                <span>Out: {shift.clockOutAt ? timeOnly(shift.clockOutAt) : "Not clocked"}</span>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500">
+                <span>In: {shift.clockInAt ? `${timeOnly(shift.clockInAt)}${shift.clockInDistanceM ? ` (${shift.clockInDistanceM}m)` : ""}` : "Not clocked"}</span>
+                <span>Out: {shift.clockOutAt ? `${timeOnly(shift.clockOutAt)}${shift.clockOutDistanceM ? ` (${shift.clockOutDistanceM}m)` : ""}` : "Not clocked"}</span>
               </div>
             </article>
           ))}
@@ -2043,6 +2058,15 @@ function ShiftCreateModal({
                 )}
               </div>
               <Field name="location" label="Location" placeholder="Shift location" />
+              <div className="rounded border border-slate-200 bg-white p-3">
+                <p className="text-sm font-semibold text-ink">GPS clock-in geofence</p>
+                <p className="mt-1 text-xs text-slate-500">Enter the allowed shift location coordinates. Workers outside this radius cannot clock in.</p>
+                <div className="mt-3 grid gap-4 sm:grid-cols-3">
+                  <Field name="allowedLatitude" label="Allowed latitude" type="number" placeholder="-33.8688" step="any" />
+                  <Field name="allowedLongitude" label="Allowed longitude" type="number" placeholder="151.2093" step="any" />
+                  <Field name="allowedRadius" label="Radius metres" type="number" defaultValue="250" placeholder="250" min="25" max="5000" />
+                </div>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label>
                   <span className="mb-2 block text-sm font-medium text-slate-700">Start time</span>
@@ -2081,11 +2105,29 @@ function RecordForm({ children, submitLabel, onSubmit }: { children: React.React
   );
 }
 
-function Field({ name, label, defaultValue = "", placeholder = "", type = "text" }: { name: string; label: string; defaultValue?: string; placeholder?: string; type?: string }) {
+function Field({
+  name,
+  label,
+  defaultValue = "",
+  placeholder = "",
+  type = "text",
+  step,
+  min,
+  max
+}: {
+  name: string;
+  label: string;
+  defaultValue?: string;
+  placeholder?: string;
+  type?: string;
+  step?: string;
+  min?: string;
+  max?: string;
+}) {
   return (
     <label>
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
-      <input name={name} type={type} required defaultValue={defaultValue} placeholder={placeholder} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
+      <input name={name} type={type} required defaultValue={defaultValue} placeholder={placeholder} step={step} min={min} max={max} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
     </label>
   );
 }
@@ -2482,6 +2524,15 @@ async function loadShifts(workerEmail?: string): Promise<ShiftRecord[]> {
       approvalStatus: String(row.approval_status ?? "not_submitted"),
       clockInAt: String(row.clock_in_at ?? ""),
       clockOutAt: String(row.clock_out_at ?? ""),
+      allowedLatitude: String(row.allowed_latitude ?? ""),
+      allowedLongitude: String(row.allowed_longitude ?? ""),
+      allowedRadiusM: String(row.allowed_radius_m ?? ""),
+      clockInLatitude: String(row.clock_in_latitude ?? ""),
+      clockInLongitude: String(row.clock_in_longitude ?? ""),
+      clockInDistanceM: String(row.clock_in_distance_m ?? ""),
+      clockOutLatitude: String(row.clock_out_latitude ?? ""),
+      clockOutLongitude: String(row.clock_out_longitude ?? ""),
+      clockOutDistanceM: String(row.clock_out_distance_m ?? ""),
       submittedAt: String(row.submitted_at ?? ""),
       submittedByEmail: String(row.submitted_by_email ?? ""),
       approvedAt: String(row.approved_at ?? ""),
@@ -2610,17 +2661,40 @@ async function runShiftClock(shiftId: string, action: "in" | "out", setNotice: (
     setNotice("Please sign in again before clocking this shift.");
     return false;
   }
+  setNotice("Requesting GPS location for shift clocking.");
+  const gps = await getBrowserGpsLocation();
+  if (!gps) {
+    setNotice("GPS location is required. Allow location access in your browser or phone settings, then try again.");
+    return false;
+  }
   const response = await fetch(`/api/shifts/${shiftId}/clock`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`
     },
-    body: JSON.stringify({ action })
+    body: JSON.stringify({ action, ...gps })
   });
   const result = await response.json().catch(() => ({ message: "Clock action failed." }));
   setNotice(result.message);
   return response.ok;
+}
+
+async function getBrowserGpsLocation(): Promise<{ latitude: number; longitude: number; accuracy: number } | null> {
+  if (typeof navigator === "undefined" || !navigator.geolocation) return null;
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        });
+      },
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+    );
+  });
 }
 
 function friendlyDatabaseError(message: string, table: string) {

@@ -136,6 +136,17 @@ create table if not exists public.shifts (
   clock_out_at timestamptz,
   clocked_by uuid references auth.users(id) on delete set null,
   clocked_by_email text,
+  allowed_latitude numeric,
+  allowed_longitude numeric,
+  allowed_radius_m integer not null default 250,
+  clock_in_latitude numeric,
+  clock_in_longitude numeric,
+  clock_in_accuracy_m numeric,
+  clock_in_distance_m numeric,
+  clock_out_latitude numeric,
+  clock_out_longitude numeric,
+  clock_out_accuracy_m numeric,
+  clock_out_distance_m numeric,
   submitted_at timestamptz,
   submitted_by uuid references auth.users(id) on delete set null,
   submitted_by_email text,
@@ -164,6 +175,39 @@ add column if not exists clocked_by uuid references auth.users(id) on delete set
 
 alter table public.shifts
 add column if not exists clocked_by_email text;
+
+alter table public.shifts
+add column if not exists allowed_latitude numeric;
+
+alter table public.shifts
+add column if not exists allowed_longitude numeric;
+
+alter table public.shifts
+add column if not exists allowed_radius_m integer not null default 250;
+
+alter table public.shifts
+add column if not exists clock_in_latitude numeric;
+
+alter table public.shifts
+add column if not exists clock_in_longitude numeric;
+
+alter table public.shifts
+add column if not exists clock_in_accuracy_m numeric;
+
+alter table public.shifts
+add column if not exists clock_in_distance_m numeric;
+
+alter table public.shifts
+add column if not exists clock_out_latitude numeric;
+
+alter table public.shifts
+add column if not exists clock_out_longitude numeric;
+
+alter table public.shifts
+add column if not exists clock_out_accuracy_m numeric;
+
+alter table public.shifts
+add column if not exists clock_out_distance_m numeric;
 
 alter table public.shifts
 add column if not exists submitted_at timestamptz;
