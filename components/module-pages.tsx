@@ -51,6 +51,7 @@ type WorkerRecord = {
 };
 
 type ShiftRecord = {
+  id: string;
   time: string;
   participant: string;
   participantName: string;
@@ -59,6 +60,14 @@ type ShiftRecord = {
   location: string;
   status: string;
   startsAt?: string;
+  endsAt?: string;
+  approvalStatus: string;
+  submittedAt: string;
+  submittedByEmail: string;
+  approvedAt: string;
+  approvedByEmail: string;
+  rejectionReason: string;
+  payrollReadyAt: string;
 };
 
 type ModuleItem = {
@@ -445,34 +454,127 @@ export function WorkerPortalPage() {
 export function MyShiftsPage() {
   const [workerName, setWorkerName] = useState("");
   const [visibleShifts, setVisibleShifts] = useState<ShiftRecord[]>([]);
+  const [notice, setNotice] = useState("Loading assigned shifts.");
 
-  useEffect(() => {
-    let active = true;
-    async function load() {
+  const refresh = useCallback(async () => {
       if (!supabase) return;
       const { data } = await supabase.auth.getUser();
       const user = data.user;
       const email = user?.email ?? "";
       const name = String(user?.user_metadata?.full_name || user?.email || user?.id || "");
       const shifts = email ? await loadShifts(email) : [];
-      if (!active) return;
       setWorkerName(name);
       setVisibleShifts(shifts);
-    }
-    void load();
+      setNotice(shifts.length ? "Only shifts assigned to your login email are shown here." : "You do not currently have any assigned shifts under this login.");
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void refresh().then(() => {
+      if (!active) return;
+    });
     return () => {
       active = false;
     };
-  }, []);
+  }, [refresh]);
+
+  async function submitShift(shiftId: string) {
+    const ok = await runShiftWorkflow(shiftId, "submit", setNotice);
+    if (ok) await refresh();
+  }
 
   return (
-    <AppShell title="My Shifts" eyebrow={`${workerName || "Worker"} assigned schedule only.`}>
+    <AppShell title="My Shifts" eyebrow={`${workerName || "Worker"} assigned schedule only. ${notice}`}>
       <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-4">
           <h2 className="font-semibold text-ink">Assigned shifts</h2>
-          <p className="mt-1 text-sm text-slate-500">Only shifts assigned to your login email are shown here.</p>
+          <p className="mt-1 text-sm text-slate-500">Complete your shift, then submit it for team leader or admin approval before payroll.</p>
         </div>
-        <ShiftTable title="Assigned shifts" shifts={visibleShifts} emptyMessage="You do not currently have any assigned shifts under this login." />
+        <ShiftTable
+          title="Assigned shifts"
+          shifts={visibleShifts}
+          emptyMessage="You do not currently have any assigned shifts under this login."
+          renderActions={(shift) => (
+            <button
+              type="button"
+              disabled={!canSubmitShift(shift)}
+              onClick={() => void submitShift(shift.id)}
+              className="rounded bg-gumleaf px-3 py-2 text-xs font-semibold text-white hover:bg-[#1d625d] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+            >
+              {shift.approvalStatus === "approved" ? "Approved" : shift.approvalStatus === "submitted" ? "Submitted" : "Submit completed shift"}
+            </button>
+          )}
+        />
+      </section>
+    </AppShell>
+  );
+}
+
+export function TimesheetsApprovalPage() {
+  const [shifts, setShifts] = useState<ShiftRecord[]>([]);
+  const [context, setContext] = useState<{ role: UserRole; email: string }>({ role: "support_worker", email: "" });
+  const [notice, setNotice] = useState("Loading shift approval queue.");
+
+  const refresh = useCallback(async () => {
+    const userContext = await getCurrentUserContext();
+    const loadedShifts = await loadShifts();
+    setContext(userContext);
+    setShifts(loadedShifts);
+    setNotice(loadedShifts.length ? "Review submitted shifts before payroll processing." : "No shifts have been created yet.");
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  async function approveShift(shiftId: string) {
+    const ok = await runShiftWorkflow(shiftId, "approve", setNotice);
+    if (ok) await refresh();
+  }
+
+  async function rejectShift(shiftId: string) {
+    const reason = window.prompt("Reason for rejection");
+    if (reason === null) return;
+    const ok = await runShiftWorkflow(shiftId, "reject", setNotice, reason);
+    if (ok) await refresh();
+  }
+
+  const pending = shifts.filter((shift) => shift.approvalStatus === "submitted");
+  const approved = shifts.filter((shift) => shift.approvalStatus === "approved");
+  const rejected = shifts.filter((shift) => shift.approvalStatus === "rejected");
+  const canReview = context.role === "admin" || context.role === "team_leader";
+
+  return (
+    <AppShell title="Timesheets" eyebrow={notice}>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label="Submitted for approval" value={String(pending.length)} delta="Waiting for review" tone="banksia" icon={CheckCircle2} />
+        <StatCard label="Payroll ready" value={String(approved.length)} delta="Approved shifts" tone="gumleaf" icon={ShieldCheck} />
+        <StatCard label="Rejected" value={String(rejected.length)} delta="Returned to worker" tone="coral" icon={AlertTriangle} />
+      </div>
+      <section className="mt-6 rounded border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-4">
+          <h2 className="font-semibold text-ink">Shift approval queue</h2>
+          <p className="mt-1 text-sm text-slate-500">Support workers submit completed shifts here for team leader or admin approval before payroll processing.</p>
+        </div>
+        {canReview ? (
+          <ShiftTable
+            title="Submitted and approved shifts"
+            shifts={shifts.filter((shift) => ["submitted", "approved", "rejected"].includes(shift.approvalStatus))}
+            emptyMessage="No shifts are waiting for payroll approval."
+            renderActions={(shift) =>
+              shift.approvalStatus === "submitted" ? (
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => void approveShift(shift.id)} className="rounded bg-gumleaf px-3 py-2 text-xs font-semibold text-white hover:bg-[#1d625d]">Approve</button>
+                  <button type="button" onClick={() => void rejectShift(shift.id)} className="rounded border border-coral/30 bg-coral/5 px-3 py-2 text-xs font-semibold text-coral hover:bg-coral/10">Reject</button>
+                </div>
+              ) : (
+                <span className="text-xs font-semibold text-slate-500">{shift.approvalStatus === "approved" ? "Payroll ready" : "Returned"}</span>
+              )
+            }
+          />
+        ) : (
+          <EmptyState title="Reviewer access required" message="Only team leaders and admin users can approve shifts for payroll." />
+        )}
       </section>
     </AppShell>
   );
@@ -1162,7 +1264,7 @@ function QuickActions() {
   );
 }
 
-function ShiftTable({ title, shifts, emptyMessage }: { title: string; shifts: ShiftRecord[]; emptyMessage: string }) {
+function ShiftTable({ title, shifts, emptyMessage, renderActions }: { title: string; shifts: ShiftRecord[]; emptyMessage: string; renderActions?: (shift: ShiftRecord) => React.ReactNode }) {
   return (
     <div className="rounded border border-slate-200 bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
@@ -1179,6 +1281,8 @@ function ShiftTable({ title, shifts, emptyMessage }: { title: string; shifts: Sh
                 <th className="px-4 py-3">Support worker</th>
                 <th className="px-4 py-3">Location</th>
                 <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Approval</th>
+                {renderActions ? <th className="px-4 py-3">Action</th> : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -1189,6 +1293,15 @@ function ShiftTable({ title, shifts, emptyMessage }: { title: string; shifts: Sh
                   <td className="px-4 py-4 text-slate-700">{shift.worker || "Unassigned"}</td>
                   <td className="px-4 py-4 text-slate-700">{shift.location || "Not recorded"}</td>
                   <td className="px-4 py-4"><span className="rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{shift.status || "Draft"}</span></td>
+                  <td className="px-4 py-4">
+                    <div className="flex flex-col gap-1">
+                      <span className={`w-fit rounded px-2.5 py-1 text-xs font-semibold ${approvalBadgeClass(shift.approvalStatus)}`}>{approvalLabel(shift.approvalStatus)}</span>
+                      {shift.submittedAt ? <span className="text-xs text-slate-500">Submitted {dateOnly(shift.submittedAt)}</span> : null}
+                      {shift.approvedAt ? <span className="text-xs text-slate-500">Approved {dateOnly(shift.approvedAt)}</span> : null}
+                      {shift.rejectionReason ? <span className="text-xs text-coral">{shift.rejectionReason}</span> : null}
+                    </div>
+                  </td>
+                  {renderActions ? <td className="px-4 py-4">{renderActions(shift)}</td> : null}
                 </tr>
               ))}
             </tbody>
@@ -1589,6 +1702,7 @@ async function loadShifts(workerEmail?: string): Promise<ShiftRecord[]> {
     const startsAt = String(row.starts_at ?? "");
     const endsAt = String(row.ends_at ?? "");
     return {
+      id: String(row.id ?? `${participantName}-${startsAt}`),
       participant: shortName(participantName),
       participantName,
       worker: String(row.support_worker_name ?? ""),
@@ -1596,6 +1710,14 @@ async function loadShifts(workerEmail?: string): Promise<ShiftRecord[]> {
       location: String(row.location ?? ""),
       status: String(row.status ?? ""),
       startsAt,
+      endsAt,
+      approvalStatus: String(row.approval_status ?? "not_submitted"),
+      submittedAt: String(row.submitted_at ?? ""),
+      submittedByEmail: String(row.submitted_by_email ?? ""),
+      approvedAt: String(row.approved_at ?? ""),
+      approvedByEmail: String(row.approved_by_email ?? ""),
+      rejectionReason: String(row.rejection_reason ?? ""),
+      payrollReadyAt: String(row.payroll_ready_at ?? ""),
       time: `${timeOnly(startsAt)} - ${timeOnly(endsAt)}`
     };
   });
@@ -1670,6 +1792,29 @@ async function persist(table: string, payload: Record<string, unknown>, setNotic
   return !error;
 }
 
+async function runShiftWorkflow(shiftId: string, action: "submit" | "approve" | "reject", setNotice: (message: string) => void, reason = "") {
+  if (!supabase) {
+    setNotice("Supabase is not connected, so the shift was not updated.");
+    return false;
+  }
+  const token = (await supabase.auth.getSession()).data.session?.access_token;
+  if (!token) {
+    setNotice("Please sign in again before updating this shift.");
+    return false;
+  }
+  const response = await fetch(`/api/shifts/${shiftId}/workflow`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ action, reason })
+  });
+  const result = await response.json().catch(() => ({ message: "Shift workflow update failed." }));
+  setNotice(response.ok ? result.message : result.message);
+  return response.ok;
+}
+
 function friendlyDatabaseError(message: string, table: string) {
   const lower = message.toLowerCase();
   if (lower.includes("could not find the table") || lower.includes("schema cache")) {
@@ -1682,6 +1827,28 @@ function friendlyDatabaseError(message: string, table: string) {
     return `Database permission denied for "${table}". Check Supabase RLS policies and user role.`;
   }
   return `Database save failed: ${message}`;
+}
+
+function canSubmitShift(shift: ShiftRecord) {
+  return ["not_submitted", "rejected"].includes(shift.approvalStatus) && !["Draft", "Offered"].includes(shift.status);
+}
+
+function approvalLabel(status: string) {
+  return {
+    not_submitted: "Not submitted",
+    submitted: "Submitted for approval",
+    approved: "Payroll ready",
+    rejected: "Rejected"
+  }[status] ?? status;
+}
+
+function approvalBadgeClass(status: string) {
+  return {
+    submitted: "bg-banksia/20 text-slate-700",
+    approved: "bg-gumleaf/10 text-gumleaf",
+    rejected: "bg-coral/10 text-coral",
+    not_submitted: "bg-slate-100 text-slate-700"
+  }[status] ?? "bg-slate-100 text-slate-700";
 }
 
 function moduleContent(kind: ModuleKind) {
@@ -1757,6 +1924,13 @@ function timeOnly(value: string) {
     return date.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit", hour12: false });
   }
   return value.split("T")[1] || value;
+}
+
+function dateOnly(value: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function normalizeTime(value: string) {

@@ -103,6 +103,7 @@ export function AdminUserManagementPage() {
               <span className="mb-2 block text-sm font-medium text-slate-700">Role</span>
               <select name="role" defaultValue="support_worker" className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15">
                 <option value="support_worker">Support worker</option>
+                <option value="team_leader">Team leader</option>
                 <option value="admin">Admin</option>
               </select>
             </label>
@@ -162,6 +163,7 @@ function UserRow({ user, disabled, onUpdate }: { user: ManagedUser; disabled: bo
         <div className="flex gap-2">
           <select value={role} onChange={(event) => setRole(event.target.value as UserRole)} className="rounded border border-slate-200 bg-white px-2 py-2 text-sm text-ink">
             <option value="support_worker">Support worker</option>
+            <option value="team_leader">Team leader</option>
             <option value="admin">Admin</option>
           </select>
           <button disabled={disabled || role === user.role} onClick={() => onUpdate({ action: "role", userId: user.id, role })} className="rounded border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">

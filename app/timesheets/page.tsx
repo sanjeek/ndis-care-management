@@ -1,5 +1,5 @@
-import { SimpleModulePage } from "@/components/module-pages";
+import { TimesheetsApprovalPage } from "@/components/module-pages";
 
 export default function Page() {
-  return <SimpleModulePage kind="timesheets" />;
+  return <TimesheetsApprovalPage />;
 }

@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { roleForUser } from "@/lib/auth";
+import { roleForUser, type UserRole } from "@/lib/auth";
 import { recordServerAudit, serviceClient } from "@/lib/server-audit";
 
 type AuthContext = {
   id: string;
   email: string;
   name: string;
-  role: "admin" | "support_worker";
+  role: UserRole;
 };
 
 type IncidentAttachmentRecord = {

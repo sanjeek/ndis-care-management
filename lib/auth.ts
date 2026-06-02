@@ -1,11 +1,14 @@
-export type UserRole = "admin" | "support_worker";
+export type UserRole = "admin" | "support_worker" | "team_leader";
 
 const workerRoutes = ["/worker-portal", "/my-shifts", "/participants", "/progress-notes", "/incident-reports", "/profile", "/unauthorised"];
 const workerNavOrder = ["/worker-portal", "/my-shifts", "/progress-notes", "/incident-reports", "/profile"];
+const teamLeaderRoutes = ["/dashboard", "/timesheets", "/profile", "/unauthorised"];
+const teamLeaderNavOrder = ["/dashboard", "/timesheets", "/profile"];
 const adminEmails = ["sanjee@live.com"];
 
 export function normalizeRole(role: unknown): UserRole {
   if (role === "admin" || role === "provider_admin") return "admin";
+  if (role === "team_leader") return "team_leader";
   return "support_worker";
 }
 
@@ -16,18 +19,23 @@ export function roleForUser(role: unknown, email?: string | null): UserRole {
 
 export function canAccessRoute(role: UserRole, pathname: string) {
   if (role === "admin") return true;
+  if (role === "team_leader") return teamLeaderRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
   return workerRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 }
 
 export function defaultRouteForRole(role: UserRole) {
+  if (role === "team_leader") return "/dashboard";
   return role === "support_worker" ? "/worker-portal" : "/dashboard";
 }
 
 export function visibleNavForRole<T extends { href: string }>(role: UserRole, items: T[]) {
   if (role === "admin") return items;
+  if (role === "team_leader") return teamLeaderNavOrder.map((href) => items.find((item) => item.href === href)).filter((item): item is T => Boolean(item));
   return workerNavOrder.map((href) => items.find((item) => item.href === href)).filter((item): item is T => Boolean(item));
 }
 
 export function friendlyRole(role: UserRole | string) {
-  return normalizeRole(role) === "support_worker" ? "Support worker" : "Admin";
+  const normalised = normalizeRole(role);
+  if (normalised === "team_leader") return "Team leader";
+  return normalised === "support_worker" ? "Support worker" : "Admin";
 }

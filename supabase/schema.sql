@@ -13,7 +13,7 @@ create table if not exists public.profiles (
   email text not null,
   full_name text,
   organisation text,
-  role text not null default 'support_worker' check (role in ('admin', 'support_worker')),
+  role text not null default 'support_worker' check (role in ('admin', 'support_worker', 'team_leader')),
   active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -21,6 +21,12 @@ create table if not exists public.profiles (
 
 alter table public.profiles
 add column if not exists active boolean not null default true;
+
+alter table public.profiles
+drop constraint if exists profiles_role_check;
+
+alter table public.profiles
+add constraint profiles_role_check check (role in ('admin', 'support_worker', 'team_leader'));
 
 create table if not exists public.support_workers (
   id uuid primary key default gen_random_uuid(),
@@ -50,15 +56,52 @@ create table if not exists public.shifts (
   id uuid primary key default gen_random_uuid(),
   participant_name text not null,
   support_worker_name text not null,
+  support_worker_email text,
   location text not null,
   starts_at timestamptz not null,
   ends_at timestamptz not null,
   status text not null default 'Draft',
+  approval_status text not null default 'not_submitted',
+  submitted_at timestamptz,
+  submitted_by uuid references auth.users(id) on delete set null,
+  submitted_by_email text,
+  approved_at timestamptz,
+  approved_by uuid references auth.users(id) on delete set null,
+  approved_by_email text,
+  rejection_reason text,
+  payroll_ready_at timestamptz,
   created_at timestamptz not null default now()
 );
 
 alter table public.shifts
 add column if not exists support_worker_email text;
+
+alter table public.shifts
+add column if not exists approval_status text not null default 'not_submitted';
+
+alter table public.shifts
+add column if not exists submitted_at timestamptz;
+
+alter table public.shifts
+add column if not exists submitted_by uuid references auth.users(id) on delete set null;
+
+alter table public.shifts
+add column if not exists submitted_by_email text;
+
+alter table public.shifts
+add column if not exists approved_at timestamptz;
+
+alter table public.shifts
+add column if not exists approved_by uuid references auth.users(id) on delete set null;
+
+alter table public.shifts
+add column if not exists approved_by_email text;
+
+alter table public.shifts
+add column if not exists rejection_reason text;
+
+alter table public.shifts
+add column if not exists payroll_ready_at timestamptz;
 
 create table if not exists public.progress_notes (
   id uuid primary key default gen_random_uuid(),
@@ -374,6 +417,17 @@ as $$
   select public.current_user_is_active() and public.current_app_role() = 'support_worker';
 $$;
 
+create or replace function public.is_team_leader()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.current_user_is_active()
+    and public.current_app_role() in ('admin', 'team_leader');
+$$;
+
 create policy "Users can read their profile"
 on public.profiles for select
 to authenticated
@@ -427,8 +481,8 @@ with check (public.is_admin());
 create policy "Admins can manage shifts"
 on public.shifts for all
 to authenticated
-using (public.is_admin())
-with check (public.is_admin());
+using (public.is_admin() or public.is_team_leader())
+with check (public.is_admin() or public.is_team_leader());
 
 create policy "Workers can read assigned shifts"
 on public.shifts for select
