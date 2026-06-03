@@ -25,6 +25,8 @@ const backupTables = [
   "service_agreements",
   "care_documents",
   "app_notifications",
+  "internal_conversations",
+  "internal_messages",
   "email_notifications",
   "audit_logs"
 ];

@@ -685,6 +685,30 @@ create table if not exists public.app_notifications (
   metadata jsonb not null default '{}'::jsonb
 );
 
+create table if not exists public.internal_conversations (
+  id uuid primary key default gen_random_uuid(),
+  subject text not null,
+  participant_emails text[] not null default '{}'::text[],
+  participant_names text[] not null default '{}'::text[],
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_email text,
+  last_message_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.internal_messages (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references public.internal_conversations(id) on delete cascade,
+  sender_id uuid references auth.users(id) on delete set null,
+  sender_email text not null,
+  sender_name text,
+  sender_role text,
+  body text not null,
+  read_by_emails text[] not null default '{}'::text[],
+  created_at timestamptz not null default now()
+);
+
 alter table public.participants enable row level security;
 alter table public.profiles enable row level security;
 alter table public.family_members enable row level security;
@@ -709,6 +733,8 @@ alter table public.audit_logs enable row level security;
 alter table public.backup_logs enable row level security;
 alter table public.email_notifications enable row level security;
 alter table public.app_notifications enable row level security;
+alter table public.internal_conversations enable row level security;
+alter table public.internal_messages enable row level security;
 
 alter table public.participants force row level security;
 alter table public.profiles force row level security;
@@ -734,6 +760,8 @@ alter table public.audit_logs force row level security;
 alter table public.backup_logs force row level security;
 alter table public.email_notifications force row level security;
 alter table public.app_notifications force row level security;
+alter table public.internal_conversations force row level security;
+alter table public.internal_messages force row level security;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
@@ -855,6 +883,11 @@ drop policy if exists "Admins can read email notifications" on public.email_noti
 drop policy if exists "Users can read own app notifications" on public.app_notifications;
 drop policy if exists "Users can update own app notifications" on public.app_notifications;
 drop policy if exists "Admins can read app notifications" on public.app_notifications;
+drop policy if exists "Users can read own internal conversations" on public.internal_conversations;
+drop policy if exists "Users can create own internal conversations" on public.internal_conversations;
+drop policy if exists "Users can update own internal conversations" on public.internal_conversations;
+drop policy if exists "Users can read own internal messages" on public.internal_messages;
+drop policy if exists "Users can create own internal messages" on public.internal_messages;
 drop policy if exists "No public storage access to care documents" on storage.objects;
 drop policy if exists "No public storage access to incident attachments" on storage.objects;
 drop policy if exists "No public storage access to database backups" on storage.objects;
@@ -1381,3 +1414,48 @@ create policy "Admins can read app notifications"
 on public.app_notifications for select
 to authenticated
 using (public.is_admin());
+
+create policy "Users can read own internal conversations"
+on public.internal_conversations for select
+to authenticated
+using (public.current_app_email() = any(participant_emails));
+
+create policy "Users can create own internal conversations"
+on public.internal_conversations for insert
+to authenticated
+with check (
+  public.current_user_is_active()
+  and public.current_app_email() = any(participant_emails)
+);
+
+create policy "Users can update own internal conversations"
+on public.internal_conversations for update
+to authenticated
+using (public.current_app_email() = any(participant_emails))
+with check (public.current_app_email() = any(participant_emails));
+
+create policy "Users can read own internal messages"
+on public.internal_messages for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.internal_conversations
+    where internal_conversations.id = internal_messages.conversation_id
+      and public.current_app_email() = any(internal_conversations.participant_emails)
+  )
+);
+
+create policy "Users can create own internal messages"
+on public.internal_messages for insert
+to authenticated
+with check (
+  public.current_user_is_active()
+  and lower(sender_email) = public.current_app_email()
+  and exists (
+    select 1
+    from public.internal_conversations
+    where internal_conversations.id = internal_messages.conversation_id
+      and public.current_app_email() = any(internal_conversations.participant_emails)
+  )
+);

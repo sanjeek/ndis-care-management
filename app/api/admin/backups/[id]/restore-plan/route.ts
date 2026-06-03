@@ -20,6 +20,8 @@ const restoreOrder = [
   "ndis_funding_records",
   "service_agreements",
   "care_documents",
+  "internal_conversations",
+  "internal_messages",
   "audit_logs"
 ];
 
