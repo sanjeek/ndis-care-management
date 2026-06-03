@@ -23,6 +23,14 @@ type AppNotification = {
   createdAt: string;
 };
 
+type SearchResult = {
+  id: string;
+  type: string;
+  title: string;
+  subtitle: string;
+  href: string;
+};
+
 export function AppShell({ title, eyebrow, children }: { title: string; eyebrow: string; children: React.ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -35,6 +43,10 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
   const [secondsUntilLogout, setSecondsUntilLogout] = useState(warningBeforeLogoutMs / 1000);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchNotice, setSearchNotice] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -208,6 +220,43 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
     };
   }, [authChecked, userEmail]);
 
+  useEffect(() => {
+    if (!authChecked || !supabase) return;
+    const client = supabase;
+    const query = search.trim();
+    if (query.length < 2) {
+      setSearchResults([]);
+      setSearchNotice(query ? "Type at least 2 characters to search." : "");
+      setSearchLoading(false);
+      return;
+    }
+
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      setSearchLoading(true);
+      const token = (await client.auth.getSession()).data.session?.access_token;
+      if (!token) {
+        setSearchNotice("Please sign in again before searching.");
+        setSearchLoading(false);
+        return;
+      }
+      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const result = await response.json().catch(() => ({ results: [], message: "Search failed." }));
+      if (!active) return;
+      setSearchResults(result.results ?? []);
+      setSearchNotice(response.ok ? (result.results?.length ? "" : "No matching records found.") : result.message);
+      setSearchLoading(false);
+      setSearchOpen(true);
+    }, 250);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [authChecked, search]);
+
   const visibleNavItems = useMemo(() => visibleNavForRole(userRole, navItems), [userRole]);
   const unreadCount = notifications.filter((notification) => !notification.readAt).length;
 
@@ -247,6 +296,12 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
     }
     setNotificationsOpen(false);
     if (notification.linkUrl) window.location.href = notification.linkUrl;
+  }
+
+  function openSearchResult(result: SearchResult) {
+    setSearchOpen(false);
+    setSearch("");
+    window.location.href = result.href;
   }
 
   if (!authChecked) {
@@ -312,20 +367,58 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                 <h1 className="text-2xl font-semibold text-ink sm:text-3xl">{title}</h1>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                {userRole === "admin" ? (
+                <div className="relative sm:w-96">
                   <form
-                    className="flex min-w-0 items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 shadow-sm sm:w-80"
+                    className="flex min-w-0 items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 shadow-sm"
                     onSubmit={(event) => {
                       event.preventDefault();
-                      if (search.trim()) {
-                        window.location.href = `/participants?search=${encodeURIComponent(search.trim())}`;
-                      }
+                      if (searchResults[0]) openSearchResult(searchResults[0]);
                     }}
                   >
                     <Search className="h-4 w-4 shrink-0 text-slate-400" />
-                    <input className="w-full bg-transparent text-sm outline-none" placeholder="Search records" value={search} onChange={(event) => setSearch(event.target.value)} />
+                    <input
+                      className="w-full bg-transparent text-sm outline-none"
+                      placeholder="Search participants, shifts, notes..."
+                      value={search}
+                      onFocus={() => setSearchOpen(true)}
+                      onChange={(event) => {
+                        setSearch(event.target.value);
+                        setSearchOpen(true);
+                      }}
+                    />
                   </form>
-                ) : null}
+                  {searchOpen && (search.trim().length > 0 || searchResults.length > 0) ? (
+                    <div className="absolute right-0 z-40 mt-2 w-[min(32rem,calc(100vw-2rem))] rounded border border-slate-200 bg-white shadow-2xl">
+                      <div className="border-b border-slate-200 px-4 py-3">
+                        <p className="font-semibold text-ink">Global search</p>
+                        <p className="text-xs text-slate-500">Results are filtered by your account permissions.</p>
+                      </div>
+                      <div className="max-h-96 overflow-y-auto">
+                        {searchLoading ? (
+                          <p className="px-4 py-5 text-sm text-slate-500">Searching records...</p>
+                        ) : searchResults.length ? (
+                          searchResults.map((result) => (
+                            <button
+                              key={result.id}
+                              type="button"
+                              onClick={() => openSearchResult(result)}
+                              className="block w-full border-b border-slate-100 px-4 py-3 text-left hover:bg-slate-50"
+                            >
+                              <span className="text-xs font-semibold uppercase tracking-wide text-gumleaf">{result.type}</span>
+                              <span className="mt-1 block font-semibold text-ink">{result.title}</span>
+                              <span className="mt-1 block text-sm text-slate-500">{result.subtitle}</span>
+                            </button>
+                          ))
+                        ) : (
+                          <p className="px-4 py-5 text-sm text-slate-500">{searchNotice || "Start typing to search records."}</p>
+                        )}
+                      </div>
+                      <button type="button" onClick={() => setSearchOpen(false)} className="w-full px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                        Close search
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
                 <Link href="/profile" className="inline-flex items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gumleaf text-xs font-bold text-white">{initials}</span>
                   <span className="hidden max-w-32 truncate md:inline">{userName}</span>
