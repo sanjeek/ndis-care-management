@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
+  BarChart3,
   CalendarDays,
   CalendarPlus,
   CheckCircle2,
@@ -21,6 +22,7 @@ import {
   Plus,
   Search,
   ShieldCheck,
+  TrendingUp,
   Upload,
   X
 } from "lucide-react";
@@ -247,6 +249,12 @@ type DashboardMetrics = {
   completedShifts: number;
   pendingIncidents: number;
   outstandingInvoices: number;
+  serviceHoursDelivered: number;
+  workerUtilisationPercent: number;
+  fundingUsagePercent: number;
+  attendanceRatePercent: number;
+  scheduledShiftHours: number;
+  deliveredShiftHours: number;
 };
 
 const statuses = ["Draft", "Offered", "Confirmed", "In progress", "Completed", "Cancelled"];
@@ -265,7 +273,13 @@ export function DashboardPage() {
     activeStaff: 0,
     completedShifts: 0,
     pendingIncidents: 0,
-    outstandingInvoices: 0
+    outstandingInvoices: 0,
+    serviceHoursDelivered: 0,
+    workerUtilisationPercent: 0,
+    fundingUsagePercent: 0,
+    attendanceRatePercent: 0,
+    scheduledShiftHours: 0,
+    deliveredShiftHours: 0
   });
   const [notice, setNotice] = useState("Database records only.");
 
@@ -293,12 +307,12 @@ export function DashboardPage() {
 
   const todaysShifts = useMemo(() => shifts.filter(isTodayShift), [shifts]);
   const metricCards = [
-    { label: "Today's shifts", value: String(todaysShifts.length), delta: todaysShifts.length ? "Scheduled for today" : "No shifts scheduled today", tone: "gumleaf", icon: CalendarDays },
+    { label: "Service hours delivered", value: formatHours(metrics.serviceHoursDelivered), delta: metrics.serviceHoursDelivered ? `${formatHours(metrics.deliveredShiftHours)} completed or approved` : "No delivered service hours yet", tone: "gumleaf", icon: BarChart3 },
     { label: "Active participants", value: String(metrics.activeParticipants), delta: metrics.activeParticipants ? "Participant records in database" : "No active participants", tone: "harbour", icon: ShieldCheck },
-    { label: "Active staff", value: String(metrics.activeStaff), delta: metrics.activeStaff ? "Support worker records in database" : "No active staff", tone: "banksia", icon: CalendarPlus },
-    { label: "Completed shifts", value: String(metrics.completedShifts), delta: metrics.completedShifts ? "Completed or approved shifts" : "No completed shifts", tone: "gumleaf", icon: CheckCircle2 },
-    { label: "Pending incidents", value: String(metrics.pendingIncidents), delta: metrics.pendingIncidents ? "Open incident records" : "No pending incidents", tone: "coral", icon: AlertTriangle },
-    { label: "Outstanding invoices", value: String(metrics.outstandingInvoices), delta: metrics.outstandingInvoices ? "Invoices not paid or closed" : "No outstanding invoices", tone: "harbour", icon: ClipboardPlus }
+    { label: "Worker utilisation", value: `${metrics.workerUtilisationPercent}%`, delta: `${formatHours(metrics.scheduledShiftHours)} rostered hours`, tone: "banksia", icon: TrendingUp },
+    { label: "Incidents", value: String(metrics.pendingIncidents), delta: metrics.pendingIncidents ? "Open incident records" : "No pending incidents", tone: "coral", icon: AlertTriangle },
+    { label: "Funding usage", value: `${metrics.fundingUsagePercent}%`, delta: metrics.fundingUsagePercent ? "NDIS funding utilised" : "No funding usage recorded", tone: "harbour", icon: ClipboardPlus },
+    { label: "Attendance rate", value: `${metrics.attendanceRatePercent}%`, delta: metrics.completedShifts ? `${metrics.completedShifts} completed shifts` : "No completed shifts", tone: "gumleaf", icon: CheckCircle2 }
   ];
 
   return (
@@ -312,7 +326,75 @@ export function DashboardPage() {
         <ShiftTable title="Today's shifts" shifts={todaysShifts} emptyMessage="No shifts are scheduled for today." />
         <QuickActions />
       </div>
+      <ManagementAnalytics metrics={metrics} todaysShiftCount={todaysShifts.length} />
     </AppShell>
+  );
+}
+
+function ManagementAnalytics({ metrics, todaysShiftCount }: { metrics: DashboardMetrics; todaysShiftCount: number }) {
+  const rows = [
+    {
+      label: "Worker utilisation",
+      value: metrics.workerUtilisationPercent,
+      detail: `${formatHours(metrics.deliveredShiftHours)} delivered from ${formatHours(metrics.scheduledShiftHours)} rostered hours`
+    },
+    {
+      label: "Attendance rate",
+      value: metrics.attendanceRatePercent,
+      detail: metrics.completedShifts ? `${metrics.completedShifts} shifts attended or completed` : "No attended shifts recorded"
+    },
+    {
+      label: "Funding usage",
+      value: metrics.fundingUsagePercent,
+      detail: metrics.fundingUsagePercent ? "Based on NDIS funding records" : "No NDIS funding spend recorded"
+    }
+  ];
+
+  return (
+    <section className="mt-6 rounded border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-ink">Management analytics</h2>
+          <p className="mt-1 text-sm text-slate-500">Service delivery, workforce performance, risk, funding, and attendance from live records.</p>
+        </div>
+        <span className="inline-flex w-fit items-center gap-2 rounded bg-gumleaf/10 px-3 py-1.5 text-xs font-semibold text-gumleaf">
+          <CalendarDays className="h-4 w-4" />
+          {todaysShiftCount} today
+        </span>
+      </div>
+      <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr_0.9fr]">
+        <div className="space-y-4 lg:col-span-2">
+          {rows.map((row) => (
+            <div key={row.label} className="rounded border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <p className="font-semibold text-ink">{row.label}</p>
+                <p className="font-semibold text-gumleaf">{row.value}%</p>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded bg-slate-200">
+                <div className="h-full bg-gumleaf" style={{ width: `${Math.min(100, Math.max(0, row.value))}%` }} />
+              </div>
+              <p className="mt-2 text-sm text-slate-600">{row.detail}</p>
+            </div>
+          ))}
+        </div>
+        <div className="grid gap-4">
+          <AnalyticsMini title="Active participants" value={String(metrics.activeParticipants)} detail="Participant records" />
+          <AnalyticsMini title="Active staff" value={String(metrics.activeStaff)} detail="Support worker records" />
+          <AnalyticsMini title="Open incidents" value={String(metrics.pendingIncidents)} detail="Require follow-up" />
+          <AnalyticsMini title="Outstanding invoices" value={String(metrics.outstandingInvoices)} detail="Not paid or closed" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AnalyticsMini({ title, value, detail }: { title: string; value: string; detail: string }) {
+  return (
+    <div className="rounded border border-slate-200 bg-slate-50 p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</p>
+      <p className="mt-2 text-2xl font-semibold text-ink">{value}</p>
+      <p className="mt-1 text-sm text-slate-600">{detail}</p>
+    </div>
   );
 }
 
@@ -3233,23 +3315,36 @@ async function loadDashboardMetrics(): Promise<DashboardMetrics> {
       activeStaff: 0,
       completedShifts: 0,
       pendingIncidents: 0,
-      outstandingInvoices: 0
+      outstandingInvoices: 0,
+      serviceHoursDelivered: 0,
+      workerUtilisationPercent: 0,
+      fundingUsagePercent: 0,
+      attendanceRatePercent: 0,
+      scheduledShiftHours: 0,
+      deliveredShiftHours: 0
     };
   }
 
-  const [participantCount, staffCount, shiftRows, incidentRows, invoiceRows] = await Promise.all([
+  const [participantCount, staffCount, shiftRows, incidentRows, invoiceRows, fundingRows] = await Promise.all([
     supabase.from("participants").select("id", { count: "exact", head: true }),
     supabase.from("support_workers").select("id", { count: "exact", head: true }),
-    supabase.from("shifts").select("status, approval_status, clock_out_at"),
+    supabase.from("shifts").select("status, approval_status, starts_at, ends_at, clock_in_at, clock_out_at"),
     supabase.from("incident_reports").select("status"),
-    supabase.from("invoices").select("status")
+    supabase.from("invoices").select("status"),
+    supabase.from("ndis_funding_records").select("plan_total_budget, spent_amount")
   ]);
 
-  const completedShifts = shiftRows.data?.filter((shift) => {
+  const shifts = shiftRows.data ?? [];
+  const completedRows = shifts.filter((shift) => {
     const status = String(shift.status ?? "").toLowerCase();
     const approvalStatus = String(shift.approval_status ?? "").toLowerCase();
     return Boolean(shift.clock_out_at) || status === "completed" || status === "approved for payroll" || approvalStatus === "approved";
-  }).length ?? 0;
+  });
+  const completedShifts = completedRows.length;
+  const activeShiftRows = shifts.filter((shift) => !["cancelled", "canceled"].includes(String(shift.status ?? "").toLowerCase()));
+  const scheduledShiftHours = activeShiftRows.reduce((sum, shift) => sum + shiftHours(String(shift.starts_at ?? ""), String(shift.ends_at ?? "")), 0);
+  const deliveredShiftHours = completedRows.reduce((sum, shift) => sum + shiftHours(String(shift.starts_at ?? ""), String(shift.ends_at ?? "")), 0);
+  const attendedShiftCount = activeShiftRows.filter((shift) => Boolean(shift.clock_in_at || shift.clock_out_at) || completedRows.includes(shift)).length;
 
   const pendingIncidents = incidentRows.data?.filter((incident) => {
     const status = String(incident.status ?? "").toLowerCase();
@@ -3261,12 +3356,21 @@ async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     return !["paid", "closed", "void", "cancelled", "canceled"].includes(status);
   }).length ?? 0;
 
+  const fundingTotal = fundingRows.data?.reduce((sum, row) => sum + Number(row.plan_total_budget ?? 0), 0) ?? 0;
+  const fundingSpent = fundingRows.data?.reduce((sum, row) => sum + Number(row.spent_amount ?? 0), 0) ?? 0;
+
   return {
     activeParticipants: participantCount.count ?? 0,
     activeStaff: staffCount.count ?? 0,
     completedShifts,
     pendingIncidents,
-    outstandingInvoices
+    outstandingInvoices,
+    serviceHoursDelivered: roundMetric(deliveredShiftHours),
+    workerUtilisationPercent: scheduledShiftHours > 0 ? Math.round((deliveredShiftHours / scheduledShiftHours) * 100) : 0,
+    fundingUsagePercent: fundingTotal > 0 ? Math.round((fundingSpent / fundingTotal) * 100) : 0,
+    attendanceRatePercent: activeShiftRows.length > 0 ? Math.round((attendedShiftCount / activeShiftRows.length) * 100) : 0,
+    scheduledShiftHours: roundMetric(scheduledShiftHours),
+    deliveredShiftHours: roundMetric(deliveredShiftHours)
   };
 }
 
@@ -3783,6 +3887,21 @@ function dateOnly(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function shiftHours(startsAt: string, endsAt: string) {
+  const start = new Date(startsAt);
+  const end = new Date(endsAt);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return 0;
+  return (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+}
+
+function roundMetric(value: number) {
+  return Math.round(value * 10) / 10;
+}
+
+function formatHours(value: number) {
+  return `${roundMetric(value)}h`;
 }
 
 function dateTimeOrFallback(value: string) {
