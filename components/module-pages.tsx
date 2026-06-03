@@ -27,6 +27,7 @@ import {
   X
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { InvoiceManagementPage } from "@/components/invoice-management-page";
 import { StatCard } from "@/components/stat-card";
 import { recordAudit, type AuditPayload } from "@/lib/audit";
 import { roleForUser, type UserRole } from "@/lib/auth";
@@ -1834,6 +1835,14 @@ export function IncidentManagementPage() {
 }
 
 export function SimpleModulePage({ kind }: { kind: ModuleKind }) {
+  if (kind === "invoices") {
+    return <InvoiceManagementPage />;
+  }
+
+  return <SimpleModuleContent kind={kind} />;
+}
+
+function SimpleModuleContent({ kind }: { kind: Exclude<ModuleKind, "invoices"> }) {
   const [notice, setNotice] = useState("Loading records from Supabase.");
   const [items, setItems] = useState<ModuleItem[]>([]);
   const [workerContext, setWorkerContext] = useState({ role: "support_worker" as UserRole, email: "", name: "" });
@@ -1886,7 +1895,7 @@ export function SimpleModulePage({ kind }: { kind: ModuleKind }) {
       },
       setNotice,
       {
-        action: kind === "invoices" ? "invoice_action" : "create",
+        action: "create",
         recordLabel: title,
         metadata: { module: kind, operation: "create" }
       }
