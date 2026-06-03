@@ -760,6 +760,7 @@ export function WorkerPortalPage() {
   const [workerNameFromSession, setWorkerNameFromSession] = useState("");
   const [visibleShifts, setVisibleShifts] = useState<ShiftRecord[]>([]);
   const [visibleParticipants, setVisibleParticipants] = useState<ParticipantRecord[]>([]);
+  const [workerNotes, setWorkerNotes] = useState<ProgressNoteRecord[]>([]);
   const [availability, setAvailability] = useState<AvailabilityRecord[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRecord[]>([]);
   const [signingShift, setSigningShift] = useState<ShiftRecord | null>(null);
@@ -773,12 +774,14 @@ export function WorkerPortalPage() {
       const name = String(user?.user_metadata?.full_name || user?.email || user?.id || "");
       const shifts = email ? await loadShifts(email) : [];
       const participants = await loadParticipantsForShifts(shifts);
-      const availabilityRows = email ? await loadWorkerAvailability(email) : [];
-      const leaveRows = email ? await loadWorkerLeave(email) : [];
+      const [availabilityRows, leaveRows, noteRows] = email
+        ? await Promise.all([loadWorkerAvailability(email), loadWorkerLeave(email), loadProgressNotes(email)])
+        : [[], [], []];
       setWorkerEmail(email);
       setWorkerNameFromSession(name);
       setVisibleShifts(shifts);
       setVisibleParticipants(participants);
+      setWorkerNotes(noteRows);
       setAvailability(availabilityRows);
       setLeaveRequests(leaveRows);
       setNotice(shifts.length ? "Clock shifts, submit notes, and report incidents from your phone." : "No assigned shifts are linked to this login yet.");
@@ -821,10 +824,16 @@ export function WorkerPortalPage() {
 
   return (
     <AppShell title="Worker Portal" eyebrow={`${workerName || "Worker"} | ${notice}`}>
-      <div className="mx-auto grid max-w-6xl gap-5 xl:grid-cols-[1.05fr_0.95fr]">
+      <div className="mx-auto grid max-w-6xl gap-5">
+        <WorkerShiftMobilePanel
+          shifts={visibleShifts}
+          participants={visibleParticipants}
+          notes={workerNotes}
+          onClock={clockShift}
+          onSubmit={(shift) => setSigningShift(shift)}
+        />
+        <WorkerPortalQuickActions />
         <div className="space-y-6">
-          <WorkerShiftMobilePanel shifts={visibleShifts} onClock={clockShift} onSubmit={(shift) => setSigningShift(shift)} />
-
           <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -850,11 +859,15 @@ export function WorkerPortalPage() {
           </section>
         </div>
 
-        <div className="space-y-6">
+        <div className="grid gap-6 xl:grid-cols-2">
           <WorkerProgressNoteForm workerName={workerName} workerEmail={workerEmail} participants={visibleParticipants} />
           <WorkerIncidentForm workerName={workerName} workerEmail={workerEmail} participants={visibleParticipants} />
+        </div>
+        <div className="grid gap-6 xl:grid-cols-2">
           <WorkerLeaveForm workerName={workerName} workerEmail={workerEmail} leaveRequests={leaveRequests} onSaved={refresh} setNotice={setNotice} />
           <WorkerAvailabilityForm workerName={workerName} workerEmail={workerEmail} availability={availability} onSaved={refresh} setNotice={setNotice} />
+        </div>
+        <div>
           <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="font-semibold text-ink">Important worker reminders</h2>
             <div className="mt-4 grid gap-3">
@@ -1789,7 +1802,7 @@ function WorkerProgressNoteForm({ workerName, workerEmail, participants }: { wor
   }
 
   return (
-    <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
+    <section id="worker-progress-note" className="scroll-mt-24 rounded border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="font-semibold text-ink">Quick progress note</h2>
       {participants.length === 0 ? (
         <EmptyWorkerState title="No assigned participant" message="You can add progress notes only for participants linked to your assigned shifts." />
@@ -1842,7 +1855,7 @@ function WorkerIncidentForm({ workerName, workerEmail, participants }: { workerN
   }
 
   return (
-    <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
+    <section id="worker-incident-report" className="scroll-mt-24 rounded border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="font-semibold text-ink">Report incident</h2>
       {participants.length === 0 ? (
         <EmptyWorkerState title="No assigned participant" message="You can submit incidents only for participants linked to your assigned shifts." />
@@ -2001,86 +2014,177 @@ function WorkerAvailabilityForm({
   );
 }
 
-function WorkerShiftMobilePanel({ shifts, onClock, onSubmit }: { shifts: ShiftRecord[]; onClock: (shiftId: string, action: "in" | "out") => Promise<void>; onSubmit: (shift: ShiftRecord) => void }) {
-  const nextShift = shifts.find((shift) => !shift.clockOutAt) ?? shifts[0];
+function WorkerShiftMobilePanel({
+  shifts,
+  participants,
+  notes,
+  onClock,
+  onSubmit
+}: {
+  shifts: ShiftRecord[];
+  participants: ParticipantRecord[];
+  notes: ProgressNoteRecord[];
+  onClock: (shiftId: string, action: "in" | "out") => Promise<void>;
+  onSubmit: (shift: ShiftRecord) => void;
+}) {
+  const todaysShifts = shifts.filter(isTodayShift);
+  const upcomingShifts = shifts.filter((shift) => !isTodayShift(shift)).slice(0, 5);
+  const focusShift = todaysShifts.find((shift) => !shift.clockOutAt) ?? todaysShifts[0] ?? upcomingShifts[0] ?? shifts[0];
+  const focusParticipant = participants.find((participant) => participant.name === focusShift?.participantName);
+  const recentNotes = notes
+    .filter((note) => !focusShift?.participantName || note.participantName === focusShift.participantName)
+    .slice(0, 4);
 
   return (
-    <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="font-semibold text-ink">Today&apos;s work</h2>
-          <p className="mt-1 text-sm text-slate-500">Clock in, clock out, then submit completed shifts for approval.</p>
-        </div>
-        <CalendarDays className="h-5 w-5 shrink-0 text-gumleaf" />
-      </div>
-
-      {nextShift ? (
-        <article className="mt-4 rounded border border-gumleaf/30 bg-gumleaf/5 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gumleaf">Current / next shift</p>
-          <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+    <section className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
+      {focusShift ? (
+        <article className="rounded border border-gumleaf/30 bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="text-lg font-semibold text-ink">{nextShift.participantName || nextShift.participant}</h3>
-              <p className="text-sm text-slate-600">{nextShift.time || "Time not recorded"} | {nextShift.location || "Location not recorded"}</p>
-              <p className="mt-1 text-xs text-slate-500">
-                GPS radius: {nextShift.allowedRadiusM ? `${nextShift.allowedRadiusM}m` : "not configured"}
-              </p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gumleaf">{isTodayShift(focusShift) ? "Today's shift" : "Next upcoming shift"}</p>
+              <h2 className="mt-2 text-2xl font-semibold text-ink">{focusShift.participantName || focusShift.participant}</h2>
+              <p className="mt-1 text-sm text-slate-600">{focusShift.time || "Time not recorded"} | {focusShift.location || "Location not recorded"}</p>
             </div>
-            <span className={`w-fit rounded px-2.5 py-1 text-xs font-semibold ${approvalBadgeClass(nextShift.approvalStatus)}`}>{approvalLabel(nextShift.approvalStatus)}</span>
+            <span className={`w-fit rounded px-2.5 py-1 text-xs font-semibold ${approvalBadgeClass(focusShift.approvalStatus)}`}>{approvalLabel(focusShift.approvalStatus)}</span>
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+
+          <div className="mt-5 grid grid-cols-2 gap-3">
             <button
               type="button"
-              disabled={Boolean(nextShift.clockInAt)}
-              onClick={() => void onClock(nextShift.id, "in")}
-              className="min-h-12 rounded bg-[#354aa3] px-4 py-3 text-base font-semibold text-white hover:bg-[#283a82] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+              disabled={Boolean(focusShift.clockInAt)}
+              onClick={() => void onClock(focusShift.id, "in")}
+              className="min-h-16 rounded bg-[#354aa3] px-4 py-3 text-base font-semibold text-white shadow-sm hover:bg-[#283a82] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
             >
-              {nextShift.clockInAt ? `Clocked in ${timeOnly(nextShift.clockInAt)}` : "Clock in"}
+              {focusShift.clockInAt ? `In ${timeOnly(focusShift.clockInAt)}` : "Clock in"}
             </button>
             <button
               type="button"
-              disabled={!nextShift.clockInAt || Boolean(nextShift.clockOutAt)}
-              onClick={() => void onClock(nextShift.id, "out")}
-              className="min-h-12 rounded bg-gumleaf px-4 py-3 text-base font-semibold text-white hover:bg-[#1d625d] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+              disabled={!focusShift.clockInAt || Boolean(focusShift.clockOutAt)}
+              onClick={() => void onClock(focusShift.id, "out")}
+              className="min-h-16 rounded bg-gumleaf px-4 py-3 text-base font-semibold text-white shadow-sm hover:bg-[#1d625d] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
             >
-              {nextShift.clockOutAt ? `Clocked out ${timeOnly(nextShift.clockOutAt)}` : "Clock out"}
+              {focusShift.clockOutAt ? `Out ${timeOnly(focusShift.clockOutAt)}` : "Clock out"}
             </button>
           </div>
+
           <button
             type="button"
-            disabled={!canSubmitShift(nextShift) || !nextShift.clockOutAt}
-            onClick={() => onSubmit(nextShift)}
-            className="mt-3 min-h-12 w-full rounded border border-gumleaf/30 bg-white px-4 py-3 text-base font-semibold text-gumleaf hover:bg-gumleaf/5 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+            disabled={!canSubmitShift(focusShift)}
+            onClick={() => onSubmit(focusShift)}
+            className="mt-3 min-h-12 w-full rounded border border-gumleaf/30 bg-gumleaf/5 px-4 py-3 text-base font-semibold text-gumleaf hover:bg-gumleaf/10 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-white disabled:text-slate-400"
           >
             Sign and submit completed shift
           </button>
-          <ShiftSignatureSummary shift={nextShift} />
+
+          <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+            <div className="rounded border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">GPS radius</p>
+              <p className="mt-1 font-medium text-slate-700">{focusShift.allowedRadiusM ? `${focusShift.allowedRadiusM}m` : "Not configured"}</p>
+            </div>
+            <div className="rounded border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Participant alert</p>
+              <p className="mt-1 font-medium text-slate-700">{focusParticipant?.riskInformation || focusParticipant?.needs || "No alert recorded"}</p>
+            </div>
+          </div>
+          <ShiftSignatureSummary shift={focusShift} />
         </article>
       ) : (
-        <EmptyWorkerState title="No assigned shifts" message="Assigned shifts will appear here when your coordinator adds them to the roster." />
+        <section className="rounded border border-slate-200 bg-white p-5 shadow-sm">
+          <EmptyWorkerState title="No assigned shifts" message="Assigned shifts will appear here when your coordinator adds them to the roster." />
+        </section>
       )}
 
-      {shifts.length ? (
-        <div className="mt-4 grid gap-3">
-          {shifts.slice(0, 5).map((shift) => (
-            <article key={shift.id} className="rounded border border-slate-200 p-3 text-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-semibold text-ink">{shift.participantName || shift.participant}</p>
-                  <p className="mt-1 text-slate-500">{dateOnly(shift.startsAt ?? "")} | {shift.time}</p>
-                  <p className="mt-1 text-slate-600">{shift.location || "Location not recorded"}</p>
-                </div>
-                <span className="rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{shift.status || "Draft"}</span>
-              </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500">
-                <span>In: {shift.clockInAt ? `${timeOnly(shift.clockInAt)}${shift.clockInDistanceM ? ` (${shift.clockInDistanceM}m)` : ""}` : "Not clocked"}</span>
-                <span>Out: {shift.clockOutAt ? `${timeOnly(shift.clockOutAt)}${shift.clockOutDistanceM ? ` (${shift.clockOutDistanceM}m)` : ""}` : "Not clocked"}</span>
-                <span>Worker signed: {shift.workerSignedAt ? dateTimeOrFallback(shift.workerSignedAt) : "No"}</span>
-                <span>Participant signed: {shift.participantSignedAt ? dateTimeOrFallback(shift.participantSignedAt) : "No"}</span>
-              </div>
-            </article>
-          ))}
-        </div>
-      ) : null}
+      <div className="grid gap-4">
+        <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-ink">Shift dashboard</h2>
+              <p className="mt-1 text-sm text-slate-500">{todaysShifts.length} today, {upcomingShifts.length} upcoming</p>
+            </div>
+            <CalendarDays className="h-5 w-5 text-gumleaf" />
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center text-sm">
+            <div className="rounded border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xl font-semibold text-ink">{todaysShifts.length}</p>
+              <p className="text-xs text-slate-500">Today</p>
+            </div>
+            <div className="rounded border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xl font-semibold text-ink">{shifts.filter((shift) => shift.clockInAt && !shift.clockOutAt).length}</p>
+              <p className="text-xs text-slate-500">Active</p>
+            </div>
+            <div className="rounded border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xl font-semibold text-ink">{shifts.filter((shift) => shift.approvalStatus === "submitted").length}</p>
+              <p className="text-xs text-slate-500">Submitted</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="font-semibold text-ink">Upcoming shifts</h2>
+          {upcomingShifts.length ? (
+            <div className="mt-3 grid gap-3">
+              {upcomingShifts.map((shift) => (
+                <article key={shift.id} className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-ink">{shift.participantName || shift.participant}</p>
+                      <p className="mt-1 text-slate-500">{dateOnly(shift.startsAt ?? "")} | {shift.time}</p>
+                      <p className="mt-1 text-slate-600">{shift.location || "Location not recorded"}</p>
+                    </div>
+                    <span className="rounded bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">{shift.status || "Draft"}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <EmptyWorkerState title="No upcoming shifts" message="Future shifts will appear here after rostering." />
+          )}
+        </section>
+
+        <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="font-semibold text-ink">Participant notes</h2>
+          {recentNotes.length ? (
+            <div className="mt-3 grid gap-3">
+              {recentNotes.map((note) => (
+                <article key={note.id} className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-semibold text-ink">{note.participantName}</p>
+                    {note.isImportant ? <span className="rounded bg-coral/10 px-2 py-1 text-xs font-semibold text-coral">Important</span> : null}
+                  </div>
+                  <p className="mt-2 line-clamp-3 leading-6 text-slate-600">{note.note || note.outcomes || "No note text recorded"}</p>
+                  <p className="mt-2 text-xs text-slate-500">{dateTimeOrFallback(note.createdAt)}</p>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <EmptyWorkerState title="No recent notes" message="Progress notes for your assigned participants will appear here." />
+          )}
+        </section>
+      </div>
+    </section>
+  );
+}
+
+function WorkerPortalQuickActions() {
+  const actions = [
+    { label: "Progress note", detail: "Record service notes", href: "#worker-progress-note", icon: FilePlus2 },
+    { label: "Report incident", detail: "Escalate immediately", href: "#worker-incident-report", icon: AlertTriangle },
+    { label: "My shifts", detail: "Full schedule", href: "/my-shifts", icon: CalendarDays }
+  ];
+
+  return (
+    <section className="grid gap-3 sm:grid-cols-3">
+      {actions.map((action) => (
+        <Link key={action.label} href={action.href} className="flex min-h-20 items-center gap-3 rounded border border-slate-200 bg-white p-4 shadow-sm hover:border-gumleaf/40 hover:bg-gumleaf/5">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-gumleaf/10 text-gumleaf">
+            <action.icon className="h-5 w-5" />
+          </span>
+          <span>
+            <span className="block font-semibold text-ink">{action.label}</span>
+            <span className="mt-1 block text-xs text-slate-500">{action.detail}</span>
+          </span>
+        </Link>
+      ))}
     </section>
   );
 }
