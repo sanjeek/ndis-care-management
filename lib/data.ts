@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  ClipboardList,
   ClipboardCheck,
   Clock3,
   Database,
@@ -34,6 +35,7 @@ export const navItems = [
   { label: "Timesheets", href: "/timesheets", icon: ClipboardCheck },
   { label: "Progress Notes", href: "/progress-notes", icon: FileText },
   { label: "Incident Reports", href: "/incident-reports", icon: AlertTriangle },
+  { label: "Risk Assessments", href: "/risk-assessments", icon: ClipboardList },
   { label: "Invoices", href: "/invoices", icon: ReceiptText },
   { label: "NDIS Funding", href: "/funding", icon: CircleDollarSign },
   { label: "Service Agreements", href: "/service-agreements", icon: FileSignature },

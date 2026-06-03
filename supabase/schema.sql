@@ -735,6 +735,35 @@ on public.participant_tasks (lower(assigned_worker_email), status, due_date);
 create index if not exists participant_tasks_participant_idx
 on public.participant_tasks (participant_name, status, due_date);
 
+create table if not exists public.participant_risk_assessments (
+  id uuid primary key default gen_random_uuid(),
+  participant_name text not null,
+  assessor_name text not null,
+  assessor_email text not null,
+  assessment_date date not null default current_date,
+  review_date date,
+  overall_risk_level text not null default 'medium' check (overall_risk_level in ('low', 'medium', 'high', 'critical')),
+  environmental_risks text not null,
+  behavioural_risks text not null,
+  medication_risks text not null,
+  manual_handling_risks text not null,
+  control_measures text not null,
+  status text not null default 'draft' check (status in ('draft', 'review_required', 'approved', 'archived')),
+  approved_by uuid references auth.users(id) on delete set null,
+  approved_by_email text,
+  approved_at timestamptz,
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists participant_risk_assessments_participant_idx
+on public.participant_risk_assessments (participant_name, overall_risk_level, review_date);
+
+create index if not exists participant_risk_assessments_assessor_idx
+on public.participant_risk_assessments (lower(assessor_email), status, review_date);
+
 alter table public.participants enable row level security;
 alter table public.profiles enable row level security;
 alter table public.family_members enable row level security;
@@ -762,6 +791,7 @@ alter table public.app_notifications enable row level security;
 alter table public.internal_conversations enable row level security;
 alter table public.internal_messages enable row level security;
 alter table public.participant_tasks enable row level security;
+alter table public.participant_risk_assessments enable row level security;
 
 alter table public.participants force row level security;
 alter table public.profiles force row level security;
@@ -790,6 +820,7 @@ alter table public.app_notifications force row level security;
 alter table public.internal_conversations force row level security;
 alter table public.internal_messages force row level security;
 alter table public.participant_tasks force row level security;
+alter table public.participant_risk_assessments force row level security;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
@@ -919,6 +950,10 @@ drop policy if exists "Users can create own internal messages" on public.interna
 drop policy if exists "Admins and team leaders can manage participant tasks" on public.participant_tasks;
 drop policy if exists "Workers can read assigned participant tasks" on public.participant_tasks;
 drop policy if exists "Workers can update assigned participant tasks" on public.participant_tasks;
+drop policy if exists "Admins and team leaders can manage participant risk assessments" on public.participant_risk_assessments;
+drop policy if exists "Workers can read assigned participant risk assessments" on public.participant_risk_assessments;
+drop policy if exists "Workers can create assigned participant risk assessments" on public.participant_risk_assessments;
+drop policy if exists "Workers can update assigned participant risk assessments" on public.participant_risk_assessments;
 drop policy if exists "No public storage access to care documents" on storage.objects;
 drop policy if exists "No public storage access to incident attachments" on storage.objects;
 drop policy if exists "No public storage access to database backups" on storage.objects;
@@ -1278,6 +1313,46 @@ using (
 with check (
   public.is_support_worker()
   and lower(assigned_worker_email) = public.current_app_email()
+);
+
+create policy "Admins and team leaders can manage participant risk assessments"
+on public.participant_risk_assessments for all
+to authenticated
+using (public.is_admin() or public.is_team_leader())
+with check (public.is_admin() or public.is_team_leader());
+
+create policy "Workers can read assigned participant risk assessments"
+on public.participant_risk_assessments for select
+to authenticated
+using (
+  public.is_support_worker()
+  and (
+    lower(assessor_email) = public.current_app_email()
+    or public.worker_is_assigned_to_participant(participant_name)
+  )
+);
+
+create policy "Workers can create assigned participant risk assessments"
+on public.participant_risk_assessments for insert
+to authenticated
+with check (
+  public.is_support_worker()
+  and lower(assessor_email) = public.current_app_email()
+  and public.worker_is_assigned_to_participant(participant_name)
+);
+
+create policy "Workers can update assigned participant risk assessments"
+on public.participant_risk_assessments for update
+to authenticated
+using (
+  public.is_support_worker()
+  and lower(assessor_email) = public.current_app_email()
+  and public.worker_is_assigned_to_participant(participant_name)
+)
+with check (
+  public.is_support_worker()
+  and lower(assessor_email) = public.current_app_email()
+  and public.worker_is_assigned_to_participant(participant_name)
 );
 
 create policy "Admins can manage module records"
