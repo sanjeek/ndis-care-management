@@ -40,6 +40,7 @@ export const navItems = [
   { label: "Documents", href: "/documents", icon: WalletCards },
   { label: "Worker Portal", href: "/worker-portal", icon: Smartphone },
   { label: "Messages", href: "/messages", icon: MessageSquare },
+  { label: "Tasks", href: "/tasks", icon: ListChecks },
   { label: "Family Portal", href: "/family-portal", icon: Home },
   { label: "My Shifts", href: "/my-shifts", icon: ListChecks },
   { label: "User Management", href: "/admin/users", icon: UserCog },

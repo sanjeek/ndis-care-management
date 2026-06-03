@@ -709,6 +709,32 @@ create table if not exists public.internal_messages (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.participant_tasks (
+  id uuid primary key default gen_random_uuid(),
+  participant_name text not null,
+  assigned_worker_name text not null,
+  assigned_worker_email text not null,
+  title text not null,
+  description text,
+  due_date date,
+  priority text not null default 'medium' check (priority in ('low', 'medium', 'high', 'critical')),
+  status text not null default 'open' check (status in ('open', 'in_progress', 'completed', 'cancelled')),
+  completed_at timestamptz,
+  completed_by uuid references auth.users(id) on delete set null,
+  completed_by_email text,
+  status_note text,
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists participant_tasks_worker_idx
+on public.participant_tasks (lower(assigned_worker_email), status, due_date);
+
+create index if not exists participant_tasks_participant_idx
+on public.participant_tasks (participant_name, status, due_date);
+
 alter table public.participants enable row level security;
 alter table public.profiles enable row level security;
 alter table public.family_members enable row level security;
@@ -735,6 +761,7 @@ alter table public.email_notifications enable row level security;
 alter table public.app_notifications enable row level security;
 alter table public.internal_conversations enable row level security;
 alter table public.internal_messages enable row level security;
+alter table public.participant_tasks enable row level security;
 
 alter table public.participants force row level security;
 alter table public.profiles force row level security;
@@ -762,6 +789,7 @@ alter table public.email_notifications force row level security;
 alter table public.app_notifications force row level security;
 alter table public.internal_conversations force row level security;
 alter table public.internal_messages force row level security;
+alter table public.participant_tasks force row level security;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
@@ -888,6 +916,9 @@ drop policy if exists "Users can create own internal conversations" on public.in
 drop policy if exists "Users can update own internal conversations" on public.internal_conversations;
 drop policy if exists "Users can read own internal messages" on public.internal_messages;
 drop policy if exists "Users can create own internal messages" on public.internal_messages;
+drop policy if exists "Admins and team leaders can manage participant tasks" on public.participant_tasks;
+drop policy if exists "Workers can read assigned participant tasks" on public.participant_tasks;
+drop policy if exists "Workers can update assigned participant tasks" on public.participant_tasks;
 drop policy if exists "No public storage access to care documents" on storage.objects;
 drop policy if exists "No public storage access to incident attachments" on storage.objects;
 drop policy if exists "No public storage access to database backups" on storage.objects;
@@ -1221,6 +1252,32 @@ with check (
   public.is_support_worker()
   and lower(worker_email) = public.current_app_email()
   and public.worker_is_assigned_to_participant(participant_name)
+);
+
+create policy "Admins and team leaders can manage participant tasks"
+on public.participant_tasks for all
+to authenticated
+using (public.is_admin() or public.is_team_leader())
+with check (public.is_admin() or public.is_team_leader());
+
+create policy "Workers can read assigned participant tasks"
+on public.participant_tasks for select
+to authenticated
+using (
+  public.is_support_worker()
+  and lower(assigned_worker_email) = public.current_app_email()
+);
+
+create policy "Workers can update assigned participant tasks"
+on public.participant_tasks for update
+to authenticated
+using (
+  public.is_support_worker()
+  and lower(assigned_worker_email) = public.current_app_email()
+)
+with check (
+  public.is_support_worker()
+  and lower(assigned_worker_email) = public.current_app_email()
 );
 
 create policy "Admins can manage module records"

@@ -15,6 +15,7 @@ const backupTables = [
   "progress_notes",
   "progress_note_templates",
   "incident_reports",
+  "participant_tasks",
   "module_records",
   "invoices",
   "invoice_items",
