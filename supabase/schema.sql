@@ -398,6 +398,9 @@ create table if not exists public.incident_reports (
   participant_informed text,
   guardian_notified text,
   corrective_actions text,
+  escalation_status text not null default 'none' check (escalation_status in ('none', 'manager_notified', 'investigation_required', 'ready_to_close', 'closed')),
+  manager_notified_at timestamptz,
+  investigation_completed_at timestamptz,
   attachment_names text[] not null default '{}'::text[],
   attachment_paths text[] not null default '{}'::text[],
   status text not null default 'submitted',
@@ -455,6 +458,21 @@ add column if not exists guardian_notified text;
 
 alter table public.incident_reports
 add column if not exists corrective_actions text;
+
+alter table public.incident_reports
+add column if not exists escalation_status text not null default 'none';
+
+alter table public.incident_reports
+drop constraint if exists incident_reports_escalation_status_check;
+
+alter table public.incident_reports
+add constraint incident_reports_escalation_status_check check (escalation_status in ('none', 'manager_notified', 'investigation_required', 'ready_to_close', 'closed'));
+
+alter table public.incident_reports
+add column if not exists manager_notified_at timestamptz;
+
+alter table public.incident_reports
+add column if not exists investigation_completed_at timestamptz;
 
 alter table public.incident_reports
 add column if not exists attachment_names text[] not null default '{}'::text[];

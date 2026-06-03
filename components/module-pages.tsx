@@ -221,6 +221,9 @@ type IncidentManagementRecord = {
   participantInformed: string;
   guardianNotified: string;
   correctiveActions: string;
+  escalationStatus: string;
+  managerNotifiedAt: string;
+  investigationCompletedAt: string;
   status: string;
   attachmentNames: string[];
   createdAt: string;
@@ -1548,7 +1551,37 @@ export function IncidentManagementPage() {
     window.open(result.url, "_blank", "noopener,noreferrer");
   }
 
+  async function updateEscalation(event: FormEvent<HTMLFormElement>, incident: IncidentManagementRecord) {
+    event.preventDefault();
+    if (!supabase) return;
+    const form = new FormData(event.currentTarget);
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) {
+      setNotice("Please sign in again before updating the incident.");
+      return;
+    }
+    const response = await fetch("/api/incidents", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        id: incident.id,
+        status: get(form, "status"),
+        investigationNotes: get(form, "investigationNotes"),
+        impactedPersonSupported: get(form, "impactedPersonSupported"),
+        correctiveActions: get(form, "correctiveActions")
+      })
+    });
+    const result = await response.json().catch(() => ({ message: "Incident escalation could not be updated." }));
+    setNotice(result.message);
+    if (response.ok) await refresh();
+  }
+
   const canSubmit = participants.length > 0 && (context.role === "support_worker" || workers.length > 0);
+  const canManageEscalation = context.role === "admin" || context.role === "team_leader";
 
   return (
     <AppShell title="Incident Management" eyebrow={notice}>
@@ -1637,6 +1670,32 @@ export function IncidentManagementPage() {
               <Info label="Guardian/key contact notification" value={incident.guardianNotified || "Not recorded"} />
               <Info label="Investigation notes" value={incident.investigationNotes || "Not recorded"} />
               <Info label="Corrective actions" value={incident.correctiveActions || "Not recorded"} />
+              <div className="mt-4 rounded border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Escalation workflow</p>
+                    <p className="mt-1 text-sm font-semibold text-ink">{friendlyEscalationStatus(incident.escalationStatus)}</p>
+                  </div>
+                  {incident.severity.toLowerCase() === "critical" ? (
+                    <span className="w-fit rounded bg-coral/10 px-2.5 py-1 text-xs font-semibold text-coral">Manager review required</span>
+                  ) : null}
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <Info label="Manager notified" value={dateTimeOrFallback(incident.managerNotifiedAt)} />
+                  <Info label="Investigation completed" value={dateTimeOrFallback(incident.investigationCompletedAt)} />
+                </div>
+                {canManageEscalation ? (
+                  <form onSubmit={(event) => void updateEscalation(event, incident)} className="mt-4 grid gap-3 border-t border-slate-200 pt-4">
+                    <Select name="status" label="Manager status" options={incidentStatuses} required defaultValue={incident.status || "Under review"} />
+                    <Area name="investigationNotes" label="Investigation notes" defaultValue={incident.investigationNotes} placeholder="Document investigation findings before closure." />
+                    <Area name="impactedPersonSupported" label="Support provided to impacted person" defaultValue={incident.impactedPersonSupported} placeholder="Record support, communication, and safety actions for the participant." />
+                    <Area name="correctiveActions" label="Corrective actions" defaultValue={incident.correctiveActions} placeholder="Record prevention actions, owner, and timeframe." />
+                    <button className="w-fit rounded bg-ink px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-700">
+                      Update escalation
+                    </button>
+                  </form>
+                ) : null}
+              </div>
               <div className="mt-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Attachments</p>
                 {incident.attachmentNames.length ? (
@@ -2884,11 +2943,11 @@ function OptionalArea({ name, label, defaultValue = "", placeholder = "" }: { na
   );
 }
 
-function Select({ name, label, options, required = true }: { name: string; label: string; options: string[]; required?: boolean }) {
+function Select({ name, label, options, required = true, defaultValue = "" }: { name: string; label: string; options: string[]; required?: boolean; defaultValue?: string }) {
   return (
     <label>
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
-      <select name={name} required={required} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15">
+      <select name={name} required={required} defaultValue={defaultValue} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15">
         {options.map((option) => (
           <option key={option} value={option}>{option || "Leave unchanged"}</option>
         ))}
@@ -3246,6 +3305,9 @@ async function loadIncidentRecords(workerEmail?: string): Promise<IncidentManage
     participantInformed: String(row.participant_informed ?? ""),
     guardianNotified: String(row.guardian_notified ?? ""),
     correctiveActions: String(row.corrective_actions ?? ""),
+    escalationStatus: String(row.escalation_status ?? "none"),
+    managerNotifiedAt: String(row.manager_notified_at ?? ""),
+    investigationCompletedAt: String(row.investigation_completed_at ?? ""),
     status: String(row.status ?? "Submitted"),
     attachmentNames: Array.isArray(row.attachment_names) ? (row.attachment_names as unknown[]).map((name) => String(name)) : [],
     createdAt: String(row.created_at ?? "")
@@ -3653,6 +3715,17 @@ function dateTimeOrFallback(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short" });
+}
+
+function friendlyEscalationStatus(value: string) {
+  const labels: Record<string, string> = {
+    none: "No escalation required",
+    manager_notified: "Manager notified",
+    investigation_required: "Investigation required before closure",
+    ready_to_close: "Investigation complete, ready to close",
+    closed: "Closed after investigation"
+  };
+  return labels[value] ?? humaniseKey(value || "not recorded");
 }
 
 function formatBytes(value: number) {

@@ -49,7 +49,7 @@ async function requireUser(request: Request): Promise<{ user: AuthContext } | { 
 }
 
 async function canAccessParticipant(participantName: string, user: AuthContext) {
-  if (user.role === "admin") return true;
+  if (user.role === "admin" || user.role === "team_leader") return true;
   if (!participantName) return false;
   const admin = serviceClient();
   if (!admin) return false;
@@ -70,6 +70,18 @@ function normaliseStatus(value: string) {
   return value || "Submitted";
 }
 
+function isCritical(value: string) {
+  return value.trim().toLowerCase() === "critical";
+}
+
+function isClosing(value: string) {
+  return value.trim().toLowerCase() === "closed";
+}
+
+function investigationIsComplete(input: { investigationNotes: string; correctiveActions: string; impactedPersonSupported: string }) {
+  return Boolean(input.investigationNotes.trim() && input.correctiveActions.trim() && input.impactedPersonSupported.trim());
+}
+
 export async function POST(request: Request) {
   const auth = await requireUser(request);
   if ("response" in auth) return auth.response;
@@ -86,6 +98,10 @@ export async function POST(request: Request) {
   const staffEmail = read(form, "staffEmail") || auth.user.email;
   const severity = read(form, "severity");
   const summary = read(form, "summary");
+  const status = normaliseStatus(read(form, "status"));
+  const investigationNotes = read(form, "investigationNotes");
+  const correctiveActions = read(form, "correctiveActions");
+  const impactedPersonSupported = read(form, "impactedPersonSupported");
   const reportableIncidentType = read(form, "reportableType");
   const reportableToCommission = reportableIncidentType !== "" && reportableIncidentType !== "Not reportable";
 
@@ -99,6 +115,10 @@ export async function POST(request: Request) {
 
   if (!(await canAccessParticipant(participantName, auth.user))) {
     return NextResponse.json({ message: "You do not have permission to create incidents for this participant." }, { status: 403 });
+  }
+
+  if (isCritical(severity) && isClosing(status) && !investigationIsComplete({ investigationNotes, correctiveActions, impactedPersonSupported })) {
+    return NextResponse.json({ message: "Critical incidents cannot be closed until investigation notes, support provided, and corrective actions are completed." }, { status: 400 });
   }
 
   const uploadedPaths: string[] = [];
@@ -134,16 +154,19 @@ export async function POST(request: Request) {
       incident_time: read(form, "incidentTime") || null,
       location: read(form, "location"),
       summary,
-      investigation_notes: read(form, "investigationNotes"),
+      investigation_notes: investigationNotes,
       reportable_to_commission: reportableToCommission,
       reportable_incident_type: reportableToCommission ? reportableIncidentType : null,
       notification_due_at: read(form, "notificationDueAt") || null,
       immediate_actions: read(form, "immediateActions"),
-      impacted_person_supported: read(form, "impactedPersonSupported"),
+      impacted_person_supported: impactedPersonSupported,
       participant_informed: read(form, "participantInformed"),
       guardian_notified: read(form, "guardianNotified"),
-      corrective_actions: read(form, "correctiveActions"),
-      status: normaliseStatus(read(form, "status")),
+      corrective_actions: correctiveActions,
+      escalation_status: isCritical(severity) ? (isClosing(status) ? "closed" : "investigation_required") : "none",
+      manager_notified_at: isCritical(severity) ? new Date().toISOString() : null,
+      investigation_completed_at: investigationIsComplete({ investigationNotes, correctiveActions, impactedPersonSupported }) ? new Date().toISOString() : null,
+      status,
       attachment_names: attachmentNames,
       attachment_paths: uploadedPaths
     })
@@ -171,7 +194,8 @@ export async function POST(request: Request) {
       reportableToCommission,
       reportableIncidentType: reportableToCommission ? reportableIncidentType : null,
       notificationDueAt: read(form, "notificationDueAt") || null,
-      status: normaliseStatus(read(form, "status")),
+      status,
+      escalationStatus: isCritical(severity) ? "investigation_required" : "none",
       attachmentCount: uploadedPaths.length
     }
   });
@@ -188,7 +212,7 @@ export async function POST(request: Request) {
       `Staff involved: ${staffName} (${staffEmail})`,
       `Severity: ${severity}`,
       `Reportable to NDIS Commission: ${reportableToCommission ? "Yes" : "No"}`,
-      `Status: ${normaliseStatus(read(form, "status"))}`,
+      `Status: ${status}`,
       `Open incident reports: ${appUrl("/incident-reports")}`
     ].join("\n"),
     metadata: {
@@ -202,5 +226,113 @@ export async function POST(request: Request) {
     }
   });
 
+  if (isCritical(severity)) {
+    await notifyManagersOfCriticalIncident(admin, {
+      incidentId: incident.id,
+      incidentNumber,
+      participantName,
+      staffName,
+      staffEmail,
+      severity,
+      summary
+    });
+  }
+
   return NextResponse.json({ message: "Incident saved.", id: incident.id });
+}
+
+export async function PATCH(request: Request) {
+  const auth = await requireUser(request);
+  if ("response" in auth) return auth.response;
+  if (auth.user.role !== "admin" && auth.user.role !== "team_leader") {
+    return NextResponse.json({ message: "Only managers can update incident escalation status." }, { status: 403 });
+  }
+
+  const admin = serviceClient();
+  if (!admin) {
+    return NextResponse.json({ message: "Supabase service role key is not configured." }, { status: 500 });
+  }
+
+  const body = await request.json();
+  const id = String(body.id ?? "").trim();
+  const status = normaliseStatus(String(body.status ?? "").trim());
+  if (!id || !status) {
+    return NextResponse.json({ message: "Incident and status are required." }, { status: 400 });
+  }
+
+  const { data: existing, error: loadError } = await admin
+    .from("incident_reports")
+    .select("id, incident_number, participant_name, severity, investigation_notes, corrective_actions, impacted_person_supported")
+    .eq("id", id)
+    .maybeSingle();
+  if (loadError || !existing) {
+    return NextResponse.json({ message: loadError?.message ?? "Incident not found." }, { status: 404 });
+  }
+
+  const investigationNotes = String(body.investigationNotes ?? existing.investigation_notes ?? "").trim();
+  const correctiveActions = String(body.correctiveActions ?? existing.corrective_actions ?? "").trim();
+  const impactedPersonSupported = String(body.impactedPersonSupported ?? existing.impacted_person_supported ?? "").trim();
+  const complete = investigationIsComplete({ investigationNotes, correctiveActions, impactedPersonSupported });
+  if (isCritical(String(existing.severity ?? "")) && isClosing(status) && !complete) {
+    return NextResponse.json({ message: "Critical incidents cannot be closed until investigation notes, support provided, and corrective actions are completed." }, { status: 400 });
+  }
+
+  const { error } = await admin
+    .from("incident_reports")
+    .update({
+      status,
+      investigation_notes: investigationNotes,
+      corrective_actions: correctiveActions,
+      impacted_person_supported: impactedPersonSupported,
+      escalation_status: isCritical(String(existing.severity ?? "")) ? (isClosing(status) ? "closed" : complete ? "ready_to_close" : "investigation_required") : "none",
+      investigation_completed_at: complete ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", id);
+  if (error) return NextResponse.json({ message: error.message }, { status: 400 });
+
+  await recordServerAudit(admin, {
+    userId: auth.user.id,
+    userEmail: auth.user.email,
+    userName: auth.user.name,
+    userRole: auth.user.role,
+    action: "incident_escalation_update",
+    tableName: "incident_reports",
+    recordId: id,
+    recordLabel: String(existing.incident_number ?? ""),
+    metadata: {
+      participantName: existing.participant_name,
+      status,
+      investigationComplete: complete
+    }
+  });
+
+  return NextResponse.json({ message: isClosing(status) ? "Incident closed." : "Incident escalation updated." });
+}
+
+async function notifyManagersOfCriticalIncident(
+  admin: NonNullable<ReturnType<typeof serviceClient>>,
+  input: { incidentId: string; incidentNumber: string; participantName: string; staffName: string; staffEmail: string; severity: string; summary: string }
+) {
+  const { data: managers } = await admin.from("profiles").select("id, email").in("role", ["admin", "team_leader"]).eq("active", true);
+  const recipients = (managers ?? []).map((manager) => String(manager.email ?? "").toLowerCase()).filter(Boolean);
+  if (!recipients.length) return;
+  await admin.from("app_notifications").insert(
+    recipients.map((email) => ({
+      recipient_email: email,
+      notification_type: "incident_report",
+      title: `Critical incident: ${input.incidentNumber}`,
+      body: `${input.participantName} requires manager review and investigation completion before closure.`,
+      link_url: "/incident-reports",
+      metadata: {
+        incidentId: input.incidentId,
+        incidentNumber: input.incidentNumber,
+        participantName: input.participantName,
+        staffName: input.staffName,
+        staffEmail: input.staffEmail,
+        severity: input.severity,
+        summary: input.summary
+      }
+    }))
+  );
 }
