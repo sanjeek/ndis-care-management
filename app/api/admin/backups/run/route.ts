@@ -14,6 +14,7 @@ const backupTables = [
   "shifts",
   "progress_notes",
   "progress_note_templates",
+  "participant_goals",
   "incident_reports",
   "participant_risk_assessments",
   "participant_tasks",

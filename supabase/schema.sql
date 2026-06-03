@@ -375,6 +375,35 @@ create table if not exists public.progress_note_templates (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.participant_goals (
+  id uuid primary key default gen_random_uuid(),
+  participant_name text not null,
+  title text not null,
+  description text,
+  target_outcome text,
+  support_strategy text,
+  start_date date,
+  target_date date,
+  current_progress_percent numeric not null default 0 check (current_progress_percent >= 0 and current_progress_percent <= 100),
+  status text not null default 'active' check (status in ('active', 'paused', 'achieved', 'archived')),
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists participant_goals_participant_idx
+on public.participant_goals (participant_name, status, target_date);
+
+alter table public.progress_notes
+add column if not exists participant_goal_id uuid references public.participant_goals(id) on delete set null;
+
+alter table public.progress_notes
+add column if not exists completed_activity boolean not null default false;
+
+alter table public.progress_notes
+add column if not exists goal_progress_increment numeric not null default 0 check (goal_progress_increment >= 0 and goal_progress_increment <= 100);
+
 create table if not exists public.incident_reports (
   id uuid primary key default gen_random_uuid(),
   incident_number text unique,
@@ -792,6 +821,7 @@ alter table public.worker_leave_requests enable row level security;
 alter table public.shifts enable row level security;
 alter table public.progress_notes enable row level security;
 alter table public.progress_note_templates enable row level security;
+alter table public.participant_goals enable row level security;
 alter table public.incident_reports enable row level security;
 alter table public.module_records enable row level security;
 alter table public.care_plans enable row level security;
@@ -821,6 +851,7 @@ alter table public.worker_leave_requests force row level security;
 alter table public.shifts force row level security;
 alter table public.progress_notes force row level security;
 alter table public.progress_note_templates force row level security;
+alter table public.participant_goals force row level security;
 alter table public.incident_reports force row level security;
 alter table public.module_records force row level security;
 alter table public.care_plans force row level security;
@@ -926,6 +957,9 @@ drop policy if exists "Workers can create own assigned progress notes" on public
 drop policy if exists "Workers can update own progress notes" on public.progress_notes;
 drop policy if exists "Admins can manage progress note templates" on public.progress_note_templates;
 drop policy if exists "Staff can read active progress note templates" on public.progress_note_templates;
+drop policy if exists "Admins and team leaders can manage participant goals" on public.participant_goals;
+drop policy if exists "Workers can read assigned participant goals" on public.participant_goals;
+drop policy if exists "Family can read approved participant goals" on public.participant_goals;
 drop policy if exists "Role based incident reports" on public.incident_reports;
 drop policy if exists "Admins can manage incident reports" on public.incident_reports;
 drop policy if exists "Workers can read own incident reports" on public.incident_reports;
@@ -1084,6 +1118,31 @@ set search_path = public
 as $$
   select public.current_user_is_active() and public.current_app_role() = 'family';
 $$;
+
+create or replace function public.apply_progress_note_goal_increment()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.participant_goal_id is not null and new.completed_activity = true and coalesce(new.goal_progress_increment, 0) > 0 then
+    update public.participant_goals
+    set current_progress_percent = least(100, current_progress_percent + new.goal_progress_increment),
+        status = case when least(100, current_progress_percent + new.goal_progress_increment) >= 100 then 'achieved' else status end,
+        updated_at = now()
+    where id = new.participant_goal_id;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists progress_notes_goal_increment_trigger on public.progress_notes;
+
+create trigger progress_notes_goal_increment_trigger
+after insert on public.progress_notes
+for each row
+execute function public.apply_progress_note_goal_increment();
 
 create policy "Users can read their profile"
 on public.profiles for select
@@ -1267,6 +1326,35 @@ using (
   public.current_user_is_active()
   and public.current_app_role() in ('admin', 'team_leader', 'support_worker')
   and status = 'active'
+);
+
+create policy "Admins and team leaders can manage participant goals"
+on public.participant_goals for all
+to authenticated
+using (public.is_admin() or public.is_team_leader())
+with check (public.is_admin() or public.is_team_leader());
+
+create policy "Workers can read assigned participant goals"
+on public.participant_goals for select
+to authenticated
+using (
+  public.is_support_worker()
+  and public.worker_is_assigned_to_participant(participant_name)
+);
+
+create policy "Family can read approved participant goals"
+on public.participant_goals for select
+to authenticated
+using (
+  public.is_family()
+  and status in ('active', 'achieved')
+  and exists (
+    select 1
+    from public.family_members
+    where family_members.participant_name = participant_goals.participant_name
+      and lower(family_members.family_email) = public.current_app_email()
+      and family_members.status = 'approved'
+  )
 );
 
 create policy "Admins can manage incident reports"

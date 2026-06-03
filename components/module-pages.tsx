@@ -163,6 +163,10 @@ type ModuleItem = {
 
 type ProgressNoteRecord = {
   id: string;
+  participantGoalId: string;
+  participantGoalTitle: string;
+  completedActivity: boolean;
+  goalProgressIncrement: number;
   participantName: string;
   workerName: string;
   workerEmail: string;
@@ -178,6 +182,14 @@ type ProgressNoteRecord = {
   signature: string;
   isImportant: boolean;
   createdAt: string;
+};
+
+type ParticipantGoalOption = {
+  id: string;
+  participantName: string;
+  title: string;
+  currentProgressPercent: number;
+  status: string;
 };
 
 type ProgressTemplateField = {
@@ -1141,6 +1153,7 @@ export function ProgressNotesPage() {
   const [participants, setParticipants] = useState<ParticipantRecord[]>([]);
   const [workers, setWorkers] = useState<WorkerRecord[]>([]);
   const [templates, setTemplates] = useState<ProgressNoteTemplate[]>([]);
+  const [goals, setGoals] = useState<ParticipantGoalOption[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [context, setContext] = useState<{ role: UserRole; email: string; name: string }>({ role: "support_worker", email: "", name: "" });
   const [notice, setNotice] = useState("Loading progress notes from Supabase.");
@@ -1149,17 +1162,19 @@ export function ProgressNotesPage() {
     const userContext = await getCurrentUserContext();
     const userName = await getCurrentUserName();
     const assignedShifts = userContext.role === "support_worker" && userContext.email ? await loadShifts(userContext.email) : [];
-    const [loadedNotes, loadedParticipants, loadedWorkers, loadedTemplates] = await Promise.all([
+    const [loadedNotes, loadedParticipants, loadedWorkers, loadedTemplates, loadedGoals] = await Promise.all([
       loadProgressNotes(userContext.role === "support_worker" ? userContext.email : undefined),
       userContext.role === "support_worker" ? loadParticipantsForShifts(assignedShifts) : loadParticipants(),
       userContext.role === "support_worker" ? Promise.resolve([]) : loadWorkers(),
-      loadProgressNoteTemplates()
+      loadProgressNoteTemplates(),
+      loadParticipantGoals(userContext.role === "support_worker" ? userContext.email : undefined)
     ]);
     setContext({ ...userContext, name: assignedShifts[0]?.worker || userName || userContext.email });
     setNotes(loadedNotes);
     setParticipants(loadedParticipants);
     setWorkers(loadedWorkers);
     setTemplates(loadedTemplates);
+    setGoals(loadedGoals);
     if (!selectedTemplateId && loadedTemplates[0]?.id) setSelectedTemplateId(loadedTemplates[0].id);
     setNotice(
       loadedNotes.length
@@ -1199,7 +1214,10 @@ export function ProgressNotesPage() {
         note: get(form, "note"),
         outcomes: get(form, "outcomes"),
         digital_signature: templateSignature,
-        is_important: get(form, "important") === "Important"
+        is_important: get(form, "important") === "Important",
+        participant_goal_id: get(form, "goalId") || null,
+        completed_activity: get(form, "completedActivity") === "Completed activity",
+        goal_progress_increment: Number(get(form, "goalProgressIncrement") || 0)
       },
       setNotice,
       {
@@ -1259,6 +1277,11 @@ export function ProgressNotesPage() {
               </div>
               <Select name="category" label="Support category" options={["Self care", "Community access", "Medication prompt", "Meal preparation", "Behaviour support", "Transport assistance", "Domestic assistance"]} />
               <Select name="important" label="Priority" options={["Standard", "Important"]} />
+              <Select name="goalId" label="Linked participant goal" options={["", ...goals.map((goal) => goal.id)]} required={false} renderLabel={(value) => goalLabel(goals, value)} />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Select name="completedActivity" label="Goal activity" options={["Not completed", "Completed activity"]} />
+                <Field name="goalProgressIncrement" label="Goal progress increase %" type="number" min="0" max="100" placeholder="0" />
+              </div>
               {selectedTemplate ? <TemplateFields template={selectedTemplate} /> : null}
               <div className="lg:col-span-2">
                 <Area name="note" label="Notes" placeholder="Write what support was provided, observations, and participant response." />
@@ -1300,6 +1323,8 @@ export function ProgressNotesPage() {
               </div>
               <Info label="Notes" value={note.note || "Not recorded"} />
               <Info label="Outcomes" value={note.outcomes || "Not recorded"} />
+              <Info label="Linked goal" value={note.participantGoalTitle || "Not linked"} />
+              <Info label="Completed activity" value={note.completedActivity ? `Yes | +${note.goalProgressIncrement}%` : "No"} />
               {Object.keys(note.templateValues).length ? <JsonInfo title="Template fields" values={note.templateValues} /> : null}
               {Object.keys(note.outcomeTracking).length ? <JsonInfo title="Outcome tracking" values={note.outcomeTracking} /> : null}
               <Info label="Digital signature" value={note.signature || "Not signed"} />
@@ -2943,13 +2968,27 @@ function OptionalArea({ name, label, defaultValue = "", placeholder = "" }: { na
   );
 }
 
-function Select({ name, label, options, required = true, defaultValue = "" }: { name: string; label: string; options: string[]; required?: boolean; defaultValue?: string }) {
+function Select({
+  name,
+  label,
+  options,
+  required = true,
+  defaultValue = "",
+  renderLabel
+}: {
+  name: string;
+  label: string;
+  options: string[];
+  required?: boolean;
+  defaultValue?: string;
+  renderLabel?: (value: string) => string;
+}) {
   return (
     <label>
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
       <select name={name} required={required} defaultValue={defaultValue} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15">
         {options.map((option) => (
-          <option key={option} value={option}>{option || "Leave unchanged"}</option>
+          <option key={option || "empty"} value={option}>{renderLabel ? renderLabel(option) : option || "Leave unchanged"}</option>
         ))}
       </select>
     </label>
@@ -3237,8 +3276,14 @@ async function loadProgressNotes(workerEmail?: string): Promise<ProgressNoteReco
   if (workerEmail) query = query.eq("worker_email", workerEmail);
   const { data, error } = await query;
   if (error || !data) return [];
+  const goalIds = Array.from(new Set(data.map((row) => String(row.participant_goal_id ?? "")).filter(Boolean)));
+  const goalTitleMap = await loadGoalTitleMap(goalIds);
   return data.map((row) => ({
     id: String(row.id ?? `${row.participant_name}-${row.created_at}`),
+    participantGoalId: String(row.participant_goal_id ?? ""),
+    participantGoalTitle: goalTitleMap.get(String(row.participant_goal_id ?? "")) ?? "",
+    completedActivity: Boolean(row.completed_activity),
+    goalProgressIncrement: Number(row.goal_progress_increment ?? 0),
     participantName: String(row.participant_name ?? ""),
     workerName: String(row.worker_name ?? ""),
     workerEmail: String(row.worker_email ?? ""),
@@ -3255,6 +3300,36 @@ async function loadProgressNotes(workerEmail?: string): Promise<ProgressNoteReco
     isImportant: Boolean(row.is_important),
     createdAt: String(row.created_at ?? "")
   }));
+}
+
+async function loadParticipantGoals(workerEmail?: string): Promise<ParticipantGoalOption[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  let query = supabase.from("participant_goals").select("id, participant_name, title, current_progress_percent, status").order("participant_name", { ascending: true });
+  if (workerEmail) {
+    const shifts = await loadShifts(workerEmail);
+    const participantNames = Array.from(new Set(shifts.map((shift) => shift.participantName).filter(Boolean)));
+    if (!participantNames.length) return [];
+    query = query.in("participant_name", participantNames);
+  }
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: String(row.id ?? ""),
+    participantName: String(row.participant_name ?? ""),
+    title: String(row.title ?? ""),
+    currentProgressPercent: Number(row.current_progress_percent ?? 0),
+    status: String(row.status ?? "active")
+  }));
+}
+
+async function loadGoalTitleMap(goalIds: string[]) {
+  const map = new Map<string, string>();
+  if (!goalIds.length || !isSupabaseConfigured || !supabase) return map;
+  const { data } = await supabase.from("participant_goals").select("id, participant_name, title").in("id", goalIds);
+  for (const row of data ?? []) {
+    map.set(String(row.id ?? ""), `${String(row.participant_name ?? "")}: ${String(row.title ?? "")}`);
+  }
+  return map;
 }
 
 async function loadProgressNoteTemplates(): Promise<ProgressNoteTemplate[]> {
@@ -3726,6 +3801,13 @@ function friendlyEscalationStatus(value: string) {
     closed: "Closed after investigation"
   };
   return labels[value] ?? humaniseKey(value || "not recorded");
+}
+
+function goalLabel(goals: ParticipantGoalOption[], id: string) {
+  if (!id) return "No linked goal";
+  const goal = goals.find((item) => item.id === id);
+  if (!goal) return id;
+  return `${goal.participantName}: ${goal.title} (${Math.round(goal.currentProgressPercent)}%)`;
 }
 
 function formatBytes(value: number) {

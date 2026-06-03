@@ -20,6 +20,7 @@ import {
   Smartphone,
   Settings,
   ShieldCheck,
+  Target,
   UserCog,
   Users,
   WalletCards
@@ -43,6 +44,7 @@ export const navItems = [
   { label: "Worker Portal", href: "/worker-portal", icon: Smartphone },
   { label: "Messages", href: "/messages", icon: MessageSquare },
   { label: "Tasks", href: "/tasks", icon: ListChecks },
+  { label: "Participant Goals", href: "/participant-goals", icon: Target },
   { label: "Family Portal", href: "/family-portal", icon: Home },
   { label: "My Shifts", href: "/my-shifts", icon: ListChecks },
   { label: "User Management", href: "/admin/users", icon: UserCog },
