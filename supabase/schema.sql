@@ -1,5 +1,18 @@
+create table if not exists public.organisation_branches (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  address text,
+  phone text,
+  manager_name text,
+  manager_email text,
+  status text not null default 'active' check (status in ('active', 'inactive')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.participants (
   id uuid primary key default gen_random_uuid(),
+  branch_id uuid references public.organisation_branches(id) on delete set null,
   name text not null,
   ndis_number text not null,
   plan_type text not null,
@@ -15,6 +28,9 @@ create table if not exists public.participants (
   communication_preferences text,
   created_at timestamptz not null default now()
 );
+
+alter table public.participants
+add column if not exists branch_id uuid references public.organisation_branches(id) on delete set null;
 
 alter table public.participants
 add column if not exists date_of_birth date;
@@ -80,6 +96,7 @@ on public.family_members (family_email, participant_name);
 
 create table if not exists public.support_workers (
   id uuid primary key default gen_random_uuid(),
+  branch_id uuid references public.organisation_branches(id) on delete set null,
   name text not null,
   email text not null,
   role text not null,
@@ -97,6 +114,9 @@ create table if not exists public.support_workers (
 
 alter table public.support_workers
 add column if not exists email text;
+
+alter table public.support_workers
+add column if not exists branch_id uuid references public.organisation_branches(id) on delete set null;
 
 alter table public.support_workers
 add column if not exists police_check_expiry date;
@@ -160,6 +180,7 @@ create table if not exists public.worker_leave_requests (
 
 create table if not exists public.shifts (
   id uuid primary key default gen_random_uuid(),
+  branch_id uuid references public.organisation_branches(id) on delete set null,
   participant_name text not null,
   support_worker_name text not null,
   support_worker_email text,
@@ -208,6 +229,9 @@ create table if not exists public.shifts (
 
 alter table public.shifts
 add column if not exists support_worker_email text;
+
+alter table public.shifts
+add column if not exists branch_id uuid references public.organisation_branches(id) on delete set null;
 
 alter table public.shifts
 add column if not exists approval_status text not null default 'not_submitted';
@@ -406,6 +430,7 @@ add column if not exists goal_progress_increment numeric not null default 0 chec
 
 create table if not exists public.incident_reports (
   id uuid primary key default gen_random_uuid(),
+  branch_id uuid references public.organisation_branches(id) on delete set null,
   incident_number text unique,
   participant_name text not null,
   worker_name text not null,
@@ -439,6 +464,9 @@ create table if not exists public.incident_reports (
 
 alter table public.incident_reports
 add column if not exists worker_email text;
+
+alter table public.incident_reports
+add column if not exists branch_id uuid references public.organisation_branches(id) on delete set null;
 
 alter table public.incident_reports
 add column if not exists incident_number text;
@@ -603,6 +631,7 @@ create table if not exists public.ndis_funding_records (
 
 create table if not exists public.invoices (
   id uuid primary key default gen_random_uuid(),
+  branch_id uuid references public.organisation_branches(id) on delete set null,
   invoice_number text not null unique,
   participant_name text not null,
   ndis_number text,
@@ -638,6 +667,9 @@ create table if not exists public.invoice_items (
   created_at timestamptz not null default now()
 );
 
+alter table public.invoices
+add column if not exists branch_id uuid references public.organisation_branches(id) on delete set null;
+
 create table if not exists public.service_agreements (
   id uuid primary key default gen_random_uuid(),
   agreement_group_id uuid not null default gen_random_uuid(),
@@ -664,6 +696,7 @@ create table if not exists public.service_agreements (
 
 create table if not exists public.care_documents (
   id uuid primary key default gen_random_uuid(),
+  branch_id uuid references public.organisation_branches(id) on delete set null,
   title text not null,
   participant_name text,
   owner_user_id uuid references auth.users(id) on delete set null,
@@ -677,6 +710,9 @@ create table if not exists public.care_documents (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.care_documents
+add column if not exists branch_id uuid references public.organisation_branches(id) on delete set null;
 
 create table if not exists public.audit_logs (
   id uuid primary key default gen_random_uuid(),
@@ -811,7 +847,23 @@ on public.participant_risk_assessments (participant_name, overall_risk_level, re
 create index if not exists participant_risk_assessments_assessor_idx
 on public.participant_risk_assessments (lower(assessor_email), status, review_date);
 
+create index if not exists participants_branch_idx
+on public.participants (branch_id);
+
+create index if not exists support_workers_branch_idx
+on public.support_workers (branch_id);
+
+create index if not exists shifts_branch_idx
+on public.shifts (branch_id, starts_at);
+
+create index if not exists incident_reports_branch_idx
+on public.incident_reports (branch_id, status);
+
+create index if not exists invoices_branch_idx
+on public.invoices (branch_id, status);
+
 alter table public.participants enable row level security;
+alter table public.organisation_branches enable row level security;
 alter table public.profiles enable row level security;
 alter table public.family_members enable row level security;
 alter table public.support_workers enable row level security;
@@ -842,6 +894,7 @@ alter table public.participant_tasks enable row level security;
 alter table public.participant_risk_assessments enable row level security;
 
 alter table public.participants force row level security;
+alter table public.organisation_branches force row level security;
 alter table public.profiles force row level security;
 alter table public.family_members force row level security;
 alter table public.support_workers force row level security;
@@ -926,6 +979,8 @@ set public = false,
     allowed_mime_types = excluded.allowed_mime_types;
 
 drop policy if exists "Authenticated users can manage participants" on public.participants;
+drop policy if exists "Admins can manage organisation branches" on public.organisation_branches;
+drop policy if exists "Team leaders can read organisation branches" on public.organisation_branches;
 drop policy if exists "Authenticated users can manage support workers" on public.support_workers;
 drop policy if exists "Authenticated users can manage worker invitations" on public.worker_invitations;
 drop policy if exists "Authenticated users can manage shifts" on public.shifts;
@@ -1143,6 +1198,17 @@ create trigger progress_notes_goal_increment_trigger
 after insert on public.progress_notes
 for each row
 execute function public.apply_progress_note_goal_increment();
+
+create policy "Admins can manage organisation branches"
+on public.organisation_branches for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create policy "Team leaders can read organisation branches"
+on public.organisation_branches for select
+to authenticated
+using (public.is_team_leader());
 
 create policy "Users can read their profile"
 on public.profiles for select

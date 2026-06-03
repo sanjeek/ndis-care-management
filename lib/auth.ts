@@ -2,8 +2,8 @@ export type UserRole = "admin" | "support_worker" | "team_leader" | "family";
 
 const workerRoutes = ["/worker-portal", "/my-shifts", "/messages", "/tasks", "/participant-goals", "/participants", "/care-plans", "/medications", "/progress-notes", "/incident-reports", "/risk-assessments", "/profile", "/unauthorised"];
 const workerNavOrder = ["/worker-portal", "/my-shifts", "/messages", "/tasks", "/participant-goals", "/care-plans", "/medications", "/progress-notes", "/incident-reports", "/risk-assessments", "/profile"];
-const teamLeaderRoutes = ["/dashboard", "/timesheets", "/messages", "/tasks", "/participant-goals", "/medications", "/incident-reports", "/risk-assessments", "/service-agreements", "/profile", "/unauthorised"];
-const teamLeaderNavOrder = ["/dashboard", "/timesheets", "/messages", "/tasks", "/participant-goals", "/medications", "/incident-reports", "/risk-assessments", "/service-agreements", "/profile"];
+const teamLeaderRoutes = ["/dashboard", "/branches", "/timesheets", "/messages", "/tasks", "/participant-goals", "/medications", "/incident-reports", "/risk-assessments", "/service-agreements", "/profile", "/unauthorised"];
+const teamLeaderNavOrder = ["/dashboard", "/branches", "/timesheets", "/messages", "/tasks", "/participant-goals", "/medications", "/incident-reports", "/risk-assessments", "/service-agreements", "/profile"];
 const familyRoutes = ["/family-portal", "/participant-goals", "/profile", "/unauthorised"];
 const familyNavOrder = ["/family-portal", "/participant-goals", "/profile"];
 const adminEmails = ["sanjee@live.com"];

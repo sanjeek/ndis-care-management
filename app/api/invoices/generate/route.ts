@@ -4,6 +4,7 @@ import { recordServerAudit } from "@/lib/server-audit";
 
 type ShiftRow = {
   id: string;
+  branch_id: string | null;
   participant_name: string;
   support_worker_name: string | null;
   starts_at: string | null;
@@ -13,8 +14,17 @@ type ShiftRow = {
 
 type ParticipantRow = {
   name: string;
+  branch_id: string | null;
   ndis_number: string | null;
   plan_type: string | null;
+};
+
+type FundingRow = {
+  participant_name: string;
+  support_category: string | null;
+  service_booking_reference: string | null;
+  provider_reference: string | null;
+  status: string | null;
 };
 
 export async function POST(request: Request) {
@@ -26,6 +36,7 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({}));
   const ndisLineItem = text(body.ndis_line_item) || "01_011_0107_1_1";
+  const travelLineItem = text(body.travel_line_item) || "01_799_0107_1_1";
   const fundingCategory = text(body.funding_category) || "Core - Assistance with Daily Life";
   const hourlyRate = money(body.hourly_rate);
   const travelKm = money(body.travel_km);
@@ -38,14 +49,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Hourly rate must be greater than zero." }, { status: 400 });
   }
 
-  const [{ data: shifts, error: shiftError }, { data: existingItems, error: existingError }, { data: participants }] = await Promise.all([
+  const [{ data: shifts, error: shiftError }, { data: existingItems, error: existingError }, { data: participants }, { data: fundingRecords }] = await Promise.all([
     auth.client
       .from("shifts")
-      .select("id, participant_name, support_worker_name, starts_at, ends_at, approval_status")
+      .select("id, branch_id, participant_name, support_worker_name, starts_at, ends_at, approval_status")
       .eq("approval_status", "approved")
       .order("starts_at", { ascending: true }),
     auth.client.from("invoice_items").select("shift_id").not("shift_id", "is", null),
-    auth.client.from("participants").select("name, ndis_number, plan_type")
+    auth.client.from("participants").select("name, branch_id, ndis_number, plan_type"),
+    auth.client.from("ndis_funding_records").select("participant_name, support_category, service_booking_reference, provider_reference, status").eq("status", "active")
   ]);
 
   if (shiftError) return NextResponse.json({ message: shiftError.message }, { status: 400 });
@@ -58,12 +70,16 @@ export async function POST(request: Request) {
   }
 
   const participantMap = new Map((participants ?? []).map((participant) => [String(participant.name), participant as ParticipantRow]));
+  const fundingMap = new Map((fundingRecords ?? []).map((record) => [String(record.participant_name), record as FundingRow]));
   const grouped = groupByParticipant(uninvoiced);
   const createdInvoiceIds: string[] = [];
   let createdItemCount = 0;
 
   for (const [participantName, rows] of grouped.entries()) {
     const participant = participantMap.get(participantName);
+    const funding = fundingMap.get(participantName);
+    const participantFundingCategory = funding?.support_category || fundingCategory;
+    const bookingSuffix = funding?.service_booking_reference ? ` | Booking ${funding.service_booking_reference}` : "";
     const serviceItems = rows.map((shift) => {
       const hours = shiftHours(shift);
       const amount = roundMoney(hours * hourlyRate);
@@ -72,9 +88,9 @@ export async function POST(request: Request) {
         participant_name: participantName,
         worker_name: shift.support_worker_name ?? "",
         service_date: dateOnly(shift.starts_at),
-        description: `${participantName} support shift ${timeRange(shift)}`,
+        description: `${participantName} support shift ${timeRange(shift)}${bookingSuffix}`,
         ndis_line_item: ndisLineItem,
-        funding_category: fundingCategory,
+        funding_category: participantFundingCategory,
         quantity: hours,
         unit_price: hourlyRate,
         amount,
@@ -87,9 +103,9 @@ export async function POST(request: Request) {
           participant_name: participantName,
           worker_name: shift.support_worker_name ?? "",
           service_date: dateOnly(shift.starts_at),
-          description: `${participantName} provider travel ${timeRange(shift)}`,
-          ndis_line_item: `${ndisLineItem}-TRAVEL`,
-          funding_category: fundingCategory,
+          description: `${participantName} provider travel ${timeRange(shift)}${bookingSuffix}`,
+          ndis_line_item: travelLineItem,
+          funding_category: participantFundingCategory,
           quantity: travelKm,
           unit_price: travelRate,
           amount: roundMoney(travelKm * travelRate),
@@ -104,11 +120,12 @@ export async function POST(request: Request) {
     const { data: invoice, error: invoiceError } = await auth.client
       .from("invoices")
       .insert({
+        branch_id: rows.find((row) => row.branch_id)?.branch_id ?? participant?.branch_id ?? null,
         invoice_number: invoiceNumber(participantName),
         participant_name: participantName,
         ndis_number: participant?.ndis_number ?? "",
         plan_type: participant?.plan_type ?? "",
-        funding_category: fundingCategory,
+        funding_category: participantFundingCategory,
         issue_date: issueDate,
         due_date: dueDate,
         status: "issued",
@@ -140,7 +157,7 @@ export async function POST(request: Request) {
     action: "invoice_generate",
     tableName: "invoices",
     recordLabel: `${createdInvoiceIds.length} invoices generated`,
-    metadata: { invoiceCount: createdInvoiceIds.length, itemCount: createdItemCount, fundingCategory, ndisLineItem, hourlyRate, travelKm, travelRate }
+    metadata: { invoiceCount: createdInvoiceIds.length, itemCount: createdItemCount, fundingCategory, ndisLineItem, travelLineItem, hourlyRate, travelKm, travelRate, usesParticipantFundingRecords: true }
   });
 
   return NextResponse.json({ message: `${createdInvoiceIds.length} invoices generated from approved shifts.`, invoiceCount: createdInvoiceIds.length, itemCount: createdItemCount });

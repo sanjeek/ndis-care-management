@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  Building2,
   ClipboardList,
   ClipboardCheck,
   Clock3,
@@ -28,6 +29,7 @@ import {
 
 export const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Branches", href: "/branches", icon: Building2 },
   { label: "Participants", href: "/participants", icon: HeartHandshake },
   { label: "Care Plans", href: "/care-plans", icon: HeartPulse },
   { label: "Medications", href: "/medications", icon: Pill },

@@ -5,6 +5,7 @@ import { recordServerAudit } from "@/lib/server-audit";
 const backupBucket = "database-backups";
 const backupTables = [
   "participants",
+  "organisation_branches",
   "profiles",
   "family_members",
   "support_workers",

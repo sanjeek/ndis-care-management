@@ -4,6 +4,7 @@ import { recordServerAudit } from "@/lib/server-audit";
 
 const restoreOrder = [
   "profiles",
+  "organisation_branches",
   "participants",
   "support_workers",
   "worker_invitations",

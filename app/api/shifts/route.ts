@@ -44,12 +44,19 @@ export async function POST(request: Request) {
   if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate <= startDate) {
     return NextResponse.json({ message: "Start and end time must be valid, and end time must be after start time." }, { status: 400 });
   }
+  const { data: participantBranch } = await auth.client
+    .from("participants")
+    .select("branch_id")
+    .eq("name", participantName)
+    .maybeSingle();
+  const branchId = String(participantBranch?.branch_id ?? "") || null;
   const durationMs = endDate.getTime() - startDate.getTime();
   const rows = Array.from({ length: recurrence.count }).map((_, index) => {
     const nextStart = new Date(startDate);
     nextStart.setDate(startDate.getDate() + recurrence.intervalDays * index);
     const nextEnd = new Date(nextStart.getTime() + durationMs);
     return {
+      branch_id: branchId,
       participant_name: participantName,
       support_worker_name: workerName,
       support_worker_email: workerEmail,
@@ -107,7 +114,7 @@ export async function POST(request: Request) {
     tableName: "shifts",
     recordId: firstShiftId,
     recordLabel: `${participantName} shift`,
-    metadata: { participantName, workerName, workerEmail, startsAt, endsAt, status, allowedLatitude, allowedLongitude, allowedRadiusM, recurrence, seriesId, createdCount: rows.length }
+    metadata: { branchId, participantName, workerName, workerEmail, startsAt, endsAt, status, allowedLatitude, allowedLongitude, allowedRadiusM, recurrence, seriesId, createdCount: rows.length }
   });
 
   const adminRecipients = await getAdminNotificationRecipients(auth.client, { fallback: [auth.user.email] });

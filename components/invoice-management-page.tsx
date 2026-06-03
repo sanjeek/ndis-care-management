@@ -101,6 +101,7 @@ export function InvoiceManagementPage() {
       },
       body: JSON.stringify({
         ndis_line_item: String(form.get("ndisLineItem")),
+        travel_line_item: String(form.get("travelLineItem")),
         funding_category: String(form.get("fundingCategory")),
         hourly_rate: String(form.get("hourlyRate")),
         travel_km: String(form.get("travelKm")),
@@ -128,6 +129,7 @@ export function InvoiceManagementPage() {
           <Panel title="Generate from approved shifts" icon={ReceiptText}>
             <form onSubmit={generate} className="grid gap-4">
               <Field name="ndisLineItem" label="NDIS line item" defaultValue="01_011_0107_1_1" />
+              <Field name="travelLineItem" label="Travel NDIS line item" defaultValue="01_799_0107_1_1" />
               <Select name="fundingCategory" label="Participant funding category" options={fundingCategories} />
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field name="hourlyRate" label="Hourly service rate" type="number" min="0" step="0.01" defaultValue="67.56" />
@@ -139,7 +141,7 @@ export function InvoiceManagementPage() {
               </div>
               <Field name="issueDate" label="Issue date" type="date" required={false} />
               <p className="rounded border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-600">
-                The generator uses approved shifts only and skips any shift already linked to an invoice item.
+                The generator uses approved shifts only, skips shifts already linked to an invoice item, and uses participant funding records when available.
               </p>
               <button className="min-h-12 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d625d]">Generate invoices</button>
             </form>
