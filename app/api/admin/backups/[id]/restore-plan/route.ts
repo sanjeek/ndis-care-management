@@ -12,6 +12,8 @@ const restoreOrder = [
   "progress_note_templates",
   "incident_reports",
   "module_records",
+  "invoices",
+  "invoice_items",
   "care_plans",
   "medication_records",
   "medication_events",

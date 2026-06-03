@@ -554,6 +554,43 @@ create table if not exists public.ndis_funding_records (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.invoices (
+  id uuid primary key default gen_random_uuid(),
+  invoice_number text not null unique,
+  participant_name text not null,
+  ndis_number text,
+  plan_type text,
+  funding_category text,
+  issue_date date not null default current_date,
+  due_date date,
+  status text not null default 'draft' check (status in ('draft', 'issued', 'paid', 'void')),
+  total_amount numeric not null default 0 check (total_amount >= 0),
+  travel_amount numeric not null default 0 check (travel_amount >= 0),
+  service_amount numeric not null default 0 check (service_amount >= 0),
+  generated_from text not null default 'approved_shifts',
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.invoice_items (
+  id uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references public.invoices(id) on delete cascade,
+  shift_id uuid references public.shifts(id) on delete set null,
+  participant_name text not null,
+  worker_name text,
+  service_date date,
+  description text not null,
+  ndis_line_item text not null,
+  funding_category text,
+  quantity numeric not null default 0 check (quantity >= 0),
+  unit_price numeric not null default 0 check (unit_price >= 0),
+  amount numeric not null default 0 check (amount >= 0),
+  item_type text not null default 'service' check (item_type in ('service', 'travel', 'adjustment')),
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.service_agreements (
   id uuid primary key default gen_random_uuid(),
   agreement_group_id uuid not null default gen_random_uuid(),
@@ -664,6 +701,8 @@ alter table public.care_plans enable row level security;
 alter table public.medication_records enable row level security;
 alter table public.medication_events enable row level security;
 alter table public.ndis_funding_records enable row level security;
+alter table public.invoices enable row level security;
+alter table public.invoice_items enable row level security;
 alter table public.service_agreements enable row level security;
 alter table public.care_documents enable row level security;
 alter table public.audit_logs enable row level security;
@@ -687,6 +726,8 @@ alter table public.care_plans force row level security;
 alter table public.medication_records force row level security;
 alter table public.medication_events force row level security;
 alter table public.ndis_funding_records force row level security;
+alter table public.invoices force row level security;
+alter table public.invoice_items force row level security;
 alter table public.service_agreements force row level security;
 alter table public.care_documents force row level security;
 alter table public.audit_logs force row level security;
@@ -798,6 +839,10 @@ drop policy if exists "Workers can read assigned medication events" on public.me
 drop policy if exists "Workers can create assigned medication events" on public.medication_events;
 drop policy if exists "Admins can manage NDIS funding records" on public.ndis_funding_records;
 drop policy if exists "Team leaders can read NDIS funding records" on public.ndis_funding_records;
+drop policy if exists "Admins can manage invoices" on public.invoices;
+drop policy if exists "Team leaders can read invoices" on public.invoices;
+drop policy if exists "Admins can manage invoice items" on public.invoice_items;
+drop policy if exists "Team leaders can read invoice items" on public.invoice_items;
 drop policy if exists "Admins can manage service agreements" on public.service_agreements;
 drop policy if exists "Team leaders can read service agreements" on public.service_agreements;
 drop policy if exists "Admins can manage care documents" on public.care_documents;
@@ -1222,6 +1267,28 @@ with check (public.is_admin());
 
 create policy "Team leaders can read NDIS funding records"
 on public.ndis_funding_records for select
+to authenticated
+using (public.is_team_leader());
+
+create policy "Admins can manage invoices"
+on public.invoices for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create policy "Team leaders can read invoices"
+on public.invoices for select
+to authenticated
+using (public.is_team_leader());
+
+create policy "Admins can manage invoice items"
+on public.invoice_items for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create policy "Team leaders can read invoice items"
+on public.invoice_items for select
 to authenticated
 using (public.is_team_leader());
 

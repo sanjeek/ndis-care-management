@@ -3040,7 +3040,7 @@ async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     supabase.from("support_workers").select("id", { count: "exact", head: true }),
     supabase.from("shifts").select("status, approval_status, clock_out_at"),
     supabase.from("incident_reports").select("status"),
-    supabase.from("module_records").select("status").eq("module", "invoices")
+    supabase.from("invoices").select("status")
   ]);
 
   const completedShifts = shiftRows.data?.filter((shift) => {

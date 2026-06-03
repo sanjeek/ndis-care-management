@@ -1,5 +1,5 @@
-import { SimpleModulePage } from "@/components/module-pages";
+import { InvoiceManagementPage } from "@/components/invoice-management-page";
 
 export default function Page() {
-  return <SimpleModulePage kind="invoices" />;
+  return <InvoiceManagementPage />;
 }
