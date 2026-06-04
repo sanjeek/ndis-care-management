@@ -333,7 +333,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
   return (
     <main className="min-h-screen bg-slate-50">
       <section className="mx-auto flex min-h-screen w-full max-w-[1500px] flex-col lg:flex-row">
-        <aside className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:h-screen lg:w-72 lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
+        <aside className="sticky top-0 z-20 flex flex-col border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:h-screen lg:w-72 lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
           <div className="flex items-center justify-between gap-4">
             <Link href={defaultRouteForRole(userRole)} className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded bg-ink text-sm font-bold text-white">CO</span>
@@ -347,7 +347,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
             </button>
           </div>
 
-          <nav className={`${open ? "grid" : "hidden"} mt-5 gap-1 lg:grid lg:max-h-[calc(100vh-15rem)] lg:overflow-y-auto lg:pr-1`}>
+          <nav className={`${open ? "grid" : "hidden"} mt-5 gap-1 lg:grid lg:flex-1 lg:overflow-y-auto lg:pr-1`}>
             {groupedNavItems.map((group) => {
               if (group.items.length === 1 && group.href) {
                 const item = group.items[0];
