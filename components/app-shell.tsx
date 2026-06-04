@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, ChevronDown, LogOut, Menu, Search, UserCircle } from "lucide-react";
+import { Bell, CalendarDays, ChevronDown, LogOut, Menu, MessageSquare, Search, UserCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { navItems } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
@@ -43,11 +43,13 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
   const [secondsUntilLogout, setSecondsUntilLogout] = useState(warningBeforeLogoutMs / 1000);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchNotice, setSearchNotice] = useState("");
-  const [openNavGroups, setOpenNavGroups] = useState<Record<string, boolean>>({});
+  const [openNavGroup, setOpenNavGroup] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -91,6 +93,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
         return;
       }
 
+      setSessionMarker(role);
       setUserEmail(user.email ?? "");
       setUserName(String(user.user_metadata?.full_name || profileName || user.email || user.id));
       setUserRole(role);
@@ -107,6 +110,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
 
     const { data: authListener } = supabase?.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT") {
+        clearSessionMarker();
         redirectToLogin();
         return;
       }
@@ -153,6 +157,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
         metadata: { reason: "inactivity_timeout", inactivityMinutes: 30, pathname: window.location.pathname }
       });
       await supabase?.auth.signOut();
+      clearSessionMarker();
       window.location.replace("/login?reason=session-expired");
     }
 
@@ -175,6 +180,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
 
     function markActivity() {
       window.localStorage.setItem(lastActivityKey, String(Date.now()));
+      setSessionMarker(userRole);
       setShowIdleWarning(false);
       setSecondsUntilLogout(warningBeforeLogoutMs / 1000);
       scheduleTimers();
@@ -201,7 +207,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
       events.forEach((eventName) => window.removeEventListener(eventName, markActivity));
       window.removeEventListener("storage", handleStorage);
     };
-  }, [authChecked, userEmail]);
+  }, [authChecked, userEmail, userRole]);
 
   useEffect(() => {
     if (!authChecked || !supabase || !userEmail) return;
@@ -273,6 +279,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
 
   const visibleNavItems = useMemo(() => visibleNavForRole(userRole, navItems), [userRole]);
   const groupedNavItems = useMemo(() => groupNavigation(visibleNavItems, pathname), [pathname, visibleNavItems]);
+  const activeNavGroup = groupedNavItems.find((group) => group.active)?.label ?? "";
   const unreadCount = notifications.filter((notification) => !notification.readAt).length;
 
   const initials = useMemo(() => {
@@ -294,11 +301,13 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
       });
       await supabase.auth.signOut();
     }
+    clearSessionMarker();
     window.location.href = "/login";
   }
 
   function staySignedIn() {
     window.localStorage.setItem(lastActivityKey, String(Date.now()));
+    setSessionMarker(userRole);
     setShowIdleWarning(false);
     setSecondsUntilLogout(warningBeforeLogoutMs / 1000);
   }
@@ -331,12 +340,12 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <section className="mx-auto flex min-h-screen w-full max-w-[1500px] flex-col lg:flex-row">
-        <aside className="sticky top-0 z-20 flex flex-col border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:h-screen lg:w-72 lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
+    <main className="min-h-screen bg-[#f7f8fc]">
+      <section className="flex min-h-screen w-full flex-col lg:flex-row">
+        <aside className="sticky top-0 z-20 flex flex-col border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:h-screen lg:w-72 lg:border-b-0 lg:border-r lg:px-5 lg:py-5">
           <div className="flex items-center justify-between gap-4">
             <Link href={defaultRouteForRole(userRole)} className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded bg-ink text-sm font-bold text-white">CO</span>
+              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-gumleaf to-harbour text-sm font-bold text-white shadow-panel">CO</span>
               <span>
                 <span className="block text-base font-semibold text-ink">CareOS</span>
                 <span className="block text-xs text-slate-500">NDIS operations</span>
@@ -357,8 +366,8 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                     key={group.label}
                     href={item.href}
                     onClick={() => setOpen(false)}
-                    className={`flex items-center gap-3 rounded px-3 py-2.5 text-sm font-semibold transition ${
-                      active ? "bg-gumleaf text-white" : "text-slate-600 hover:bg-slate-100 hover:text-ink"
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
+                      active ? "bg-gumleaf text-white shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-ink"
                     }`}
                   >
                     <item.icon className="h-4 w-4" />
@@ -367,14 +376,14 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                 );
               }
 
-              const isOpen = openNavGroups[group.label] ?? group.active;
+              const isOpen = group.label === (openNavGroup || activeNavGroup);
               const Icon = group.icon;
               return (
                 <div key={group.label} className="grid gap-1">
                   <button
                     type="button"
-                    onClick={() => setOpenNavGroups((current) => ({ ...current, [group.label]: !isOpen }))}
-                    className={`flex w-full items-center gap-3 rounded px-3 py-2.5 text-left text-sm font-semibold transition ${
+                    onClick={() => setOpenNavGroup(isOpen ? "" : group.label)}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition ${
                       group.active ? "bg-gumleaf/10 text-gumleaf" : "text-slate-600 hover:bg-slate-100 hover:text-ink"
                     }`}
                     aria-expanded={isOpen}
@@ -384,16 +393,19 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                     <ChevronDown className={`h-4 w-4 transition ${isOpen ? "rotate-180" : ""}`} />
                   </button>
                   {isOpen ? (
-                    <div className="grid gap-1 pl-6">
+                    <div className="grid gap-1 border-l border-slate-200 pl-4 ml-5">
                       {group.items.map((item) => {
                         const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
                         return (
                           <Link
                             key={item.href}
                             href={item.href}
-                            onClick={() => setOpen(false)}
-                            className={`flex items-center gap-2 rounded px-3 py-2 text-sm font-medium transition ${
-                              active ? "bg-slate-100 text-ink" : "text-slate-600 hover:bg-slate-100 hover:text-ink"
+                            onClick={() => {
+                              setOpen(false);
+                              setOpenNavGroup(group.label);
+                            }}
+                            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                              active ? "bg-slate-100 text-gumleaf" : "text-slate-600 hover:bg-slate-100 hover:text-ink"
                             }`}
                           >
                             <item.icon className="h-3.5 w-3.5" />
@@ -408,7 +420,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
             })}
           </nav>
 
-          <div className="mt-4 hidden rounded border border-slate-200 bg-slate-50 px-3 py-2.5 lg:block">
+          <div className="mt-4 hidden rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 lg:block">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Account</p>
             <p className="mt-1 truncate text-xs font-semibold text-ink">{userName}</p>
             <p className="truncate text-[11px] text-slate-500">{userEmail}</p>
@@ -435,7 +447,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                     <Search className="h-4 w-4 shrink-0 text-slate-400" />
                     <input
                       className="w-full bg-transparent text-sm outline-none"
-                      placeholder="Search participants, shifts, notes..."
+                      placeholder="Search participants, workers, shifts, invoices, documents..."
                       value={search}
                       onFocus={() => setSearchOpen(true)}
                       onChange={(event) => {
@@ -476,16 +488,21 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                     </div>
                   ) : null}
                 </div>
-                <Link href="/profile" className="inline-flex items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gumleaf text-xs font-bold text-white">{initials}</span>
-                  <span className="hidden max-w-32 truncate md:inline">{userName}</span>
-                  <UserCircle className="h-4 w-4 text-slate-400" />
-                </Link>
+                {canAccessRoute(userRole, "/messages") ? (
+                  <Link href="/messages" className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2.5 text-slate-700 shadow-sm hover:bg-slate-50" aria-label="Open messages">
+                    <MessageSquare className="h-4 w-4" />
+                  </Link>
+                ) : null}
+                <label className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm md:flex">
+                  <CalendarDays className="h-4 w-4 text-gumleaf" />
+                  <span className="sr-only">Selected date</span>
+                  <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} className="border-0 bg-transparent p-0 text-sm font-semibold text-slate-700 outline-none" />
+                </label>
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setNotificationsOpen(!notificationsOpen)}
-                    className="relative inline-flex items-center justify-center rounded border border-slate-200 bg-white p-2.5 text-slate-700 shadow-sm hover:bg-slate-50"
+                    className="relative inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2.5 text-slate-700 shadow-sm hover:bg-slate-50"
                     aria-label="Open notifications"
                   >
                     <Bell className="h-4 w-4" />
@@ -524,10 +541,41 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                     </div>
                   ) : null}
                 </div>
-                <button onClick={signOut} className="inline-flex items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
-                  <LogOut className="h-4 w-4" />
-                  Sign out
-                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setProfileOpen((current) => !current)}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                    aria-label="Open user profile menu"
+                  >
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gumleaf text-xs font-bold text-white">{initials}</span>
+                    <span className="hidden max-w-32 truncate md:inline">{userName}</span>
+                    <ChevronDown className={`h-4 w-4 text-slate-400 transition ${profileOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {profileOpen ? (
+                    <div className="absolute right-0 z-30 mt-2 w-72 rounded-lg border border-slate-200 bg-white p-2 shadow-2xl">
+                      <div className="rounded-lg bg-slate-50 p-3">
+                        <p className="font-semibold text-ink">{userName}</p>
+                        <p className="mt-1 truncate text-sm text-slate-500">{userEmail}</p>
+                        <p className="mt-2 inline-flex rounded bg-gumleaf/10 px-2.5 py-1 text-xs font-semibold text-gumleaf">{friendlyRole(userRole)}</p>
+                      </div>
+                      <Link href="/profile" onClick={() => setProfileOpen(false)} className="mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                        <UserCircle className="h-4 w-4 text-gumleaf" />
+                        Profile
+                      </Link>
+                      {canAccessRoute(userRole, "/settings") ? (
+                        <Link href="/settings" onClick={() => setProfileOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                          <UserCircle className="h-4 w-4 text-gumleaf" />
+                          Settings
+                        </Link>
+                      ) : null}
+                      <button onClick={signOut} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-coral hover:bg-coral/5">
+                        <LogOut className="h-4 w-4" />
+                        Sign out
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
           </header>
@@ -564,17 +612,30 @@ function formatCountdown(seconds: number) {
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
+function setSessionMarker(role: UserRole) {
+  if (typeof document === "undefined") return;
+  document.cookie = `careos-session=active; path=/; max-age=${Math.floor(inactivityLimitMs / 1000)}; SameSite=Lax`;
+  document.cookie = `careos-role=${encodeURIComponent(role)}; path=/; max-age=${Math.floor(inactivityLimitMs / 1000)}; SameSite=Lax`;
+}
+
+function clearSessionMarker() {
+  if (typeof document === "undefined") return;
+  document.cookie = "careos-session=; path=/; max-age=0; SameSite=Lax";
+  document.cookie = "careos-role=; path=/; max-age=0; SameSite=Lax";
+}
+
 type NavItem = (typeof navItems)[number];
 
 const navGroupDefinitions = [
   { label: "Dashboard", hrefs: ["/dashboard"] },
-  { label: "Scheduler", hrefs: ["/rostering", "/timesheets", "/payroll", "/travel", "/shift-attachments", "/my-shifts", "/worker-portal"] },
-  { label: "Participants", hrefs: ["/participants", "/care-plans", "/medications", "/participant-goals", "/checklists", "/participant-matching", "/progress-notes", "/risk-assessments", "/incident-reports"] },
-  { label: "Staff", hrefs: ["/support-workers", "/admin/users", "/profile"] },
-  { label: "Communication", hrefs: ["/messages", "/tasks", "/documents", "/family-portal"] },
+  { label: "Participants", hrefs: ["/participants", "/participant-goals", "/care-plans", "/medications", "/risk-assessments", "/participant-matching", "/checklists", "/family-portal"] },
+  { label: "Workforce", hrefs: ["/support-workers", "/admin/users", "/worker-portal", "/my-shifts", "/travel", "/profile"] },
+  { label: "Rostering", hrefs: ["/rostering", "/timesheets", "/payroll"] },
+  { label: "Service Delivery", hrefs: ["/progress-notes", "/incident-reports", "/support-coordination", "/tasks", "/messages", "/visitors", "/vehicles"] },
   { label: "Finance", hrefs: ["/invoices", "/funding", "/service-agreements"] },
-  { label: "Organisation", hrefs: ["/branches", "/support-coordination", "/visitors", "/vehicles"] },
-  { label: "Admin", hrefs: ["/admin/backups", "/admin/reminders", "/admin/compliance", "/admin/audit", "/settings"] }
+  { label: "Reports", hrefs: ["/admin/compliance", "/admin/audit", "/admin/reminders"] },
+  { label: "Documents", hrefs: ["/documents", "/shift-attachments"] },
+  { label: "Administration", hrefs: ["/branches", "/admin/backups", "/settings"] }
 ];
 
 function groupNavigation(items: NavItem[], pathname: string) {

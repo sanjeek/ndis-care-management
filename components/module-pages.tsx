@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   AlertTriangle,
   BarChart3,
+  Bell,
   CalendarDays,
   CalendarPlus,
   CheckCircle2,
@@ -24,7 +25,9 @@ import {
   ShieldCheck,
   TrendingUp,
   Upload,
-  X
+  Users,
+  X,
+  type LucideIcon
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { InvoiceManagementPage } from "@/components/invoice-management-page";
@@ -288,6 +291,35 @@ type DashboardMetrics = {
   deliveredShiftHours: number;
 };
 
+type DashboardPlanReview = {
+  id: string;
+  participantName: string;
+  title: string;
+  reviewDate: string;
+  status: string;
+};
+
+type DashboardComplianceAlert = {
+  worker: string;
+  label: string;
+  status: "expired" | "due_soon";
+  message: string;
+};
+
+type DashboardActivity = {
+  id: string;
+  action: string;
+  label: string;
+  actor: string;
+  createdAt: string;
+};
+
+type DashboardOverview = {
+  planReviews: DashboardPlanReview[];
+  complianceAlerts: DashboardComplianceAlert[];
+  recentActivity: DashboardActivity[];
+};
+
 const statuses = ["Draft", "Open", "Unfilled", "Offered", "Confirmed", "In progress", "Completed", "Cancelled"];
 const rosterStatusFilters = [
   { label: "All status", value: "all", colour: "bg-slate-300" },
@@ -323,6 +355,11 @@ export function DashboardPage() {
     scheduledShiftHours: 0,
     deliveredShiftHours: 0
   });
+  const [overview, setOverview] = useState<DashboardOverview>({
+    planReviews: [],
+    complianceAlerts: [],
+    recentActivity: []
+  });
   const [notice, setNotice] = useState("Database records only.");
 
   useEffect(() => {
@@ -332,13 +369,15 @@ export function DashboardPage() {
         setNotice("Connect Supabase to show live records.");
         return;
       }
-      const [loadedShifts, loadedMetrics] = await Promise.all([
+      const [loadedShifts, loadedMetrics, loadedOverview] = await Promise.all([
         loadShifts(),
-        loadDashboardMetrics()
+        loadDashboardMetrics(),
+        loadDashboardOverview()
       ]);
       if (!active) return;
       setShifts(loadedShifts);
       setMetrics(loadedMetrics);
+      setOverview(loadedOverview);
       setNotice("Showing records from Supabase.");
     }
     void load();
@@ -348,29 +387,199 @@ export function DashboardPage() {
   }, []);
 
   const todaysShifts = useMemo(() => shifts.filter(isTodayShift), [shifts]);
+  const unfilledShifts = useMemo(() => shifts.filter((shift) => isUnfilledShift(shift)).length, [shifts]);
+  const staffOnDuty = useMemo(() => new Set(todaysShifts.map((shift) => shift.workerEmail || shift.worker).filter(Boolean)).size, [todaysShifts]);
+  const pendingTimesheets = useMemo(() => shifts.filter((shift) => isPendingTimesheetShift(shift)).length, [shifts]);
+  const dashboardAlerts = useMemo(() => buildDashboardAlerts(unfilledShifts, metrics.pendingIncidents, pendingTimesheets, overview), [metrics.pendingIncidents, overview, pendingTimesheets, unfilledShifts]);
   const metricCards = [
-    { label: "Service hours delivered", value: formatHours(metrics.serviceHoursDelivered), delta: metrics.serviceHoursDelivered ? `${formatHours(metrics.deliveredShiftHours)} completed or approved` : "No delivered service hours yet", tone: "gumleaf", icon: BarChart3 },
-    { label: "Active participants", value: String(metrics.activeParticipants), delta: metrics.activeParticipants ? "Participant records in database" : "No active participants", tone: "harbour", icon: ShieldCheck },
-    { label: "Worker utilisation", value: `${metrics.workerUtilisationPercent}%`, delta: `${formatHours(metrics.scheduledShiftHours)} rostered hours`, tone: "banksia", icon: TrendingUp },
-    { label: "Incidents", value: String(metrics.pendingIncidents), delta: metrics.pendingIncidents ? "Open incident records" : "No pending incidents", tone: "coral", icon: AlertTriangle },
-    { label: "Funding usage", value: `${metrics.fundingUsagePercent}%`, delta: metrics.fundingUsagePercent ? "NDIS funding utilised" : "No funding usage recorded", tone: "harbour", icon: ClipboardPlus },
-    { label: "Attendance rate", value: `${metrics.attendanceRatePercent}%`, delta: metrics.completedShifts ? `${metrics.completedShifts} completed shifts` : "No completed shifts", tone: "gumleaf", icon: CheckCircle2 }
+    { label: "Today's Shifts", value: String(todaysShifts.length), delta: todaysShifts.length ? "Scheduled for today" : "No shifts today", tone: "harbour", icon: CalendarDays },
+    { label: "Unfilled Shifts", value: String(unfilledShifts), delta: unfilledShifts ? "Need allocation" : "No unfilled shifts", tone: "coral", icon: AlertTriangle },
+    { label: "Active Participants", value: String(metrics.activeParticipants), delta: metrics.activeParticipants ? "Participant records" : "No active participants", tone: "gumleaf", icon: ShieldCheck },
+    { label: "Staff On Duty", value: String(staffOnDuty), delta: staffOnDuty ? "Workers rostered today" : "No staff on duty", tone: "banksia", icon: Users },
+    { label: "Pending Timesheets", value: String(pendingTimesheets), delta: pendingTimesheets ? "Need review" : "No pending review", tone: "harbour", icon: ClipboardPlus },
+    { label: "Incidents Requiring Review", value: String(metrics.pendingIncidents), delta: metrics.pendingIncidents ? "Open incident records" : "No pending incidents", tone: "coral", icon: AlertTriangle }
   ];
 
   return (
     <AppShell title="Dashboard" eyebrow={`${formatToday()} | ${notice}`}>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         {metricCards.map((metric) => (
           <StatCard key={metric.label} {...metric} />
         ))}
       </div>
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
-        <ShiftTable title="Today's shifts" shifts={todaysShifts} emptyMessage="No shifts are scheduled for today." />
+      <div className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_0.8fr]">
+        <ShiftTable title="Today's Schedule" shifts={todaysShifts} emptyMessage="No shifts are scheduled for today." />
+        <AlertsPanel alerts={dashboardAlerts} />
+      </div>
+      <div className="mt-6 grid gap-6 xl:grid-cols-[0.75fr_1.25fr]">
         <QuickActions />
+        <ShiftOverviewChart shifts={shifts} />
+      </div>
+      <div className="mt-6 grid gap-6 xl:grid-cols-3">
+        <UpcomingPlanReviews reviews={overview.planReviews} />
+        <ComplianceExpiry alerts={overview.complianceAlerts} />
+        <RecentActivityList activities={overview.recentActivity} />
       </div>
       <ManagementAnalytics metrics={metrics} todaysShiftCount={todaysShifts.length} />
     </AppShell>
   );
+}
+
+function AlertsPanel({ alerts }: { alerts: Array<{ title: string; message: string; tone: "coral" | "banksia" | "gumleaf" | "harbour"; href: string }> }) {
+  return (
+    <DashboardPanel title="Alerts & Notifications" icon={Bell}>
+      {alerts.length ? (
+        <div className="grid gap-3">
+          {alerts.map((alert) => (
+            <Link key={`${alert.title}-${alert.href}`} href={alert.href} className={`rounded-lg border p-4 text-sm transition hover:-translate-y-0.5 hover:shadow-sm ${alertToneClass(alert.tone)}`}>
+              <p className="font-semibold text-ink">{alert.title}</p>
+              <p className="mt-1 leading-6 text-slate-600">{alert.message}</p>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <EmptyWorkerState title="No active alerts" message="Alerts will appear here when shifts, incidents, compliance, or plan reviews need attention." />
+      )}
+    </DashboardPanel>
+  );
+}
+
+function ShiftOverviewChart({ shifts }: { shifts: ShiftRecord[] }) {
+  const rows = [
+    { label: "Confirmed", count: shifts.filter((shift) => shift.status.toLowerCase() === "confirmed").length, tone: "bg-gumleaf" },
+    { label: "In progress", count: shifts.filter((shift) => shift.status.toLowerCase() === "in progress").length, tone: "bg-harbour" },
+    { label: "Completed", count: shifts.filter((shift) => ["completed", "approved for payroll"].includes(shift.status.toLowerCase())).length, tone: "bg-[#22c55e]" },
+    { label: "Unfilled", count: shifts.filter((shift) => isUnfilledShift(shift)).length, tone: "bg-coral" },
+    { label: "Cancelled", count: shifts.filter((shift) => shift.status.toLowerCase() === "cancelled").length, tone: "bg-slate-400" }
+  ];
+  const max = Math.max(1, ...rows.map((row) => row.count));
+
+  return (
+    <DashboardPanel title="Shift Overview chart" icon={BarChart3}>
+      <div className="grid gap-4">
+        {rows.map((row) => (
+          <div key={row.label}>
+            <div className="mb-2 flex items-center justify-between text-sm">
+              <span className="font-semibold text-slate-700">{row.label}</span>
+              <span className="text-slate-500">{row.count}</span>
+            </div>
+            <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+              <div className={`h-full rounded-full ${row.tone}`} style={{ width: `${Math.max(4, (row.count / max) * 100)}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </DashboardPanel>
+  );
+}
+
+function UpcomingPlanReviews({ reviews }: { reviews: DashboardPlanReview[] }) {
+  return (
+    <DashboardPanel title="Upcoming Plan Reviews" icon={CalendarDays}>
+      {reviews.length ? (
+        <div className="grid gap-3">
+          {reviews.map((review) => (
+            <Link key={review.id} href="/care-plans" className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm hover:bg-white hover:shadow-sm">
+              <p className="font-semibold text-ink">{review.participantName}</p>
+              <p className="mt-1 text-slate-600">{review.title || "Care plan review"}</p>
+              <span className="mt-2 inline-flex rounded bg-harbour/10 px-2.5 py-1 text-xs font-semibold text-harbour">{dateOnly(review.reviewDate)}</span>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <EmptyWorkerState title="No plan reviews due" message="Care plan reviews with review dates will appear here." />
+      )}
+    </DashboardPanel>
+  );
+}
+
+function ComplianceExpiry({ alerts }: { alerts: DashboardComplianceAlert[] }) {
+  return (
+    <DashboardPanel title="Compliance Expiry" icon={ShieldCheck}>
+      {alerts.length ? (
+        <div className="grid gap-3">
+          {alerts.map((alert) => (
+            <Link key={`${alert.worker}-${alert.label}`} href="/support-workers" className={`rounded-lg border p-3 text-sm hover:shadow-sm ${alert.status === "expired" ? "border-coral/25 bg-coral/5" : "border-banksia/30 bg-banksia/10"}`}>
+              <p className="font-semibold text-ink">{alert.worker}</p>
+              <p className="mt-1 text-slate-600">{alert.label}: {alert.message}</p>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <EmptyWorkerState title="No expiry alerts" message="Police checks, NDIS screening, first aid, CPR, and licence alerts will appear here." />
+      )}
+    </DashboardPanel>
+  );
+}
+
+function RecentActivityList({ activities }: { activities: DashboardActivity[] }) {
+  return (
+    <DashboardPanel title="Recent Activity" icon={TrendingUp}>
+      {activities.length ? (
+        <div className="grid gap-3">
+          {activities.map((activity) => (
+            <div key={activity.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+              <p className="font-semibold text-ink">{friendlyActivity(activity.action)}</p>
+              <p className="mt-1 text-slate-600">{activity.label || "Record updated"}</p>
+              <p className="mt-2 text-xs text-slate-500">{activity.actor || "CareOS"} | {dateTimeOrFallback(activity.createdAt)}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyWorkerState title="No recent activity" message="Audit log activity will appear here after users create or update records." />
+      )}
+    </DashboardPanel>
+  );
+}
+
+function DashboardPanel({ title, icon: Icon, children }: { title: string; icon: LucideIcon; children: React.ReactNode }) {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-panel">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold text-ink">{title}</h2>
+        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gumleaf/10 text-gumleaf">
+          <Icon className="h-5 w-5" />
+        </span>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function buildDashboardAlerts(unfilledShifts: number, pendingIncidents: number, pendingTimesheets: number, overview: DashboardOverview) {
+  const alerts: Array<{ title: string; message: string; tone: "coral" | "banksia" | "gumleaf" | "harbour"; href: string }> = [];
+  if (unfilledShifts) alerts.push({ title: "Unfilled shifts", message: `${unfilledShifts} shift${unfilledShifts === 1 ? "" : "s"} need worker allocation.`, tone: "coral", href: "/rostering" });
+  if (pendingIncidents) alerts.push({ title: "Incident review", message: `${pendingIncidents} incident${pendingIncidents === 1 ? "" : "s"} require management review.`, tone: "coral", href: "/incident-reports" });
+  if (pendingTimesheets) alerts.push({ title: "Timesheet approval", message: `${pendingTimesheets} completed shift${pendingTimesheets === 1 ? "" : "s"} need timesheet or payroll review.`, tone: "banksia", href: "/timesheets" });
+  if (overview.complianceAlerts.length) alerts.push({ title: "Compliance expiry", message: `${overview.complianceAlerts.length} staff compliance record${overview.complianceAlerts.length === 1 ? "" : "s"} are expired or due soon.`, tone: "banksia", href: "/support-workers" });
+  if (overview.planReviews.length) alerts.push({ title: "Plan reviews", message: `${overview.planReviews.length} care plan review${overview.planReviews.length === 1 ? "" : "s"} are coming up.`, tone: "harbour", href: "/care-plans" });
+  return alerts;
+}
+
+function alertToneClass(tone: "coral" | "banksia" | "gumleaf" | "harbour") {
+  if (tone === "coral") return "border-coral/25 bg-coral/5";
+  if (tone === "banksia") return "border-banksia/35 bg-banksia/10";
+  if (tone === "harbour") return "border-harbour/25 bg-harbour/5";
+  return "border-gumleaf/25 bg-gumleaf/5";
+}
+
+function isUnfilledShift(shift: ShiftRecord) {
+  const status = shift.status.toLowerCase();
+  return ["open", "unfilled", "vacant", "draft"].includes(status) || !shift.workerEmail && !shift.worker;
+}
+
+function isPendingTimesheetShift(shift: ShiftRecord) {
+  const approval = shift.approvalStatus.toLowerCase();
+  const status = shift.status.toLowerCase();
+  return ["submitted", "pending", "pending_review", "awaiting_approval"].includes(approval) || (status === "completed" && approval !== "approved");
+}
+
+function friendlyActivity(action: string) {
+  return action
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
 }
 
 function ManagementAnalytics({ metrics, todaysShiftCount }: { metrics: DashboardMetrics; todaysShiftCount: number }) {
@@ -2657,17 +2866,20 @@ function EmptyWorkerState({ title, message }: { title: string; message: string }
 
 function QuickActions() {
   const actions = [
-    { label: "New progress note", icon: FilePlus2, href: "/progress-notes" },
-    { label: "Log incident report", icon: AlertTriangle, href: "/incident-reports" },
-    { label: "Approve timesheet", icon: CheckCircle2, href: "/timesheets" },
-    { label: "Upload document", icon: Upload, href: "/documents" }
+    { label: "Create Shift", icon: CalendarPlus, href: "/rostering" },
+    { label: "Add Participant", icon: ShieldCheck, href: "/participants" },
+    { label: "Add Support Worker", icon: Users, href: "/support-workers" },
+    { label: "New Progress Note", icon: FilePlus2, href: "/progress-notes" },
+    { label: "Log Incident", icon: AlertTriangle, href: "/incident-reports" },
+    { label: "Upload Document", icon: Upload, href: "/documents" },
+    { label: "Create Invoice", icon: ClipboardPlus, href: "/invoices" }
   ];
   return (
-    <div className="rounded border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="font-semibold text-ink">Quick actions</h2>
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
+      <h2 className="font-semibold text-ink">Quick Actions</h2>
       <div className="mt-4 grid gap-3">
         {actions.map((action) => (
-          <Link key={action.label} href={action.href} className="flex items-center justify-between rounded border border-slate-200 px-3 py-3 text-left text-sm font-medium text-slate-700 hover:border-gumleaf/40 hover:bg-gumleaf/5">
+          <Link key={action.label} href={action.href} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-3 text-left text-sm font-medium text-slate-700 transition hover:border-gumleaf/40 hover:bg-gumleaf/5">
             <span className="flex items-center gap-3">
               <action.icon className="h-4 w-4 text-gumleaf" />
               {action.label}
@@ -3404,12 +3616,13 @@ function RecordForm({ children, submitLabel, onSubmit }: { children: React.React
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
+    if (!form.reportValidity()) return;
     void onSubmit(new FormData(form)).then(() => form.reset());
   }
   return (
-    <form onSubmit={handleSubmit} className="mb-6 rounded border border-slate-200 bg-white p-4 shadow-sm">
+    <form onSubmit={handleSubmit} className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
       <div className="grid gap-4">{children}</div>
-      <button className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d625d] sm:w-auto">
+      <button className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-gumleaf px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-harbour sm:w-auto">
         <Plus className="h-4 w-4" />
         {submitLabel}
       </button>
@@ -3906,6 +4119,56 @@ async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     scheduledShiftHours: roundMetric(scheduledShiftHours),
     deliveredShiftHours: roundMetric(deliveredShiftHours)
   };
+}
+
+async function loadDashboardOverview(): Promise<DashboardOverview> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { planReviews: [], complianceAlerts: [], recentActivity: [] };
+  }
+
+  const [carePlans, workers, recentActivity] = await Promise.all([
+    loadCarePlans(),
+    loadWorkers(),
+    loadRecentActivity()
+  ]);
+
+  const planReviews = carePlans
+    .filter((plan) => {
+      const days = daysUntil(plan.reviewDate);
+      return !Number.isNaN(days) && days >= 0 && days <= 90;
+    })
+    .sort((a, b) => daysUntil(a.reviewDate) - daysUntil(b.reviewDate))
+    .slice(0, 5)
+    .map((plan) => ({
+      id: plan.id,
+      participantName: plan.participantName,
+      title: plan.title,
+      reviewDate: plan.reviewDate,
+      status: plan.status
+    }));
+
+  return {
+    planReviews,
+    complianceAlerts: workers.flatMap(workerComplianceAlerts).slice(0, 6),
+    recentActivity
+  };
+}
+
+async function loadRecentActivity(): Promise<DashboardActivity[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  const { data, error } = await supabase
+    .from("audit_logs")
+    .select("id, action, record_label, user_name, user_email, created_at")
+    .order("created_at", { ascending: false })
+    .limit(8);
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: String(row.id ?? `${row.action}-${row.created_at}`),
+    action: String(row.action ?? ""),
+    label: String(row.record_label ?? ""),
+    actor: String(row.user_name || row.user_email || ""),
+    createdAt: String(row.created_at ?? "")
+  }));
 }
 
 async function loadProgressNotes(workerEmail?: string): Promise<ProgressNoteRecord[]> {

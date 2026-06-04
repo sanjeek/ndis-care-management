@@ -236,6 +236,7 @@ export function OperationsModulePage({ module }: { module: ModuleKey }) {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!event.currentTarget.reportValidity()) return;
     if (!supabase) return;
     const token = (await supabase.auth.getSession()).data.session?.access_token;
     if (!token) {

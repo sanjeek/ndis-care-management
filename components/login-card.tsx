@@ -31,6 +31,7 @@ export function LoginCard() {
           const { data: profile } = await client.from("profiles").select("role").eq("id", data.session.user.id).maybeSingle();
           role = roleForUser(profile?.role, data.session.user.email);
         }
+        setSessionMarker(role);
         window.location.replace(getSafeNextPath(role));
       }
     });
@@ -103,6 +104,7 @@ export function LoginCard() {
       metadata: { next: getSafeNextPath(role) }
     });
     window.localStorage.setItem("careos:last-activity", String(Date.now()));
+    setSessionMarker(role);
     window.location.replace(getSafeNextPath(role));
   }
 
@@ -219,4 +221,10 @@ function getSafeNextPath(role: UserRole = "admin") {
   }
   const pathname = next.split(/[?#]/)[0] || "/";
   return canAccessRoute(role, pathname) ? next : defaultRouteForRole(role);
+}
+
+function setSessionMarker(role: UserRole) {
+  if (typeof document === "undefined") return;
+  document.cookie = "careos-session=active; path=/; max-age=1800; SameSite=Lax";
+  document.cookie = `careos-role=${encodeURIComponent(role)}; path=/; max-age=1800; SameSite=Lax`;
 }

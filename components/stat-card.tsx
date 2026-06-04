@@ -17,13 +17,13 @@ const toneClasses: Record<string, string> = {
 
 export function StatCard({ label, value, delta, tone, icon: Icon }: StatCardProps) {
   return (
-    <article className="rounded border border-slate-200 bg-white p-4 shadow-sm">
+    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-slate-500">{label}</p>
+          <p className="text-sm font-semibold text-slate-500">{label}</p>
           <p className="mt-2 text-3xl font-semibold text-ink">{value}</p>
         </div>
-        <span className={`inline-flex h-10 w-10 items-center justify-center rounded ${toneClasses[tone]}`}>
+        <span className={`inline-flex h-10 w-10 items-center justify-center rounded-lg ${toneClasses[tone]}`}>
           <Icon className="h-5 w-5" />
         </span>
       </div>

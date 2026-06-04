@@ -13,10 +13,7 @@
 
 body {
   margin: 0;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(246, 247, 249, 0.97)),
-    radial-gradient(circle at 18% 0%, rgba(35, 117, 111, 0.12), transparent 28%),
-    radial-gradient(circle at 92% 18%, rgba(200, 135, 40, 0.12), transparent 25%);
+  background: #f7f8fc;
   color: #172033;
 }
 
@@ -30,6 +27,26 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+label:has(input[required], select[required], textarea[required]) > span:first-child::after {
+  content: " *";
+  color: #d65452;
+  font-weight: 700;
+}
+
+label:has(input:not([type="checkbox"]):not([type="radio"]), select, textarea):not(:has(input[required], select[required], textarea[required])) > span:first-child::after {
+  content: " Optional";
+  color: #94a3b8;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+input:user-invalid,
+select:user-invalid,
+textarea:user-invalid {
+  border-color: #d65452;
+  box-shadow: 0 0 0 2px rgba(214, 84, 82, 0.12);
 }
 
 .scrollbar-subtle {
