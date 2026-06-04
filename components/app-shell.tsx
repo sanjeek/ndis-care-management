@@ -408,11 +408,11 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
             })}
           </nav>
 
-          <div className="mt-6 hidden rounded border border-slate-200 bg-slate-50 p-3 lg:block">
-            <p className="text-xs font-semibold uppercase text-slate-400">Account</p>
-            <p className="mt-1 truncate text-sm font-semibold text-ink">{userName}</p>
-            <p className="truncate text-xs text-slate-500">{userEmail}</p>
-            <p className="mt-2 inline-flex rounded bg-gumleaf/10 px-2 py-1 text-xs font-semibold text-gumleaf">{friendlyRole(userRole)}</p>
+          <div className="mt-4 hidden rounded border border-slate-200 bg-slate-50 px-3 py-2.5 lg:block">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Account</p>
+            <p className="mt-1 truncate text-xs font-semibold text-ink">{userName}</p>
+            <p className="truncate text-[11px] text-slate-500">{userEmail}</p>
+            <p className="mt-1.5 inline-flex rounded bg-gumleaf/10 px-2 py-0.5 text-[10px] font-semibold text-gumleaf">{friendlyRole(userRole)}</p>
           </div>
         </aside>
 
