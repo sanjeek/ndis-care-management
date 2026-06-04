@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -2583,32 +2583,68 @@ function SchedulerGrid({
   onAddShift: () => void;
   onEditShift: (shift: ShiftRecord) => void;
 }) {
-  const days = weekDays();
+  const [viewDate, setViewDate] = useState(() => new Date());
+  const [viewMode, setViewMode] = useState<"weekly" | "monthly">("weekly");
+  const [showStaffList, setShowStaffList] = useState(true);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const days = weekDays(viewDate);
+  const monthDays = monthCalendarDays(viewDate);
   const visibleWorkers = workers.filter((worker) => {
     if (!searchTerm.trim()) return true;
     const term = normaliseRosterText(searchTerm);
     return normaliseRosterText(`${worker.name} ${worker.email}`).includes(term) || shifts.some((shift) => shiftBelongsToWorker(shift, worker) && shiftMatchesSearch(shift, term));
   });
+  const visiblePeriodShifts = viewMode === "weekly"
+    ? shifts.filter((shift) => days.some((day) => day.key === dateKey(shift.startsAt)))
+    : shifts.filter((shift) => sameMonth(shift.startsAt, viewDate));
+
+  function goToday() {
+    setViewDate(new Date());
+  }
+
+  function moveCalendar(direction: -1 | 1) {
+    setViewDate((current) => {
+      const next = new Date(current);
+      if (viewMode === "monthly") {
+        next.setMonth(current.getMonth() + direction);
+      } else {
+        next.setDate(current.getDate() + direction * 7);
+      }
+      return next;
+    });
+  }
 
   return (
     <section className="overflow-hidden rounded border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-wrap items-center gap-3">
-          <button className="inline-flex items-center gap-2 rounded border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+          <button
+            type="button"
+            onClick={() => setShowStaffList((current) => !current)}
+            className={`inline-flex items-center gap-2 rounded border px-4 py-2 text-sm font-semibold hover:bg-slate-50 ${showStaffList ? "border-gumleaf/30 bg-gumleaf/5 text-gumleaf" : "border-slate-200 bg-white text-slate-700"}`}
+          >
             <CalendarDays className="h-4 w-4 text-gumleaf" />
             Staff
           </button>
-          <button className="rounded border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50" aria-label="Filter scheduler">
+          <button
+            type="button"
+            onClick={() => {
+              setShowStaffList(true);
+              window.setTimeout(() => searchInputRef.current?.focus(), 0);
+            }}
+            className="rounded border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"
+            aria-label="Filter scheduler"
+          >
             <Filter className="h-4 w-4" />
           </button>
-          <button className="rounded border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Today</button>
-          <button className="rounded border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50" aria-label="Previous week">
+          <button type="button" onClick={goToday} className="rounded border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Today</button>
+          <button type="button" onClick={() => moveCalendar(-1)} className="rounded border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50" aria-label={viewMode === "monthly" ? "Previous month" : "Previous week"}>
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <button className="rounded border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50" aria-label="Next week">
+          <button type="button" onClick={() => moveCalendar(1)} className="rounded border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50" aria-label={viewMode === "monthly" ? "Next month" : "Next week"}>
             <ChevronRight className="h-4 w-4" />
           </button>
-          <h2 className="ml-1 text-xl font-semibold text-ink">{monthYear()}</h2>
+          <h2 className="ml-1 text-xl font-semibold text-ink">{monthYear(viewDate)}</h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value)} className="rounded border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 outline-none hover:bg-slate-50 focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15">
@@ -2616,46 +2652,62 @@ function SchedulerGrid({
             {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
             <option value="unfilled">Unfilled</option>
           </select>
-          <button className="rounded border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Weekly</button>
+          <select value={viewMode} onChange={(event) => setViewMode(event.target.value as "weekly" | "monthly")} className="rounded border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 outline-none hover:bg-slate-50 focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" aria-label="Roster view">
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
           <button onClick={onAddShift} className="inline-flex items-center gap-2 rounded bg-[#354aa3] px-4 py-2 text-sm font-semibold text-white hover:bg-[#283a82]">
             <Plus className="h-4 w-4" />
             Add Shift
           </button>
-          <button className="rounded border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50" aria-label="More scheduler actions">
+          <button type="button" onClick={() => { onSearchChange(""); onStatusFilterChange("all"); }} className="rounded border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50" aria-label="Clear scheduler filters">
             <MoreVertical className="h-4 w-4" />
           </button>
         </div>
       </div>
 
+      {(!showStaffList || viewMode === "monthly") ? (
+        <div className="border-b border-slate-200 bg-slate-50 p-3">
+          <label className="flex max-w-xl items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
+            <Search className="h-4 w-4 text-slate-400" />
+            <input ref={searchInputRef} value={searchTerm} onChange={(event) => onSearchChange(event.target.value)} className="w-full bg-transparent outline-none placeholder:text-slate-400" placeholder="Search by staff, participant, location or status ..." />
+          </label>
+        </div>
+      ) : null}
+
       {workers.length ? (
-        <div className="grid border-b border-slate-200 md:grid-cols-[310px_1fr]">
-          <div className="border-r border-slate-200 bg-white">
+        <div className={`grid border-b border-slate-200 ${showStaffList && viewMode === "weekly" ? "md:grid-cols-[310px_1fr]" : "grid-cols-1"}`}>
+          {showStaffList && viewMode === "weekly" ? <div className="border-r border-slate-200 bg-white">
             <div className="border-b border-slate-200 p-3">
               <label className="flex items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
                 <Search className="h-4 w-4 text-slate-400" />
-                <input value={searchTerm} onChange={(event) => onSearchChange(event.target.value)} className="w-full bg-transparent outline-none placeholder:text-slate-400" placeholder="Search by team, staff or client ..." />
+                <input ref={searchInputRef} value={searchTerm} onChange={(event) => onSearchChange(event.target.value)} className="w-full bg-transparent outline-none placeholder:text-slate-400" placeholder="Search by team, staff or client ..." />
               </label>
             </div>
             <VacantShiftRow shifts={allShifts} />
             {visibleWorkers.map((worker) => {
-              const workerHours = shifts.filter((shift) => shiftBelongsToWorker(shift, worker)).reduce((sum, shift) => sum + shiftDurationHours(shift), 0);
+              const workerHours = visiblePeriodShifts.filter((shift) => shiftBelongsToWorker(shift, worker)).reduce((sum, shift) => sum + shiftDurationHours(shift), 0);
               return <StaffScheduleRow key={worker.email || worker.name} worker={worker} hours={workerHours} />;
             })}
             {!visibleWorkers.length ? <div className="p-4"><EmptyWorkerState title="No matching staff" message="Try another staff, participant, location, or status filter." /></div> : null}
-          </div>
+          </div> : null}
 
-          <div className="overflow-x-auto scrollbar-subtle">
-            <div className="grid min-w-[980px] grid-cols-7">
-              {days.map((day, index) => (
-                <div key={day.label} className={`border-b border-r border-slate-200 p-3 text-center ${index === 0 ? "bg-banksia/15" : "bg-slate-50"}`}>
-                  <p className="text-xs font-semibold uppercase text-slate-400">{day.label}</p>
-                  <p className="font-semibold text-ink">{day.date}</p>
-                </div>
-              ))}
-              {visibleWorkers.map((worker) => (
-                <ScheduleRow key={worker.email || worker.name} worker={worker} shifts={shifts} onEditShift={onEditShift} />
-              ))}
-            </div>
+          <div className="min-w-0">
+            {viewMode === "weekly" ? (
+              <div className="grid grid-cols-7">
+                {days.map((day, index) => (
+                  <div key={day.label} className={`min-w-0 border-b border-r border-slate-200 p-2 text-center sm:p-3 ${index === 0 ? "bg-banksia/15" : "bg-slate-50"}`}>
+                    <p className="text-xs font-semibold uppercase text-slate-400">{day.label}</p>
+                    <p className="font-semibold text-ink">{day.date}</p>
+                  </div>
+                ))}
+                {visibleWorkers.map((worker) => (
+                  <ScheduleRow key={worker.email || worker.name} worker={worker} shifts={visiblePeriodShifts} days={days} onEditShift={onEditShift} />
+                ))}
+              </div>
+            ) : (
+              <MonthSchedule days={monthDays} shifts={visiblePeriodShifts} onEditShift={onEditShift} />
+            )}
           </div>
         </div>
       ) : (
@@ -2667,8 +2719,7 @@ function SchedulerGrid({
   );
 }
 
-function ScheduleRow({ worker, shifts, onEditShift }: { worker: WorkerRecord; shifts: ShiftRecord[]; onEditShift: (shift: ShiftRecord) => void }) {
-  const days = weekDays();
+function ScheduleRow({ worker, shifts, days, onEditShift }: { worker: WorkerRecord; shifts: ShiftRecord[]; days: Array<{ label: string; date: string; key: string }>; onEditShift: (shift: ShiftRecord) => void }) {
   const workerShifts = shifts.filter((shift) => shiftBelongsToWorker(shift, worker));
   return (
     <>
@@ -2690,6 +2741,41 @@ function ScheduleRow({ worker, shifts, onEditShift }: { worker: WorkerRecord; sh
         );
       })}
     </>
+  );
+}
+
+function MonthSchedule({ days, shifts, onEditShift }: { days: Array<{ label: string; date: string; key: string; currentMonth: boolean }>; shifts: ShiftRecord[]; onEditShift: (shift: ShiftRecord) => void }) {
+  const weekdayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  return (
+    <div>
+      <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
+        {weekdayLabels.map((label) => (
+          <div key={label} className="border-r border-slate-200 px-2 py-3 text-center text-xs font-semibold uppercase text-slate-400">
+            {label}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7">
+        {days.map((day) => {
+          const dayShifts = shifts.filter((shift) => dateKey(shift.startsAt) === day.key);
+          return (
+            <div key={day.key} className={`min-h-[132px] min-w-0 border-b border-r border-slate-200 p-2 ${day.currentMonth ? "bg-white" : "bg-slate-50 text-slate-400"}`}>
+              <p className="text-xs font-semibold">{day.date}</p>
+              <div className="mt-2 grid gap-1.5">
+                {dayShifts.slice(0, 4).map((shift) => (
+                  <button key={shift.id} type="button" onClick={() => onEditShift(shift)} className="min-w-0 border-l-4 border-gumleaf bg-slate-50 px-2 py-1.5 text-left text-xs shadow-sm hover:bg-gumleaf/5">
+                    <p className="truncate font-semibold text-slate-700">{shift.time}</p>
+                    <p className="truncate text-ink">{shift.participantName || shift.participant}</p>
+                    <p className="truncate text-slate-500">{shift.worker || "Unassigned"}</p>
+                  </button>
+                ))}
+                {dayShifts.length > 4 ? <p className="text-xs font-semibold text-gumleaf">+{dayShifts.length - 4} more</p> : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -4145,9 +4231,8 @@ function dateKey(value?: string | Date) {
   return date.toISOString().slice(0, 10);
 }
 
-function weekDays() {
-  const now = new Date();
-  const monday = new Date(now);
+function weekDays(anchor = new Date()) {
+  const monday = new Date(anchor);
   const day = monday.getDay() || 7;
   monday.setDate(monday.getDate() - day + 1);
   return Array.from({ length: 7 }).map((_, index) => {
@@ -4161,8 +4246,32 @@ function weekDays() {
   });
 }
 
-function monthYear() {
-  return new Date().toLocaleDateString("en-AU", { month: "long", year: "numeric" });
+function monthCalendarDays(anchor = new Date()) {
+  const firstOfMonth = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+  const firstMonday = new Date(firstOfMonth);
+  const weekday = firstMonday.getDay() || 7;
+  firstMonday.setDate(firstMonday.getDate() - weekday + 1);
+  return Array.from({ length: 42 }).map((_, index) => {
+    const date = new Date(firstMonday);
+    date.setDate(firstMonday.getDate() + index);
+    return {
+      label: date.toLocaleDateString("en-AU", { weekday: "short" }),
+      date: date.toLocaleDateString("en-AU", { day: "numeric" }),
+      key: dateKey(date),
+      currentMonth: date.getMonth() === anchor.getMonth() && date.getFullYear() === anchor.getFullYear()
+    };
+  });
+}
+
+function sameMonth(value: string | undefined, anchor: Date) {
+  if (!value) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  return date.getMonth() === anchor.getMonth() && date.getFullYear() === anchor.getFullYear();
+}
+
+function monthYear(date = new Date()) {
+  return date.toLocaleDateString("en-AU", { month: "long", year: "numeric" });
 }
 
 function formatToday() {
