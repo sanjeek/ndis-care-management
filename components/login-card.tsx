@@ -85,6 +85,10 @@ export function LoginCard() {
       setMessage(error.message);
       return;
     }
+    if (!data.session) {
+      setMessage("Login succeeded, but the browser session was not returned. Please try again.");
+      return;
+    }
     let role = roleForUser(data.user?.user_metadata?.role, data.user?.email);
     if (!data.user?.user_metadata?.role && data.user?.id) {
       const { data: profile } = await client.from("profiles").select("role").eq("id", data.user.id).maybeSingle();
@@ -98,7 +102,8 @@ export function LoginCard() {
       recordLabel: data.user?.email ?? email,
       metadata: { next: getSafeNextPath(role) }
     });
-    window.location.href = getSafeNextPath(role);
+    window.localStorage.setItem("careos:last-activity", String(Date.now()));
+    window.location.replace(getSafeNextPath(role));
   }
 
   return (

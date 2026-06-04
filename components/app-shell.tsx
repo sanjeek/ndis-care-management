@@ -51,14 +51,23 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
   useEffect(() => {
     let active = true;
 
+    async function readSessionWithRetry() {
+      if (!supabase) return null;
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) return data.session;
+        await new Promise((resolve) => window.setTimeout(resolve, 150));
+      }
+      return null;
+    }
+
     async function checkSession() {
       if (!supabase) {
         redirectToLogin();
         return;
       }
 
-      const { data } = await supabase.auth.getSession();
-      const session = data.session;
+      const session = await readSessionWithRetry();
 
       if (!session) {
         redirectToLogin();
@@ -95,9 +104,13 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
 
     void checkSession();
 
-    const { data: authListener } = supabase?.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
+    const { data: authListener } = supabase?.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") {
         redirectToLogin();
+        return;
+      }
+      if (session) {
+        void checkSession();
       }
     }) ?? { data: null };
 
