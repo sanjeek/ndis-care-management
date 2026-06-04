@@ -61,6 +61,14 @@ type ParticipantDocument = {
   createdAt: string;
 };
 
+type ParticipantTimelineItem = {
+  id: string;
+  type: string;
+  title: string;
+  detail: string;
+  occurredAt: string;
+};
+
 type CarePlanRecord = {
   id: string;
   participantName: string;
@@ -155,6 +163,13 @@ type ShiftRecord = {
   participantSignature: string;
   participantSignedAt: string;
   signatureCapturedByEmail: string;
+};
+
+type ShiftMatch = {
+  name: string;
+  email: string;
+  score: number;
+  reasons: string[];
 };
 
 type ModuleItem = {
@@ -258,10 +273,12 @@ type DashboardMetrics = {
   deliveredShiftHours: number;
 };
 
-const statuses = ["Draft", "Offered", "Confirmed", "In progress", "Completed", "Cancelled"];
+const statuses = ["Draft", "Open", "Unfilled", "Offered", "Confirmed", "In progress", "Completed", "Cancelled"];
 const rosterStatusFilters = [
   { label: "All status", value: "all", colour: "bg-slate-300" },
   { label: "Pending", value: "Draft", colour: "bg-coral" },
+  { label: "Open", value: "open", colour: "bg-[#6366f1]" },
+  { label: "Unfilled", value: "unfilled", colour: "bg-[#eab308]" },
   { label: "Cancelled", value: "Cancelled", colour: "bg-[#f59e0b]" },
   { label: "Booked", value: "Confirmed", colour: "bg-[#00a85a]" },
   { label: "Approved", value: "Completed", colour: "bg-[#00a85a]" },
@@ -513,6 +530,7 @@ export function ParticipantsPage() {
 export function ParticipantProfilePage({ participantId }: { participantId: string }) {
   const [participant, setParticipant] = useState<ParticipantRecord | null>(null);
   const [documents, setDocuments] = useState<ParticipantDocument[]>([]);
+  const [timeline, setTimeline] = useState<ParticipantTimelineItem[]>([]);
   const [notice, setNotice] = useState("Loading participant profile.");
 
   useEffect(() => {
@@ -525,9 +543,10 @@ export function ParticipantProfilePage({ participantId }: { participantId: strin
         setNotice("Participant not found or you do not have permission to view this profile.");
         return;
       }
-      const docs = await loadParticipantDocuments(row.name);
+      const [docs, events] = await Promise.all([loadParticipantDocuments(row.name), loadParticipantTimeline(row.name)]);
       if (!active) return;
       setDocuments(docs);
+      setTimeline(events);
       setNotice("Showing participant profile from Supabase.");
     }
     void load();
@@ -610,6 +629,7 @@ export function ParticipantProfilePage({ participantId }: { participantId: strin
             <ProfileSection title="Risk information" value={participant.riskInformation} tone="risk" />
             <ProfileSection title="Medical notes" value={participant.medicalNotes} />
             <ProfileSection title="Allergies" value={participant.allergies} tone="risk" />
+            <ParticipantTimeline timeline={timeline} />
           </section>
         </div>
       ) : (
@@ -866,6 +886,7 @@ export function WorkerPortalPage() {
   const [workerEmail, setWorkerEmail] = useState("");
   const [workerNameFromSession, setWorkerNameFromSession] = useState("");
   const [visibleShifts, setVisibleShifts] = useState<ShiftRecord[]>([]);
+  const [openShifts, setOpenShifts] = useState<ShiftRecord[]>([]);
   const [visibleParticipants, setVisibleParticipants] = useState<ParticipantRecord[]>([]);
   const [workerNotes, setWorkerNotes] = useState<ProgressNoteRecord[]>([]);
   const [availability, setAvailability] = useState<AvailabilityRecord[]>([]);
@@ -880,6 +901,7 @@ export function WorkerPortalPage() {
       const email = user?.email ?? "";
       const name = String(user?.user_metadata?.full_name || user?.email || user?.id || "");
       const shifts = email ? await loadShifts(email) : [];
+      const availableOpenShifts = email ? await loadOpenShifts() : [];
       const participants = await loadParticipantsForShifts(shifts);
       const [availabilityRows, leaveRows, noteRows] = email
         ? await Promise.all([loadWorkerAvailability(email), loadWorkerLeave(email), loadProgressNotes(email)])
@@ -887,6 +909,7 @@ export function WorkerPortalPage() {
       setWorkerEmail(email);
       setWorkerNameFromSession(name);
       setVisibleShifts(shifts);
+      setOpenShifts(availableOpenShifts);
       setVisibleParticipants(participants);
       setWorkerNotes(noteRows);
       setAvailability(availabilityRows);
@@ -908,6 +931,11 @@ export function WorkerPortalPage() {
 
   async function clockShift(shiftId: string, action: "in" | "out") {
     const ok = await runShiftClock(shiftId, action, setNotice);
+    if (ok) await refresh();
+  }
+
+  async function acceptOpenShift(shiftId: string) {
+    const ok = await postJson(`/api/shifts/${shiftId}/accept`, {}, setNotice);
     if (ok) await refresh();
   }
 
@@ -934,10 +962,12 @@ export function WorkerPortalPage() {
       <div className="mx-auto grid max-w-6xl gap-5">
         <WorkerShiftMobilePanel
           shifts={visibleShifts}
+          openShifts={openShifts}
           participants={visibleParticipants}
           notes={workerNotes}
           onClock={clockShift}
           onSubmit={(shift) => setSigningShift(shift)}
+          onAcceptOpenShift={acceptOpenShift}
         />
         <WorkerPortalQuickActions />
         <div className="space-y-6">
@@ -1212,16 +1242,17 @@ export function RosteringPage() {
     const workerEmail = get(form, "workerEmail").toLowerCase();
     const participantName = get(form, "participant");
     const worker = workers.find((item) => item.email.toLowerCase() === workerEmail);
+    const status = get(form, "status");
     const ok = await postJson(
       "/api/shifts",
       {
         participant_name: participantName,
-        support_worker_name: worker?.name ?? "",
-        support_worker_email: worker?.email ?? workerEmail,
+        support_worker_name: workerEmail ? worker?.name ?? "" : "",
+        support_worker_email: workerEmail ? worker?.email ?? workerEmail : "",
         location: get(form, "location"),
         starts_at: start,
         ends_at: end,
-        status: get(form, "status"),
+        status: workerEmail ? status : status === "Draft" ? "Open" : status,
         allowed_latitude: get(form, "allowedLatitude"),
         allowed_longitude: get(form, "allowedLongitude"),
         allowed_radius_m: get(form, "allowedRadius"),
@@ -1239,17 +1270,18 @@ export function RosteringPage() {
     if (!editingShift) return;
     const workerEmail = get(form, "workerEmail").toLowerCase();
     const worker = workers.find((item) => item.email.toLowerCase() === workerEmail);
+    const status = get(form, "status");
     const ok = await patchJson(
       "/api/shifts",
       {
         id: editingShift.id,
         participant_name: get(form, "participant"),
-        support_worker_name: worker?.name ?? "",
-        support_worker_email: worker?.email ?? workerEmail,
+        support_worker_name: workerEmail ? worker?.name ?? "" : "",
+        support_worker_email: workerEmail ? worker?.email ?? workerEmail : "",
         location: get(form, "location"),
         starts_at: get(form, "start"),
         ends_at: get(form, "end"),
-        status: get(form, "status"),
+        status: workerEmail ? status : status === "Draft" ? "Open" : status,
         allowed_latitude: get(form, "allowedLatitude"),
         allowed_longitude: get(form, "allowedLongitude"),
         allowed_radius_m: get(form, "allowedRadius")
@@ -2242,16 +2274,20 @@ function WorkerAvailabilityForm({
 
 function WorkerShiftMobilePanel({
   shifts,
+  openShifts,
   participants,
   notes,
   onClock,
-  onSubmit
+  onSubmit,
+  onAcceptOpenShift
 }: {
   shifts: ShiftRecord[];
+  openShifts: ShiftRecord[];
   participants: ParticipantRecord[];
   notes: ProgressNoteRecord[];
   onClock: (shiftId: string, action: "in" | "out") => Promise<void>;
   onSubmit: (shift: ShiftRecord) => void;
+  onAcceptOpenShift: (shiftId: string) => Promise<void>;
 }) {
   const todaysShifts = shifts.filter(isTodayShift);
   const upcomingShifts = shifts.filter((shift) => !isTodayShift(shift)).slice(0, 5);
@@ -2321,6 +2357,30 @@ function WorkerShiftMobilePanel({
       )}
 
       <div className="grid gap-4">
+        <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-ink">Open shifts</h2>
+              <p className="mt-1 text-sm text-slate-500">Claim available shifts after checking time and location.</p>
+            </div>
+            <CalendarPlus className="h-5 w-5 text-[#354aa3]" />
+          </div>
+          {openShifts.length ? (
+            <div className="mt-3 grid gap-2">
+              {openShifts.slice(0, 4).map((shift) => (
+                <div key={shift.id} className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
+                  <p className="font-semibold text-ink">{shift.participantName || shift.participant}</p>
+                  <p className="mt-1 text-slate-600">{shift.time} | {shift.location || "Location not recorded"}</p>
+                  <button type="button" onClick={() => void onAcceptOpenShift(shift.id)} className="mt-3 w-full rounded bg-[#354aa3] px-3 py-2 text-sm font-semibold text-white hover:bg-[#283a82]">
+                    Accept shift
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-slate-500">No open shifts are available right now.</p>
+          )}
+        </section>
         <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -3054,7 +3114,9 @@ function ShiftCreateModal({
   const [selectedWorkerEmail, setSelectedWorkerEmail] = useState(initialWorkerEmail);
   const [startValue, setStartValue] = useState(toDateTimeLocalValue(initialShift?.startsAt ?? ""));
   const [endValue, setEndValue] = useState(toDateTimeLocalValue(initialShift?.endsAt ?? ""));
-  const canCreate = participants.length > 0 && workers.length > 0;
+  const [matches, setMatches] = useState<ShiftMatch[]>([]);
+  const [matchNotice, setMatchNotice] = useState("");
+  const canCreate = participants.length > 0;
   const selectedWorker = workers.find((worker) => worker.email.toLowerCase() === selectedWorkerEmail.toLowerCase());
   const workerAvailability = availability
     .filter((slot) => slot.workerEmail.toLowerCase() === selectedWorkerEmail.toLowerCase())
@@ -3066,6 +3128,30 @@ function ShiftCreateModal({
   function applyAvailability(slot: AvailabilityRecord) {
     setStartValue(toDateTimeLocal(slot.date, slot.startTime));
     setEndValue(toDateTimeLocal(slot.date, slot.endTime));
+  }
+
+  async function findMatches() {
+    if (!participants.length) return;
+    const participantName = initialShift?.participantName || participants[0]?.name || "";
+    const token = supabase ? (await supabase.auth.getSession()).data.session?.access_token : "";
+    if (!token) {
+      setMatchNotice("Sign in again before running matching.");
+      return;
+    }
+    setMatchNotice("Checking availability, leave, compliance, and conflicts.");
+    const response = await fetch("/api/shifts/match", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        participant_name: participantName,
+        starts_at: startValue,
+        ends_at: endValue,
+        location: initialShift?.location || ""
+      })
+    });
+    const result = await response.json().catch(() => ({ message: "Matching failed." }));
+    setMatches(Array.isArray(result.matches) ? result.matches : []);
+    setMatchNotice(result.message ?? "Matching complete.");
   }
 
   return (
@@ -3088,11 +3174,11 @@ function ShiftCreateModal({
                 <span className="mb-2 block text-sm font-medium text-slate-700">Assign support worker</span>
                 <select
                   name="workerEmail"
-                  required
                   value={selectedWorkerEmail}
                   onChange={(event) => setSelectedWorkerEmail(event.target.value)}
                   className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15"
                 >
+                  <option value="">Open / unassigned shift</option>
                   {workers.map((worker) => (
                     <option key={worker.email || worker.name} value={worker.email}>{worker.name}</option>
                   ))}
@@ -3140,6 +3226,36 @@ function ShiftCreateModal({
                   </div>
                 ) : null}
               </div>
+              <div className="rounded border border-slate-200 bg-white p-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-ink">AI shift matching</p>
+                    <p className="mt-1 text-xs text-slate-500">Scores staff using availability, leave, conflicts, and compliance expiry.</p>
+                  </div>
+                  <button type="button" onClick={() => void findMatches()} className="rounded border border-[#354aa3]/30 px-3 py-2 text-xs font-semibold text-[#354aa3] hover:bg-[#354aa3]/5">
+                    Find matching workers
+                  </button>
+                </div>
+                {matchNotice ? <p className="mt-2 text-xs text-slate-500">{matchNotice}</p> : null}
+                {matches.length ? (
+                  <div className="mt-3 grid gap-2">
+                    {matches.map((match) => (
+                      <button
+                        key={match.email}
+                        type="button"
+                        onClick={() => setSelectedWorkerEmail(match.email)}
+                        className="rounded border border-slate-200 bg-slate-50 p-3 text-left hover:border-gumleaf/40 hover:bg-gumleaf/5"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-semibold text-ink">{match.name}</p>
+                          <span className="rounded bg-gumleaf/10 px-2 py-1 text-xs font-semibold text-gumleaf">{match.score}% match</span>
+                        </div>
+                        <p className="mt-1 text-xs text-slate-500">{match.reasons.slice(0, 2).join(" | ")}</p>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
               <Field name="location" label="Location" placeholder="Shift location" defaultValue={initialShift?.location ?? ""} />
               <div className="rounded border border-slate-200 bg-white p-3">
                 <p className="text-sm font-semibold text-ink">GPS clock-in geofence</p>
@@ -3172,7 +3288,7 @@ function ShiftCreateModal({
               <Select name="status" label="Shift status" options={statuses} defaultValue={initialShift?.status || "Draft"} />
             </RecordForm>
           ) : (
-            <EmptyWorkerState title="Participant and worker records required" message="Create at least one participant and one support worker before adding a shift." />
+            <EmptyWorkerState title="Participant records required" message="Create at least one participant before adding an assigned or open shift." />
           )}
         </div>
       </div>
@@ -3340,6 +3456,33 @@ function ProfileSection({ title, value, tone = "default" }: { title: string; val
   );
 }
 
+function ParticipantTimeline({ timeline }: { timeline: ParticipantTimelineItem[] }) {
+  return (
+    <article className="rounded border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 className="font-semibold text-ink">Participant timeline</h2>
+      <p className="mt-1 text-sm text-slate-500">Progress notes, incidents, shifts, and document events from the database.</p>
+      {timeline.length ? (
+        <div className="mt-4 grid gap-3">
+          {timeline.map((item) => (
+            <div key={`${item.type}-${item.id}`} className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-ink">{item.title}</p>
+                  <p className="mt-1 text-slate-600">{item.detail || "No details recorded"}</p>
+                </div>
+                <span className="rounded bg-white px-2 py-1 text-xs font-semibold text-slate-600">{item.type}</span>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">{dateTimeOrFallback(item.occurredAt)}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyWorkerState title="No timeline events" message="Timeline events appear after shifts, notes, incidents, or documents are recorded." />
+      )}
+    </article>
+  );
+}
+
 function CarePlanDetail({ title, value, tone = "default" }: { title: string; value: string; tone?: "default" | "risk" }) {
   return (
     <div className={`mt-4 border-t pt-4 ${tone === "risk" ? "border-coral/20" : "border-slate-100"}`}>
@@ -3400,6 +3543,72 @@ async function loadParticipantDocuments(participantName: string): Promise<Partic
     sizeBytes: Number(row.size_bytes ?? 0),
     createdAt: String(row.created_at ?? "")
   }));
+}
+
+async function loadParticipantTimeline(participantName: string): Promise<ParticipantTimelineItem[]> {
+  if (!isSupabaseConfigured || !supabase || !participantName) return [];
+  const [notes, incidents, shifts, documents] = await Promise.all([
+    supabase
+      .from("progress_notes")
+      .select("id, worker_name, service_date, category, note, outcomes, created_at")
+      .eq("participant_name", participantName)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("incident_reports")
+      .select("id, incident_number, severity, status, summary, incident_date, created_at")
+      .eq("participant_name", participantName)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("shifts")
+      .select("id, support_worker_name, starts_at, ends_at, status, location")
+      .eq("participant_name", participantName)
+      .order("starts_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("care_documents")
+      .select("id, title, file_name, created_at")
+      .eq("participant_name", participantName)
+      .order("created_at", { ascending: false })
+      .limit(10)
+  ]);
+
+  const events: ParticipantTimelineItem[] = [
+    ...((notes.data ?? []).map((row) => ({
+      id: String(row.id ?? ""),
+      type: "Progress note",
+      title: String(row.category ?? "Progress note"),
+      detail: [row.worker_name, row.note || row.outcomes].filter(Boolean).join(" | "),
+      occurredAt: String(row.service_date || row.created_at || "")
+    }))),
+    ...((incidents.data ?? []).map((row) => ({
+      id: String(row.id ?? ""),
+      type: "Incident",
+      title: String(row.incident_number || "Incident report"),
+      detail: [row.severity, row.status, row.summary].filter(Boolean).join(" | "),
+      occurredAt: String(row.incident_date || row.created_at || "")
+    }))),
+    ...((shifts.data ?? []).map((row) => ({
+      id: String(row.id ?? ""),
+      type: "Shift",
+      title: String(row.status || "Scheduled shift"),
+      detail: [row.support_worker_name || "Open shift", row.location, `${timeOnly(String(row.starts_at ?? ""))} - ${timeOnly(String(row.ends_at ?? ""))}`].filter(Boolean).join(" | "),
+      occurredAt: String(row.starts_at || "")
+    }))),
+    ...((documents.data ?? []).map((row) => ({
+      id: String(row.id ?? ""),
+      type: "Document",
+      title: String(row.title || "Document uploaded"),
+      detail: String(row.file_name ?? ""),
+      occurredAt: String(row.created_at ?? "")
+    })))
+  ];
+
+  return events
+    .filter((item) => item.occurredAt)
+    .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
+    .slice(0, 20);
 }
 
 async function loadCarePlans(): Promise<CarePlanRecord[]> {
@@ -3762,6 +3971,65 @@ async function loadShifts(workerEmail?: string): Promise<ShiftRecord[]> {
       participantSignature: String(row.participant_signature ?? ""),
       participantSignedAt: String(row.participant_signed_at ?? ""),
       signatureCapturedByEmail: String(row.signature_captured_by_email ?? ""),
+      time: `${timeOnly(startsAt)} - ${timeOnly(endsAt)}`
+    };
+  });
+}
+
+async function loadOpenShifts(): Promise<ShiftRecord[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("shifts")
+    .select("*")
+    .or("support_worker_email.is.null,support_worker_email.eq.")
+    .gte("starts_at", now)
+    .neq("status", "Cancelled")
+    .order("starts_at", { ascending: true })
+    .limit(20);
+  if (error || !data) return [];
+  return data.map((row) => {
+    const participantName = String(row.participant_name ?? "");
+    const startsAt = String(row.starts_at ?? "");
+    const endsAt = String(row.ends_at ?? "");
+    return {
+      id: String(row.id ?? `${participantName}-${startsAt}`),
+      participant: shortName(participantName),
+      participantName,
+      worker: "",
+      workerEmail: "",
+      location: String(row.location ?? ""),
+      status: String(row.status ?? "Open"),
+      startsAt,
+      endsAt,
+      approvalStatus: String(row.approval_status ?? "not_submitted"),
+      clockInAt: "",
+      clockOutAt: "",
+      allowedLatitude: String(row.allowed_latitude ?? ""),
+      allowedLongitude: String(row.allowed_longitude ?? ""),
+      allowedRadiusM: String(row.allowed_radius_m ?? ""),
+      clockInLatitude: "",
+      clockInLongitude: "",
+      clockInDistanceM: "",
+      clockOutLatitude: "",
+      clockOutLongitude: "",
+      clockOutDistanceM: "",
+      recurrenceSeriesId: String(row.recurrence_series_id ?? ""),
+      recurrenceType: String(row.recurrence_type ?? "single"),
+      recurrenceIntervalDays: String(row.recurrence_interval_days ?? ""),
+      recurrenceCount: String(row.recurrence_count ?? "1"),
+      recurrencePosition: String(row.recurrence_position ?? "1"),
+      submittedAt: "",
+      submittedByEmail: "",
+      approvedAt: "",
+      approvedByEmail: "",
+      rejectionReason: "",
+      payrollReadyAt: "",
+      workerSignature: "",
+      workerSignedAt: "",
+      participantSignature: "",
+      participantSignedAt: "",
+      signatureCapturedByEmail: "",
       time: `${timeOnly(startsAt)} - ${timeOnly(endsAt)}`
     };
   });

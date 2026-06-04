@@ -28,8 +28,9 @@ export async function POST(request: Request) {
   const recurrenceCount = Math.min(Math.max(Number(body.recurrence_count ?? 1), 1), 60);
   const recurrence = recurrenceConfig(recurrenceType, customIntervalDays, recurrenceCount);
 
-  if (!participantName || !workerName || !workerEmail || !startsAt || !endsAt) {
-    return NextResponse.json({ message: "Participant, support worker, worker email, start time, and end time are required." }, { status: 400 });
+  const isOpenShift = !workerEmail || status.toLowerCase() === "open" || status.toLowerCase() === "unfilled";
+  if (!participantName || !startsAt || !endsAt || (!isOpenShift && (!workerName || !workerEmail))) {
+    return NextResponse.json({ message: "Participant, start time, and end time are required. Assign a support worker or save the shift as Open/Unfilled." }, { status: 400 });
   }
   if (!isValidLatitude(allowedLatitude) || !isValidLongitude(allowedLongitude) || !isValidRadius(allowedRadiusM)) {
     return NextResponse.json({ message: "Valid GPS latitude, longitude, and an allowed radius between 25 and 5000 metres are required." }, { status: 400 });
@@ -58,8 +59,8 @@ export async function POST(request: Request) {
     return {
       branch_id: branchId,
       participant_name: participantName,
-      support_worker_name: workerName,
-      support_worker_email: workerEmail,
+      support_worker_name: isOpenShift ? null : workerName,
+      support_worker_email: isOpenShift ? null : workerEmail,
       location,
       starts_at: nextStart.toISOString(),
       ends_at: nextEnd.toISOString(),
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
     };
   });
 
-  const unavailableConflict = await findUnavailableConflict(auth.client, workerEmail, rows);
+  const unavailableConflict = isOpenShift ? null : await findUnavailableConflict(auth.client, workerEmail, rows);
   if (unavailableConflict) {
     return NextResponse.json(
       {
@@ -85,7 +86,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const leaveConflict = await findApprovedLeaveConflict(auth.client, workerEmail, rows);
+  const leaveConflict = isOpenShift ? null : await findApprovedLeaveConflict(auth.client, workerEmail, rows);
   if (leaveConflict) {
     return NextResponse.json(
       {
@@ -118,25 +119,27 @@ export async function POST(request: Request) {
   });
 
   const adminRecipients = await getAdminNotificationRecipients(auth.client, { fallback: [auth.user.email] });
-  await notifyCareEvent(auth.client, {
-    type: "new_shift",
-    to: [workerEmail],
-    title: rows.length > 1 ? `${rows.length} new recurring shifts` : "New shift assigned",
-    body: rows.length > 1 ? `${participantName} recurring shifts have been assigned to you.` : `${participantName} shift has been assigned to you.`,
-    linkUrl: "/worker-portal",
-    subject: rows.length > 1 ? `New recurring shifts assigned: ${participantName}` : `New shift assigned: ${participantName}`,
-    text: [
-      rows.length > 1 ? `${rows.length} recurring shifts have been assigned to you.` : `A new shift has been assigned to you.`,
-      `Participant: ${participantName}`,
-      `Location: ${location || "Not recorded"}`,
-      `Start: ${startsAt}`,
-      `End: ${endsAt}`,
-      `Recurrence: ${recurrenceLabel(recurrence.type, recurrence.intervalDays, recurrence.count)}`,
-      `Status: ${status}`,
-      `Open worker portal: ${appUrl("/worker-portal")}`
-    ].join("\n"),
-    metadata: { shiftId: firstShiftId, seriesId, participantName, workerName, workerEmail, startsAt, endsAt, status, allowedLatitude, allowedLongitude, allowedRadiusM, recurrence, createdCount: rows.length }
-  });
+  if (!isOpenShift) {
+    await notifyCareEvent(auth.client, {
+      type: "new_shift",
+      to: [workerEmail],
+      title: rows.length > 1 ? `${rows.length} new recurring shifts` : "New shift assigned",
+      body: rows.length > 1 ? `${participantName} recurring shifts have been assigned to you.` : `${participantName} shift has been assigned to you.`,
+      linkUrl: "/worker-portal",
+      subject: rows.length > 1 ? `New recurring shifts assigned: ${participantName}` : `New shift assigned: ${participantName}`,
+      text: [
+        rows.length > 1 ? `${rows.length} recurring shifts have been assigned to you.` : `A new shift has been assigned to you.`,
+        `Participant: ${participantName}`,
+        `Location: ${location || "Not recorded"}`,
+        `Start: ${startsAt}`,
+        `End: ${endsAt}`,
+        `Recurrence: ${recurrenceLabel(recurrence.type, recurrence.intervalDays, recurrence.count)}`,
+        `Status: ${status}`,
+        `Open worker portal: ${appUrl("/worker-portal")}`
+      ].join("\n"),
+      metadata: { shiftId: firstShiftId, seriesId, participantName, workerName, workerEmail, startsAt, endsAt, status, allowedLatitude, allowedLongitude, allowedRadiusM, recurrence, createdCount: rows.length }
+    });
+  }
   await notifyCareEvent(auth.client, {
     type: "new_shift",
     to: adminRecipients,
@@ -147,7 +150,7 @@ export async function POST(request: Request) {
     text: [
       rows.length > 1 ? `${rows.length} shifts created by ${auth.user.name} (${auth.user.email}).` : `Shift created by ${auth.user.name} (${auth.user.email}).`,
       `Participant: ${participantName}`,
-      `Support worker: ${workerName} (${workerEmail})`,
+      `Support worker: ${isOpenShift ? "Open / unassigned" : `${workerName} (${workerEmail})`}`,
       `Start: ${startsAt}`,
       `End: ${endsAt}`,
       `Recurrence: ${recurrenceLabel(recurrence.type, recurrence.intervalDays, recurrence.count)}`,
@@ -179,8 +182,9 @@ export async function PATCH(request: Request) {
   const allowedLongitude = Number(body.allowed_longitude);
   const allowedRadiusM = Number(body.allowed_radius_m ?? 250);
 
-  if (!id || !participantName || !workerName || !workerEmail || !startsAt || !endsAt) {
-    return NextResponse.json({ message: "Shift, participant, support worker, worker email, start time, and end time are required." }, { status: 400 });
+  const isOpenShift = !workerEmail || status.toLowerCase() === "open" || status.toLowerCase() === "unfilled";
+  if (!id || !participantName || !startsAt || !endsAt || (!isOpenShift && (!workerName || !workerEmail))) {
+    return NextResponse.json({ message: "Shift, participant, start time, and end time are required. Assign a support worker or save the shift as Open/Unfilled." }, { status: 400 });
   }
   if (!isValidLatitude(allowedLatitude) || !isValidLongitude(allowedLongitude) || !isValidRadius(allowedRadiusM)) {
     return NextResponse.json({ message: "Valid GPS latitude, longitude, and an allowed radius between 25 and 5000 metres are required." }, { status: 400 });
@@ -200,8 +204,8 @@ export async function PATCH(request: Request) {
   const update = {
     branch_id: String(participantBranch?.branch_id ?? "") || null,
     participant_name: participantName,
-    support_worker_name: workerName,
-    support_worker_email: workerEmail,
+    support_worker_name: isOpenShift ? null : workerName,
+    support_worker_email: isOpenShift ? null : workerEmail,
     location,
     starts_at: startDate.toISOString(),
     ends_at: endDate.toISOString(),

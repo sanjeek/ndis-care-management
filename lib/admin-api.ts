@@ -58,7 +58,7 @@ export async function requireAdminSession(request: Request) {
     }
   }
 
-  if (role !== "admin") {
+  if (role !== "admin" && role !== "super_admin") {
     return { error: "Only admin users can access this resource.", status: 403 };
   }
 

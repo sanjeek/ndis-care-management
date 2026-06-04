@@ -49,5 +49,6 @@ export async function requireApiUser(request: Request): Promise<ApiAuthResult> {
 }
 
 export function requireRole(user: ApiUser, roles: UserRole[]) {
+  if (user.role === "super_admin" && roles.includes("admin")) return true;
   return roles.includes(user.role);
 }

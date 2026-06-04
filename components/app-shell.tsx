@@ -574,7 +574,7 @@ const navGroupDefinitions = [
   { label: "Communication", hrefs: ["/messages", "/tasks", "/documents", "/family-portal"] },
   { label: "Finance", hrefs: ["/invoices", "/funding", "/service-agreements"] },
   { label: "Organisation", hrefs: ["/branches", "/support-coordination"] },
-  { label: "Admin", hrefs: ["/admin/backups", "/admin/compliance", "/admin/audit", "/settings"] }
+  { label: "Admin", hrefs: ["/admin/backups", "/admin/reminders", "/admin/compliance", "/admin/audit", "/settings"] }
 ];
 
 function groupNavigation(items: NavItem[], pathname: string) {

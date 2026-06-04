@@ -61,7 +61,7 @@ create table if not exists public.profiles (
   email text not null,
   full_name text,
   organisation text,
-  role text not null default 'support_worker' check (role in ('admin', 'support_worker', 'team_leader', 'family')),
+  role text not null default 'support_worker' check (role in ('super_admin', 'admin', 'support_worker', 'team_leader', 'family')),
   active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -74,7 +74,7 @@ alter table public.profiles
 drop constraint if exists profiles_role_check;
 
 alter table public.profiles
-add constraint profiles_role_check check (role in ('admin', 'support_worker', 'team_leader', 'family'));
+add constraint profiles_role_check check (role in ('super_admin', 'admin', 'support_worker', 'team_leader', 'family'));
 
 create table if not exists public.family_members (
   id uuid primary key default gen_random_uuid(),
@@ -1125,6 +1125,7 @@ drop policy if exists "Team leaders can manage worker leave" on public.worker_le
 drop policy if exists "Workers can manage own leave" on public.worker_leave_requests;
 drop policy if exists "Admins can manage shifts" on public.shifts;
 drop policy if exists "Workers can read assigned shifts" on public.shifts;
+drop policy if exists "Workers can read open shifts" on public.shifts;
 drop policy if exists "Role based progress notes" on public.progress_notes;
 drop policy if exists "Admins can manage progress notes" on public.progress_notes;
 drop policy if exists "Workers can read own progress notes" on public.progress_notes;
@@ -1204,7 +1205,7 @@ security definer
 set search_path = public
 as $$
   select coalesce(
-    case when lower(coalesce(auth.jwt() ->> 'email', '')) = 'sanjee@live.com' then 'admin' end,
+    case when lower(coalesce(auth.jwt() ->> 'email', '')) = 'sanjee@live.com' then 'super_admin' end,
     nullif(auth.jwt() -> 'user_metadata' ->> 'role', ''),
     (select role from public.profiles where id = auth.uid() and active = true),
     'support_worker'
@@ -1250,15 +1251,15 @@ as $$
 $$;
 
 update auth.users
-set raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) || '{"role":"admin"}'::jsonb
+set raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) || '{"role":"super_admin"}'::jsonb
 where lower(email) = 'sanjee@live.com';
 
 insert into public.profiles (id, email, full_name, organisation, role, active)
-select id, email, coalesce(raw_user_meta_data ->> 'full_name', email), coalesce(raw_user_meta_data ->> 'organisation', ''), 'admin', true
+select id, email, coalesce(raw_user_meta_data ->> 'full_name', email), coalesce(raw_user_meta_data ->> 'organisation', ''), 'super_admin', true
 from auth.users
 where lower(email) = 'sanjee@live.com'
 on conflict (id) do update
-set role = 'admin',
+set role = 'super_admin',
     active = true,
     email = excluded.email,
     full_name = coalesce(public.profiles.full_name, excluded.full_name),
@@ -1271,7 +1272,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select public.current_user_is_active() and public.current_app_role() in ('admin', 'provider_admin');
+  select public.current_user_is_active() and public.current_app_role() in ('super_admin', 'admin', 'provider_admin');
 $$;
 
 create or replace function public.is_support_worker()
@@ -1470,6 +1471,15 @@ to authenticated
 using (
   public.is_support_worker()
   and lower(support_worker_email) = public.current_app_email()
+);
+
+create policy "Workers can read open shifts"
+on public.shifts for select
+to authenticated
+using (
+  public.is_support_worker()
+  and nullif(support_worker_email, '') is null
+  and coalesce(status, '') not in ('Cancelled', 'Rejected')
 );
 
 create policy "Admins can manage progress notes"

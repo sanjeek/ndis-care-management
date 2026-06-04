@@ -8,8 +8,10 @@ export type EmailNotificationType =
   | "document_upload"
   | "worker_availability"
   | "worker_leave"
+  | "document_expiry"
   | "shift_change"
   | "shift_cancellation"
+  | "shift_acceptance"
   | "shift_reminder"
   | "missed_clock_in"
   | "payroll_export";
