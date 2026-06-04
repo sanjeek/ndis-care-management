@@ -172,6 +172,21 @@ type ShiftMatch = {
   reasons: string[];
 };
 
+type SpeechRecognitionResultItem = { transcript: string };
+type SpeechRecognitionResultLike = { 0?: SpeechRecognitionResultItem };
+type SpeechRecognitionEventLike = { results: ArrayLike<SpeechRecognitionResultLike> };
+type SpeechRecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  start: () => void;
+};
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
 type ModuleItem = {
   id: string;
   title: string;
@@ -1406,6 +1421,7 @@ export function ProgressNotesPage() {
   return (
     <AppShell title="Progress Notes" eyebrow={notice}>
       {context.role === "admin" ? <ProgressTemplateManager templates={templates} setNotice={setNotice} onSaved={refresh} /> : null}
+      <ProgressNoteAssistPanel participants={participants} setNotice={setNotice} />
       <section className="mb-6 rounded border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-5 flex flex-col gap-2">
           <h2 className="text-lg font-semibold text-ink">New progress note</h2>
@@ -1572,6 +1588,94 @@ function ProgressTemplateManager({
       ) : (
         <EmptyState title="No templates yet" message="Create a template to standardise required progress note fields." />
       )}
+    </section>
+  );
+}
+
+function ProgressNoteAssistPanel({ participants, setNotice }: { participants: ParticipantRecord[]; setNotice: (message: string) => void }) {
+  const [rawNote, setRawNote] = useState("");
+  const [draft, setDraft] = useState("");
+  const [participant, setParticipant] = useState("");
+  const [category, setCategory] = useState("General");
+  const [listening, setListening] = useState(false);
+
+  async function startVoice() {
+    const recognitionConstructor = typeof window !== "undefined" ? ((window as unknown as { SpeechRecognition?: SpeechRecognitionConstructor; webkitSpeechRecognition?: SpeechRecognitionConstructor }).SpeechRecognition || (window as unknown as { webkitSpeechRecognition?: SpeechRecognitionConstructor }).webkitSpeechRecognition) : null;
+    if (!recognitionConstructor) {
+      setNotice("Voice-to-text is not available in this browser. Use Chrome or Edge on desktop or mobile.");
+      return;
+    }
+    const recognition = new recognitionConstructor();
+    recognition.lang = "en-AU";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.onstart = () => setListening(true);
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => {
+      setListening(false);
+      setNotice("Voice capture stopped. Check microphone permission and try again.");
+    };
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results).map((result) => result[0]?.transcript ?? "").join(" ").trim();
+      setRawNote((current) => [current, transcript].filter(Boolean).join(" "));
+      setNotice("Voice text captured. Review it before saving a progress note.");
+    };
+    recognition.start();
+  }
+
+  async function generateDraft() {
+    if (!supabase) return;
+    const token = (await supabase.auth.getSession()).data.session?.access_token;
+    if (!token) {
+      setNotice("Please sign in again before using the note assistant.");
+      return;
+    }
+    const response = await fetch("/api/progress-notes/assistant", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ raw_note: rawNote, participant_name: participant, category })
+    });
+    const result = await response.json().catch(() => ({ message: "Assistant could not generate a draft." }));
+    setNotice(result.message);
+    if (response.ok) setDraft(String(result.draft ?? ""));
+  }
+
+  return (
+    <section className="mb-6 rounded border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="font-semibold text-ink">Voice-to-text and note assistant</h2>
+          <p className="mt-1 text-sm text-slate-500">Capture rough notes by voice, then generate a structured draft for review before saving.</p>
+        </div>
+        <button type="button" onClick={() => void startVoice()} className="rounded border border-[#354aa3]/30 px-4 py-2 text-sm font-semibold text-[#354aa3] hover:bg-[#354aa3]/5">
+          {listening ? "Listening..." : "Start voice note"}
+        </button>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4">
+          <label>
+            <span className="mb-2 block text-sm font-medium text-slate-700">Participant context</span>
+            <select value={participant} onChange={(event) => setParticipant(event.target.value)} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15">
+              <option value="">Not selected</option>
+              {participants.map((item) => <option key={item.id || item.name} value={item.name}>{item.name}</option>)}
+            </select>
+          </label>
+          <label>
+            <span className="mb-2 block text-sm font-medium text-slate-700">Support category</span>
+            <select value={category} onChange={(event) => setCategory(event.target.value)} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15">
+              {["General", "Self care", "Community access", "Medication prompt", "Behaviour support", "Transport assistance"].map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+          <textarea value={rawNote} onChange={(event) => setRawNote(event.target.value)} rows={7} placeholder="Type or dictate rough notes here. Review for accuracy before using in a formal progress note." className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
+          <button type="button" onClick={() => void generateDraft()} className="rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d625d]">
+            Generate structured draft
+          </button>
+        </div>
+        <div>
+          <p className="mb-2 text-sm font-medium text-slate-700">Assistant draft</p>
+          <textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={14} placeholder="Generated draft appears here. Review and copy into the formal progress note fields when correct." className="w-full rounded border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
+        </div>
+      </div>
     </section>
   );
 }

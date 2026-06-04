@@ -49,7 +49,7 @@ async function requireUser(request: Request): Promise<{ user: AuthContext } | { 
 }
 
 async function canAccessParticipant(participantName: string, user: AuthContext) {
-  if (user.role === "admin") return true;
+  if (user.role === "admin" || user.role === "super_admin") return true;
   if (!participantName) return false;
   const admin = serviceClient();
   if (!admin) return false;

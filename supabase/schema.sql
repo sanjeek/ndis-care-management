@@ -178,11 +178,101 @@ create table if not exists public.worker_leave_requests (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.travel_logs (
+  id uuid primary key default gen_random_uuid(),
+  shift_id uuid,
+  participant_name text not null,
+  worker_name text not null,
+  worker_email text not null,
+  travel_date date not null,
+  start_location text,
+  end_location text,
+  kilometres numeric not null default 0 check (kilometres >= 0),
+  travel_purpose text not null,
+  vehicle_registration text,
+  notes text,
+  status text not null default 'submitted' check (status in ('draft', 'submitted', 'approved', 'rejected', 'invoiced')),
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.participant_matches (
+  id uuid primary key default gen_random_uuid(),
+  participant_name text not null,
+  worker_name text not null,
+  worker_email text not null,
+  match_score numeric not null default 0 check (match_score >= 0 and match_score <= 100),
+  matching_preferences text,
+  support_need_alignment text,
+  restrictions text,
+  status text not null default 'recommended' check (status in ('recommended', 'review_required', 'restricted', 'inactive')),
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.visitor_logs (
+  id uuid primary key default gen_random_uuid(),
+  visitor_name text not null,
+  organisation text,
+  participant_name text,
+  visit_date date not null,
+  sign_in_time time not null,
+  sign_out_time time,
+  purpose text not null,
+  host_worker_name text,
+  host_worker_email text,
+  status text not null default 'signed_in' check (status in ('signed_in', 'signed_out', 'cancelled')),
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.vehicles (
+  id uuid primary key default gen_random_uuid(),
+  registration text not null unique,
+  make_model text not null,
+  owner text,
+  odometer numeric not null default 0 check (odometer >= 0),
+  insurance_expiry date,
+  registration_expiry date,
+  service_due_date date,
+  status text not null default 'active' check (status in ('active', 'maintenance', 'inactive')),
+  notes text,
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.participant_checklists (
+  id uuid primary key default gen_random_uuid(),
+  participant_name text not null,
+  checklist_title text not null,
+  assigned_worker_name text not null,
+  assigned_worker_email text not null,
+  due_date date,
+  checklist_items text not null,
+  completion_status text not null default 'open' check (completion_status in ('open', 'in_progress', 'completed', 'cancelled')),
+  notes text,
+  completed_at timestamptz,
+  completed_by uuid references auth.users(id) on delete set null,
+  completed_by_email text,
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.shifts (
   id uuid primary key default gen_random_uuid(),
   branch_id uuid references public.organisation_branches(id) on delete set null,
   participant_name text not null,
-  support_worker_name text not null,
+  support_worker_name text,
   support_worker_email text,
   location text not null,
   starts_at timestamptz not null,
@@ -224,6 +314,27 @@ create table if not exists public.shifts (
   signature_captured_by uuid references auth.users(id) on delete set null,
   signature_captured_by_email text,
   signed_record jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+alter table public.shifts
+alter column support_worker_name drop not null;
+
+create table if not exists public.shift_attachments (
+  id uuid primary key default gen_random_uuid(),
+  shift_id uuid not null references public.shifts(id) on delete cascade,
+  participant_name text not null,
+  support_worker_name text,
+  support_worker_email text,
+  title text not null,
+  attachment_type text not null default 'general',
+  storage_bucket text not null default 'shift-attachments',
+  storage_path text not null,
+  file_name text not null,
+  content_type text,
+  size_bytes bigint not null default 0,
+  uploaded_by uuid references auth.users(id) on delete set null,
+  uploaded_by_email text,
   created_at timestamptz not null default now()
 );
 
@@ -966,6 +1077,21 @@ on public.support_workers (branch_id);
 create index if not exists shifts_branch_idx
 on public.shifts (branch_id, starts_at);
 
+create index if not exists travel_logs_worker_idx
+on public.travel_logs (worker_email, travel_date);
+
+create index if not exists participant_matches_participant_idx
+on public.participant_matches (participant_name, worker_email);
+
+create index if not exists visitor_logs_visit_date_idx
+on public.visitor_logs (visit_date, status);
+
+create index if not exists participant_checklists_worker_idx
+on public.participant_checklists (assigned_worker_email, completion_status);
+
+create index if not exists shift_attachments_shift_idx
+on public.shift_attachments (shift_id, support_worker_email);
+
 create index if not exists incident_reports_branch_idx
 on public.incident_reports (branch_id, status);
 
@@ -980,7 +1106,13 @@ alter table public.support_workers enable row level security;
 alter table public.worker_invitations enable row level security;
 alter table public.worker_availability enable row level security;
 alter table public.worker_leave_requests enable row level security;
+alter table public.travel_logs enable row level security;
+alter table public.participant_matches enable row level security;
+alter table public.visitor_logs enable row level security;
+alter table public.vehicles enable row level security;
+alter table public.participant_checklists enable row level security;
 alter table public.shifts enable row level security;
+alter table public.shift_attachments enable row level security;
 alter table public.progress_notes enable row level security;
 alter table public.progress_note_templates enable row level security;
 alter table public.participant_goals enable row level security;
@@ -1016,7 +1148,13 @@ alter table public.support_workers force row level security;
 alter table public.worker_invitations force row level security;
 alter table public.worker_availability force row level security;
 alter table public.worker_leave_requests force row level security;
+alter table public.travel_logs force row level security;
+alter table public.participant_matches force row level security;
+alter table public.visitor_logs force row level security;
+alter table public.vehicles force row level security;
+alter table public.participant_checklists force row level security;
 alter table public.shifts force row level security;
+alter table public.shift_attachments force row level security;
 alter table public.progress_notes force row level security;
 alter table public.progress_note_templates force row level security;
 alter table public.participant_goals force row level security;
@@ -1087,6 +1225,27 @@ set public = false,
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
+  'shift-attachments',
+  'shift-attachments',
+  false,
+  52428800,
+  array[
+    'application/pdf',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/plain'
+  ]
+)
+on conflict (id) do update
+set public = false,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
   'database-backups',
   'database-backups',
   false,
@@ -1123,6 +1282,15 @@ drop policy if exists "Workers can manage own availability" on public.worker_ava
 drop policy if exists "Admins can manage worker leave" on public.worker_leave_requests;
 drop policy if exists "Team leaders can manage worker leave" on public.worker_leave_requests;
 drop policy if exists "Workers can manage own leave" on public.worker_leave_requests;
+drop policy if exists "Admins and team leaders can manage travel logs" on public.travel_logs;
+drop policy if exists "Workers can manage own travel logs" on public.travel_logs;
+drop policy if exists "Admins and team leaders can manage participant matches" on public.participant_matches;
+drop policy if exists "Admins and team leaders can manage visitor logs" on public.visitor_logs;
+drop policy if exists "Admins and team leaders can manage vehicles" on public.vehicles;
+drop policy if exists "Admins and team leaders can manage participant checklists" on public.participant_checklists;
+drop policy if exists "Workers can manage assigned participant checklists" on public.participant_checklists;
+drop policy if exists "Admins and team leaders can manage shift attachments" on public.shift_attachments;
+drop policy if exists "Workers can manage assigned shift attachments" on public.shift_attachments;
 drop policy if exists "Admins can manage shifts" on public.shifts;
 drop policy if exists "Workers can read assigned shifts" on public.shifts;
 drop policy if exists "Workers can read open shifts" on public.shifts;
@@ -1195,6 +1363,7 @@ drop policy if exists "Workers can create assigned participant risk assessments"
 drop policy if exists "Workers can update assigned participant risk assessments" on public.participant_risk_assessments;
 drop policy if exists "No public storage access to care documents" on storage.objects;
 drop policy if exists "No public storage access to incident attachments" on storage.objects;
+drop policy if exists "No public storage access to shift attachments" on storage.objects;
 drop policy if exists "No public storage access to database backups" on storage.objects;
 
 create or replace function public.current_app_role()
@@ -1457,6 +1626,78 @@ using (
 with check (
   public.is_support_worker()
   and lower(worker_email) = public.current_app_email()
+);
+
+create policy "Admins and team leaders can manage travel logs"
+on public.travel_logs for all
+to authenticated
+using (public.is_admin() or public.is_team_leader())
+with check (public.is_admin() or public.is_team_leader());
+
+create policy "Workers can manage own travel logs"
+on public.travel_logs for all
+to authenticated
+using (
+  public.is_support_worker()
+  and lower(worker_email) = public.current_app_email()
+)
+with check (
+  public.is_support_worker()
+  and lower(worker_email) = public.current_app_email()
+);
+
+create policy "Admins and team leaders can manage participant matches"
+on public.participant_matches for all
+to authenticated
+using (public.is_admin() or public.is_team_leader())
+with check (public.is_admin() or public.is_team_leader());
+
+create policy "Admins and team leaders can manage visitor logs"
+on public.visitor_logs for all
+to authenticated
+using (public.is_admin() or public.is_team_leader())
+with check (public.is_admin() or public.is_team_leader());
+
+create policy "Admins and team leaders can manage vehicles"
+on public.vehicles for all
+to authenticated
+using (public.is_admin() or public.is_team_leader())
+with check (public.is_admin() or public.is_team_leader());
+
+create policy "Admins and team leaders can manage participant checklists"
+on public.participant_checklists for all
+to authenticated
+using (public.is_admin() or public.is_team_leader())
+with check (public.is_admin() or public.is_team_leader());
+
+create policy "Workers can manage assigned participant checklists"
+on public.participant_checklists for all
+to authenticated
+using (
+  public.is_support_worker()
+  and lower(assigned_worker_email) = public.current_app_email()
+)
+with check (
+  public.is_support_worker()
+  and lower(assigned_worker_email) = public.current_app_email()
+);
+
+create policy "Admins and team leaders can manage shift attachments"
+on public.shift_attachments for all
+to authenticated
+using (public.is_admin() or public.is_team_leader())
+with check (public.is_admin() or public.is_team_leader());
+
+create policy "Workers can manage assigned shift attachments"
+on public.shift_attachments for all
+to authenticated
+using (
+  public.is_support_worker()
+  and lower(support_worker_email) = public.current_app_email()
+)
+with check (
+  public.is_support_worker()
+  and lower(support_worker_email) = public.current_app_email()
 );
 
 create policy "Admins can manage shifts"
@@ -1887,6 +2128,11 @@ create policy "No public storage access to incident attachments"
 on storage.objects for select
 to authenticated
 using (bucket_id = 'incident-attachments' and false);
+
+create policy "No public storage access to shift attachments"
+on storage.objects for select
+to authenticated
+using (bucket_id = 'shift-attachments' and false);
 
 create policy "No public storage access to database backups"
 on storage.objects for select

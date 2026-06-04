@@ -568,12 +568,12 @@ type NavItem = (typeof navItems)[number];
 
 const navGroupDefinitions = [
   { label: "Dashboard", hrefs: ["/dashboard"] },
-  { label: "Scheduler", hrefs: ["/rostering", "/timesheets", "/payroll", "/my-shifts", "/worker-portal"] },
-  { label: "Participants", hrefs: ["/participants", "/care-plans", "/medications", "/participant-goals", "/progress-notes", "/risk-assessments", "/incident-reports"] },
+  { label: "Scheduler", hrefs: ["/rostering", "/timesheets", "/payroll", "/travel", "/shift-attachments", "/my-shifts", "/worker-portal"] },
+  { label: "Participants", hrefs: ["/participants", "/care-plans", "/medications", "/participant-goals", "/checklists", "/participant-matching", "/progress-notes", "/risk-assessments", "/incident-reports"] },
   { label: "Staff", hrefs: ["/support-workers", "/admin/users", "/profile"] },
   { label: "Communication", hrefs: ["/messages", "/tasks", "/documents", "/family-portal"] },
   { label: "Finance", hrefs: ["/invoices", "/funding", "/service-agreements"] },
-  { label: "Organisation", hrefs: ["/branches", "/support-coordination"] },
+  { label: "Organisation", hrefs: ["/branches", "/support-coordination", "/visitors", "/vehicles"] },
   { label: "Admin", hrefs: ["/admin/backups", "/admin/reminders", "/admin/compliance", "/admin/audit", "/settings"] }
 ];
 
