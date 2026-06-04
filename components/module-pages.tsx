@@ -1266,7 +1266,6 @@ export function RosteringPage() {
         onAddShift={() => setCreateOpen(true)}
         onEditShift={setEditingShift}
       />
-      <LeaveManagementPanel leaveRequests={leaveRequests} workers={workers} setNotice={setNotice} onSaved={refresh} />
       <RecurringSeriesPanel shifts={shifts} setNotice={setNotice} onSaved={refresh} />
       {createOpen ? <ShiftCreateModal participants={participants} workers={workers} availability={availability} leaveRequests={leaveRequests} onClose={() => setCreateOpen(false)} onSubmit={submit} /> : null}
       {editingShift ? <ShiftCreateModal participants={participants} workers={workers} availability={availability} leaveRequests={leaveRequests} initialShift={editingShift} onClose={() => setEditingShift(null)} onSubmit={updateShift} /> : null}
