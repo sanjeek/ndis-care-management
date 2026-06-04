@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, LogOut, Menu, Search, UserCircle } from "lucide-react";
+import { Bell, ChevronDown, LogOut, Menu, Search, UserCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { navItems } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
@@ -47,6 +47,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchNotice, setSearchNotice] = useState("");
+  const [openNavGroups, setOpenNavGroups] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let active = true;
@@ -271,6 +272,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
   }, [authChecked, search]);
 
   const visibleNavItems = useMemo(() => visibleNavForRole(userRole, navItems), [userRole]);
+  const groupedNavItems = useMemo(() => groupNavigation(visibleNavItems, pathname), [pathname, visibleNavItems]);
   const unreadCount = notifications.filter((notification) => !notification.readAt).length;
 
   const initials = useMemo(() => {
@@ -345,21 +347,63 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
             </button>
           </div>
 
-          <nav className={`${open ? "grid" : "hidden"} mt-5 gap-1 lg:grid`}>
-            {visibleNavItems.map((item) => {
-              const active = pathname === item.href;
+          <nav className={`${open ? "grid" : "hidden"} mt-5 gap-1 lg:grid lg:max-h-[calc(100vh-15rem)] lg:overflow-y-auto lg:pr-1`}>
+            {groupedNavItems.map((group) => {
+              if (group.items.length === 1 && group.href) {
+                const item = group.items[0];
+                const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                return (
+                  <Link
+                    key={group.label}
+                    href={item.href}
+                    onClick={() => setOpen(false)}
+                    className={`flex items-center gap-3 rounded px-3 py-2.5 text-sm font-semibold transition ${
+                      active ? "bg-gumleaf text-white" : "text-slate-600 hover:bg-slate-100 hover:text-ink"
+                    }`}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {group.label}
+                  </Link>
+                );
+              }
+
+              const isOpen = openNavGroups[group.label] ?? group.active;
+              const Icon = group.icon;
               return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  onClick={() => setOpen(false)}
-                  className={`flex items-center gap-3 rounded px-3 py-2.5 text-sm font-medium transition ${
-                    active ? "bg-gumleaf text-white" : "text-slate-600 hover:bg-slate-100 hover:text-ink"
-                  }`}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </Link>
+                <div key={group.label} className="grid gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setOpenNavGroups((current) => ({ ...current, [group.label]: !isOpen }))}
+                    className={`flex w-full items-center gap-3 rounded px-3 py-2.5 text-left text-sm font-semibold transition ${
+                      group.active ? "bg-gumleaf/10 text-gumleaf" : "text-slate-600 hover:bg-slate-100 hover:text-ink"
+                    }`}
+                    aria-expanded={isOpen}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span className="min-w-0 flex-1 truncate">{group.label}</span>
+                    <ChevronDown className={`h-4 w-4 transition ${isOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {isOpen ? (
+                    <div className="grid gap-1 pl-6">
+                      {group.items.map((item) => {
+                        const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            onClick={() => setOpen(false)}
+                            className={`flex items-center gap-2 rounded px-3 py-2 text-sm font-medium transition ${
+                              active ? "bg-slate-100 text-ink" : "text-slate-600 hover:bg-slate-100 hover:text-ink"
+                            }`}
+                          >
+                            <item.icon className="h-3.5 w-3.5" />
+                            <span className="truncate">{item.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
               );
             })}
           </nav>
@@ -518,4 +562,49 @@ function formatCountdown(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
+type NavItem = (typeof navItems)[number];
+
+const navGroupDefinitions = [
+  { label: "Dashboard", hrefs: ["/dashboard"] },
+  { label: "Scheduler", hrefs: ["/rostering", "/timesheets", "/payroll", "/my-shifts", "/worker-portal"] },
+  { label: "Participants", hrefs: ["/participants", "/care-plans", "/medications", "/participant-goals", "/progress-notes", "/risk-assessments", "/incident-reports"] },
+  { label: "Staff", hrefs: ["/support-workers", "/admin/users", "/profile"] },
+  { label: "Communication", hrefs: ["/messages", "/tasks", "/documents", "/family-portal"] },
+  { label: "Finance", hrefs: ["/invoices", "/funding", "/service-agreements"] },
+  { label: "Organisation", hrefs: ["/branches", "/support-coordination"] },
+  { label: "Admin", hrefs: ["/admin/backups", "/admin/compliance", "/admin/audit", "/settings"] }
+];
+
+function groupNavigation(items: NavItem[], pathname: string) {
+  const byHref = new Map(items.map((item) => [item.href, item]));
+  const used = new Set<string>();
+  const groups = navGroupDefinitions
+    .map((definition) => {
+      const groupItems = definition.hrefs.map((href) => byHref.get(href)).filter((item): item is NavItem => Boolean(item));
+      groupItems.forEach((item) => used.add(item.href));
+      const active = groupItems.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
+      return {
+        label: definition.label,
+        href: groupItems[0]?.href,
+        icon: groupItems[0]?.icon ?? navItems[0].icon,
+        active,
+        items: groupItems
+      };
+    })
+    .filter((group) => group.items.length > 0);
+
+  const leftover = items.filter((item) => !used.has(item.href));
+  if (leftover.length) {
+    groups.push({
+      label: "More",
+      href: leftover[0].href,
+      icon: leftover[0].icon,
+      active: leftover.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`)),
+      items: leftover
+    });
+  }
+
+  return groups;
 }
