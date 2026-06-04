@@ -259,6 +259,15 @@ type DashboardMetrics = {
 };
 
 const statuses = ["Draft", "Offered", "Confirmed", "In progress", "Completed", "Cancelled"];
+const rosterStatusFilters = [
+  { label: "All status", value: "all", colour: "bg-slate-300" },
+  { label: "Pending", value: "Draft", colour: "bg-coral" },
+  { label: "Cancelled", value: "Cancelled", colour: "bg-[#f59e0b]" },
+  { label: "Booked", value: "Confirmed", colour: "bg-[#00a85a]" },
+  { label: "Approved", value: "Completed", colour: "bg-[#00a85a]" },
+  { label: "Rejected", value: "Rejected", colour: "bg-[#dc2626]" },
+  { label: "Invoiced", value: "Invoiced", colour: "bg-[#1c9ec2]" }
+];
 const availabilityStatuses = ["available", "preferred", "unavailable"];
 const leaveTypes = ["Annual leave", "Sick leave", "Unavailable period"];
 const recurrenceTypes = ["single", "daily", "weekly", "fortnightly", "custom"];
@@ -2586,6 +2595,9 @@ function SchedulerGrid({
   const [viewDate, setViewDate] = useState(() => new Date());
   const [viewMode, setViewMode] = useState<"weekly" | "monthly">("weekly");
   const [showStaffList, setShowStaffList] = useState(true);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filterSection, setFilterSection] = useState<"status" | "types" | "sort" | "others">("status");
+  const [statusSearch, setStatusSearch] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const days = weekDays(viewDate);
   const monthDays = monthCalendarDays(viewDate);
@@ -2626,17 +2638,32 @@ function SchedulerGrid({
             <CalendarDays className="h-4 w-4 text-gumleaf" />
             Staff
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              setShowStaffList(true);
-              window.setTimeout(() => searchInputRef.current?.focus(), 0);
-            }}
-            className="rounded border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"
-            aria-label="Filter scheduler"
-          >
-            <Filter className="h-4 w-4" />
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setFilterOpen((current) => !current)}
+              className={`rounded border p-2 hover:bg-slate-50 ${filterOpen || statusFilter !== "all" ? "border-gumleaf/30 bg-gumleaf/5 text-gumleaf" : "border-slate-200 bg-white text-slate-600"}`}
+              aria-label="Filter scheduler"
+              aria-expanded={filterOpen}
+            >
+              <Filter className="h-4 w-4" />
+            </button>
+            {filterOpen ? (
+              <RosterFilterPopover
+                section={filterSection}
+                setSection={setFilterSection}
+                statusFilter={statusFilter}
+                setStatusFilter={onStatusFilterChange}
+                search={statusSearch}
+                setSearch={setStatusSearch}
+                reset={() => {
+                  onStatusFilterChange("all");
+                  setStatusSearch("");
+                  onSearchChange("");
+                }}
+              />
+            ) : null}
+          </div>
           <button type="button" onClick={goToday} className="rounded border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Today</button>
           <button type="button" onClick={() => moveCalendar(-1)} className="rounded border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50" aria-label={viewMode === "monthly" ? "Previous month" : "Previous week"}>
             <ChevronLeft className="h-4 w-4" />
@@ -2647,11 +2674,6 @@ function SchedulerGrid({
           <h2 className="ml-1 text-xl font-semibold text-ink">{monthYear(viewDate)}</h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <select value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value)} className="rounded border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 outline-none hover:bg-slate-50 focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15">
-            <option value="all">All statuses</option>
-            {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
-            <option value="unfilled">Unfilled</option>
-          </select>
           <select value={viewMode} onChange={(event) => setViewMode(event.target.value as "weekly" | "monthly")} className="rounded border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 outline-none hover:bg-slate-50 focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" aria-label="Roster view">
             <option value="weekly">Weekly</option>
             <option value="monthly">Monthly</option>
@@ -2716,6 +2738,89 @@ function SchedulerGrid({
         </div>
       )}
     </section>
+  );
+}
+
+function RosterFilterPopover({
+  section,
+  setSection,
+  statusFilter,
+  setStatusFilter,
+  search,
+  setSearch,
+  reset
+}: {
+  section: "status" | "types" | "sort" | "others";
+  setSection: (section: "status" | "types" | "sort" | "others") => void;
+  statusFilter: string;
+  setStatusFilter: (value: string) => void;
+  search: string;
+  setSearch: (value: string) => void;
+  reset: () => void;
+}) {
+  const sections = [
+    { key: "status", label: "Shift Status" },
+    { key: "types", label: "Shift Types" },
+    { key: "sort", label: "Sort By" },
+    { key: "others", label: "Others" }
+  ] as const;
+  const filteredStatuses = rosterStatusFilters.filter((item) => item.label.toLowerCase().includes(search.trim().toLowerCase()));
+
+  return (
+    <div className="absolute left-0 top-full z-40 mt-3 grid w-[min(34rem,calc(100vw-2rem))] grid-cols-[150px_1fr] overflow-hidden rounded border border-slate-200 bg-white text-sm shadow-2xl">
+      <span className="absolute left-8 top-[-7px] h-3 w-3 rotate-45 border-l border-t border-slate-200 bg-white" />
+      <div className="grid content-start gap-1 border-r border-slate-200 bg-slate-50 py-3">
+        {sections.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => setSection(item.key)}
+            className={`px-4 py-2 text-right font-medium ${section === item.key ? "text-[#354aa3]" : "text-slate-600 hover:text-ink"}`}
+          >
+            {item.label}
+          </button>
+        ))}
+        <button type="button" onClick={reset} className="mx-3 mt-8 rounded border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+          Reset Filters
+        </button>
+      </div>
+      <div className="min-h-[280px] p-4">
+        {section === "status" ? (
+          <div>
+            <label className="mb-3 flex items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+              <Search className="h-4 w-4 text-slate-400" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full bg-transparent outline-none placeholder:text-slate-400" placeholder="Search Shift Status..." />
+            </label>
+            <div className="grid gap-1">
+              {filteredStatuses.map((item) => {
+                const active = statusFilter === item.value;
+                return (
+                  <button key={item.value} type="button" onClick={() => setStatusFilter(item.value)} className="flex items-center gap-3 rounded px-2 py-2 text-left text-slate-700 hover:bg-slate-50">
+                    <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${item.colour}`}>
+                      {item.label === "Approved" ? <CheckCircle2 className="h-4 w-4 text-white" /> : item.label === "Rejected" ? <X className="h-3 w-3 text-white" /> : null}
+                    </span>
+                    <span className={`flex-1 ${active ? "font-semibold text-[#354aa3]" : ""}`}>{item.label}</span>
+                    {active ? <CheckCircle2 className="h-5 w-5 text-[#354aa3]" /> : null}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+        {section === "types" ? <FilterHint title="Shift Types" message="Shift type filtering can be connected once service type records are saved with shifts." /> : null}
+        {section === "sort" ? <FilterHint title="Sort By" message="Current roster is sorted by staff and calendar date." /> : null}
+        {section === "others" ? <FilterHint title="Others" message="Use the staff search box for participant, staff, location, and status keywords." /> : null}
+      </div>
+    </div>
+  );
+}
+
+function FilterHint({ title, message }: { title: string; message: string }) {
+  return (
+    <div className="rounded border border-dashed border-slate-300 bg-slate-50 p-4">
+      <p className="font-semibold text-ink">{title}</p>
+      <p className="mt-2 leading-6 text-slate-600">{message}</p>
+    </div>
   );
 }
 
