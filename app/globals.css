@@ -29,13 +29,13 @@ textarea {
   font: inherit;
 }
 
-label:has(input[required], select[required], textarea[required]) > span:first-child::after {
+.field-label-required::after {
   content: " *";
   color: #d65452;
   font-weight: 700;
 }
 
-label:has(input:not([type="checkbox"]):not([type="radio"]), select, textarea):not(:has(input[required], select[required], textarea[required])) > span:first-child::after {
+.field-label-optional::after {
   content: " Optional";
   color: #94a3b8;
   font-size: 0.72rem;
