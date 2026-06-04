@@ -1177,6 +1177,11 @@ export function RosteringPage() {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRecord[]>([]);
   const [notice, setNotice] = useState("Loading scheduler records from Supabase.");
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingShift, setEditingShift] = useState<ShiftRecord | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const filteredShifts = useMemo(() => filterRosterShifts(shifts, searchTerm, statusFilter), [shifts, searchTerm, statusFilter]);
 
   const refresh = useCallback(async () => {
     const [loadedShifts, loadedParticipants, loadedWorkers, loadedAvailability, loadedLeave] = await Promise.all([loadShifts(), loadParticipants(), loadWorkers(), loadWorkerAvailability(), loadWorkerLeave()]);
@@ -1195,15 +1200,15 @@ export function RosteringPage() {
   async function submit(form: FormData) {
     const start = get(form, "start");
     const end = get(form, "end");
-    const workerName = get(form, "worker");
+    const workerEmail = get(form, "workerEmail").toLowerCase();
     const participantName = get(form, "participant");
-    const worker = workers.find((item) => item.name === workerName);
+    const worker = workers.find((item) => item.email.toLowerCase() === workerEmail);
     const ok = await postJson(
       "/api/shifts",
       {
         participant_name: participantName,
-        support_worker_name: workerName,
-        support_worker_email: worker?.email ?? "",
+        support_worker_name: worker?.name ?? "",
+        support_worker_email: worker?.email ?? workerEmail,
         location: get(form, "location"),
         starts_at: start,
         ends_at: end,
@@ -1221,12 +1226,50 @@ export function RosteringPage() {
     setCreateOpen(false);
   }
 
+  async function updateShift(form: FormData) {
+    if (!editingShift) return;
+    const workerEmail = get(form, "workerEmail").toLowerCase();
+    const worker = workers.find((item) => item.email.toLowerCase() === workerEmail);
+    const ok = await patchJson(
+      "/api/shifts",
+      {
+        id: editingShift.id,
+        participant_name: get(form, "participant"),
+        support_worker_name: worker?.name ?? "",
+        support_worker_email: worker?.email ?? workerEmail,
+        location: get(form, "location"),
+        starts_at: get(form, "start"),
+        ends_at: get(form, "end"),
+        status: get(form, "status"),
+        allowed_latitude: get(form, "allowedLatitude"),
+        allowed_longitude: get(form, "allowedLongitude"),
+        allowed_radius_m: get(form, "allowedRadius")
+      },
+      setNotice
+    );
+    if (ok) {
+      await refresh();
+      setEditingShift(null);
+    }
+  }
+
   return (
     <AppShell title="Rostering / Shifts" eyebrow={notice}>
-      <SchedulerGrid shifts={shifts} workers={workers} onAddShift={() => setCreateOpen(true)} />
+      <SchedulerGrid
+        shifts={filteredShifts}
+        allShifts={shifts}
+        workers={workers}
+        searchTerm={searchTerm}
+        statusFilter={statusFilter}
+        onSearchChange={setSearchTerm}
+        onStatusFilterChange={setStatusFilter}
+        onAddShift={() => setCreateOpen(true)}
+        onEditShift={setEditingShift}
+      />
       <LeaveManagementPanel leaveRequests={leaveRequests} workers={workers} setNotice={setNotice} onSaved={refresh} />
       <RecurringSeriesPanel shifts={shifts} setNotice={setNotice} onSaved={refresh} />
       {createOpen ? <ShiftCreateModal participants={participants} workers={workers} availability={availability} leaveRequests={leaveRequests} onClose={() => setCreateOpen(false)} onSubmit={submit} /> : null}
+      {editingShift ? <ShiftCreateModal participants={participants} workers={workers} availability={availability} leaveRequests={leaveRequests} initialShift={editingShift} onClose={() => setEditingShift(null)} onSubmit={updateShift} /> : null}
     </AppShell>
   );
 }
@@ -2520,8 +2563,33 @@ function ShiftTable({ title, shifts, emptyMessage, renderActions }: { title: str
   );
 }
 
-function SchedulerGrid({ shifts, workers, onAddShift }: { shifts: ShiftRecord[]; workers: WorkerRecord[]; onAddShift: () => void }) {
+function SchedulerGrid({
+  shifts,
+  allShifts,
+  workers,
+  searchTerm,
+  statusFilter,
+  onSearchChange,
+  onStatusFilterChange,
+  onAddShift,
+  onEditShift
+}: {
+  shifts: ShiftRecord[];
+  allShifts: ShiftRecord[];
+  workers: WorkerRecord[];
+  searchTerm: string;
+  statusFilter: string;
+  onSearchChange: (value: string) => void;
+  onStatusFilterChange: (value: string) => void;
+  onAddShift: () => void;
+  onEditShift: (shift: ShiftRecord) => void;
+}) {
   const days = weekDays();
+  const visibleWorkers = workers.filter((worker) => {
+    if (!searchTerm.trim()) return true;
+    const term = normaliseRosterText(searchTerm);
+    return normaliseRosterText(`${worker.name} ${worker.email}`).includes(term) || shifts.some((shift) => shiftBelongsToWorker(shift, worker) && shiftMatchesSearch(shift, term));
+  });
 
   return (
     <section className="overflow-hidden rounded border border-slate-200 bg-white shadow-sm">
@@ -2544,6 +2612,11 @@ function SchedulerGrid({ shifts, workers, onAddShift }: { shifts: ShiftRecord[];
           <h2 className="ml-1 text-xl font-semibold text-ink">{monthYear()}</h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <select value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value)} className="rounded border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 outline-none hover:bg-slate-50 focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15">
+            <option value="all">All statuses</option>
+            {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
+            <option value="unfilled">Unfilled</option>
+          </select>
           <button className="rounded border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Weekly</button>
           <button onClick={onAddShift} className="inline-flex items-center gap-2 rounded bg-[#354aa3] px-4 py-2 text-sm font-semibold text-white hover:bg-[#283a82]">
             <Plus className="h-4 w-4" />
@@ -2561,14 +2634,15 @@ function SchedulerGrid({ shifts, workers, onAddShift }: { shifts: ShiftRecord[];
             <div className="border-b border-slate-200 p-3">
               <label className="flex items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
                 <Search className="h-4 w-4 text-slate-400" />
-                <input className="w-full bg-transparent outline-none placeholder:text-slate-400" placeholder="Search by team, staff or client ..." />
+                <input value={searchTerm} onChange={(event) => onSearchChange(event.target.value)} className="w-full bg-transparent outline-none placeholder:text-slate-400" placeholder="Search by team, staff or client ..." />
               </label>
             </div>
-            <VacantShiftRow shifts={shifts} />
-            {workers.map((worker) => {
-              const workerHours = shifts.filter((shift) => shift.worker === worker.name).length * 4;
+            <VacantShiftRow shifts={allShifts} />
+            {visibleWorkers.map((worker) => {
+              const workerHours = shifts.filter((shift) => shiftBelongsToWorker(shift, worker)).reduce((sum, shift) => sum + shiftDurationHours(shift), 0);
               return <StaffScheduleRow key={worker.email || worker.name} worker={worker} hours={workerHours} />;
             })}
+            {!visibleWorkers.length ? <div className="p-4"><EmptyWorkerState title="No matching staff" message="Try another staff, participant, location, or status filter." /></div> : null}
           </div>
 
           <div className="overflow-x-auto scrollbar-subtle">
@@ -2579,8 +2653,8 @@ function SchedulerGrid({ shifts, workers, onAddShift }: { shifts: ShiftRecord[];
                   <p className="font-semibold text-ink">{day.date}</p>
                 </div>
               ))}
-              {workers.map((worker) => (
-                <ScheduleRow key={worker.email || worker.name} worker={worker} shifts={shifts} />
+              {visibleWorkers.map((worker) => (
+                <ScheduleRow key={worker.email || worker.name} worker={worker} shifts={shifts} onEditShift={onEditShift} />
               ))}
             </div>
           </div>
@@ -2594,23 +2668,25 @@ function SchedulerGrid({ shifts, workers, onAddShift }: { shifts: ShiftRecord[];
   );
 }
 
-function ScheduleRow({ worker, shifts }: { worker: WorkerRecord; shifts: ShiftRecord[] }) {
+function ScheduleRow({ worker, shifts, onEditShift }: { worker: WorkerRecord; shifts: ShiftRecord[]; onEditShift: (shift: ShiftRecord) => void }) {
   const days = weekDays();
-  const workerShifts = shifts.filter((shift) => shift.worker === worker.name);
+  const workerShifts = shifts.filter((shift) => shiftBelongsToWorker(shift, worker));
   return (
     <>
       {days.map((day, dayIndex) => {
-        const shift = workerShifts.find((item) => dateKey(item.startsAt) === day.key);
+        const dayShifts = workerShifts.filter((item) => dateKey(item.startsAt) === day.key);
         return (
           <div key={`${worker.email || worker.name}-${dayIndex}`} className={`min-h-[102px] border-b border-r border-slate-200 p-2 ${dayIndex === 0 ? "bg-banksia/15" : "bg-white"}`}>
-            {shift ? (
-              <div className="border-l-4 border-gumleaf bg-slate-50 px-2 py-2 text-xs shadow-sm">
-                <div className="mb-1 h-1 rounded-full bg-slate-400" />
-                <p className="font-semibold text-slate-600">{shift.time}</p>
-                <p className="mt-1 truncate font-semibold text-ink">{shift.participantName || shift.participant}</p>
-                <p className="mt-1 truncate text-slate-500">{shift.location}</p>
-              </div>
-            ) : null}
+            <div className="grid gap-2">
+              {dayShifts.map((shift) => (
+                <button key={shift.id} type="button" onClick={() => onEditShift(shift)} className="border-l-4 border-gumleaf bg-slate-50 px-2 py-2 text-left text-xs shadow-sm hover:bg-gumleaf/5">
+                  <div className="mb-1 h-1 rounded-full bg-slate-400" />
+                  <p className="font-semibold text-slate-600">{shift.time}</p>
+                  <p className="mt-1 truncate font-semibold text-ink">{shift.participantName || shift.participant}</p>
+                  <p className="mt-1 truncate text-slate-500">{shift.location || "No location"}</p>
+                </button>
+              ))}
+            </div>
           </div>
         );
       })}
@@ -2718,7 +2794,9 @@ function LeaveManagementPanel({ leaveRequests, workers, setNotice, onSaved }: { 
 }
 
 function VacantShiftRow({ shifts }: { shifts: ShiftRecord[] }) {
-  const vacant = shifts.filter((shift) => !shift.worker || shift.status.toLowerCase() === "unfilled").length;
+  const vacant = shifts.filter((shift) => !shift.workerEmail && !shift.worker).length;
+  if (!vacant) return null;
+
   return (
     <div className="flex min-h-[102px] items-center gap-3 border-b border-slate-200 px-3 py-4">
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-coral text-sm font-semibold text-white">VS</span>
@@ -2728,6 +2806,46 @@ function VacantShiftRow({ shifts }: { shifts: ShiftRecord[] }) {
       </div>
     </div>
   );
+}
+
+function filterRosterShifts(shifts: ShiftRecord[], searchTerm: string, statusFilter: string) {
+  const term = normaliseRosterText(searchTerm);
+  return shifts.filter((shift) => {
+    const status = normaliseRosterText(shift.status);
+    const statusOk = statusFilter === "all" || status === normaliseRosterText(statusFilter) || (statusFilter === "unfilled" && !shift.workerEmail && !shift.worker);
+    const searchOk = !term || shiftMatchesSearch(shift, term);
+    return statusOk && searchOk;
+  });
+}
+
+function shiftMatchesSearch(shift: ShiftRecord, normalisedTerm: string) {
+  return normaliseRosterText(`${shift.participantName} ${shift.participant} ${shift.worker} ${shift.workerEmail} ${shift.location} ${shift.status}`).includes(normalisedTerm);
+}
+
+function shiftBelongsToWorker(shift: ShiftRecord, worker: WorkerRecord) {
+  const shiftEmail = normaliseRosterText(shift.workerEmail);
+  const workerEmail = normaliseRosterText(worker.email);
+  if (shiftEmail && workerEmail) return shiftEmail === workerEmail;
+  return normaliseRosterText(shift.worker) === normaliseRosterText(worker.name);
+}
+
+function normaliseRosterText(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function shiftDurationHours(shift: ShiftRecord) {
+  const start = shift.startsAt ? new Date(shift.startsAt) : null;
+  const end = shift.endsAt ? new Date(shift.endsAt) : null;
+  if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return 0;
+  return Math.round(((end.getTime() - start.getTime()) / 3600000) * 100) / 100;
+}
+
+function toDateTimeLocalValue(value: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 16);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
 }
 
 function RecurringSeriesPanel({ shifts, setNotice, onSaved }: { shifts: ShiftRecord[]; setNotice: (message: string) => void; onSaved: () => Promise<void> }) {
@@ -2829,6 +2947,7 @@ function ShiftCreateModal({
   workers,
   availability,
   leaveRequests,
+  initialShift,
   onClose,
   onSubmit
 }: {
@@ -2836,14 +2955,16 @@ function ShiftCreateModal({
   workers: WorkerRecord[];
   availability: AvailabilityRecord[];
   leaveRequests: LeaveRecord[];
+  initialShift?: ShiftRecord;
   onClose: () => void;
   onSubmit: (form: FormData) => Promise<void>;
 }) {
-  const [selectedWorker, setSelectedWorker] = useState(workers[0]?.name ?? "");
-  const [startValue, setStartValue] = useState("");
-  const [endValue, setEndValue] = useState("");
+  const initialWorkerEmail = initialShift?.workerEmail || workers.find((worker) => normaliseRosterText(worker.name) === normaliseRosterText(initialShift?.worker ?? ""))?.email || workers[0]?.email || "";
+  const [selectedWorkerEmail, setSelectedWorkerEmail] = useState(initialWorkerEmail);
+  const [startValue, setStartValue] = useState(toDateTimeLocalValue(initialShift?.startsAt ?? ""));
+  const [endValue, setEndValue] = useState(toDateTimeLocalValue(initialShift?.endsAt ?? ""));
   const canCreate = participants.length > 0 && workers.length > 0;
-  const selectedWorkerEmail = workers.find((worker) => worker.name === selectedWorker)?.email ?? "";
+  const selectedWorker = workers.find((worker) => worker.email.toLowerCase() === selectedWorkerEmail.toLowerCase());
   const workerAvailability = availability
     .filter((slot) => slot.workerEmail.toLowerCase() === selectedWorkerEmail.toLowerCase())
     .slice(0, 6);
@@ -2862,7 +2983,7 @@ function ShiftCreateModal({
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-gumleaf">Weekly scheduler</p>
-            <h2 id="create-shift-title" className="text-xl font-semibold text-ink">Create shift</h2>
+            <h2 id="create-shift-title" className="text-xl font-semibold text-ink">{initialShift ? "Edit shift" : "Create shift"}</h2>
           </div>
           <button onClick={onClose} className="rounded border border-slate-200 p-2 text-slate-500 hover:bg-slate-50" aria-label="Close create shift">
             <X className="h-4 w-4" />
@@ -2870,26 +2991,26 @@ function ShiftCreateModal({
         </div>
         <div className="p-5">
           {canCreate ? (
-            <RecordForm submitLabel="Save shift" onSubmit={onSubmit}>
-              <Select name="participant" label="Participant" options={participants.map((participant) => participant.name)} />
+            <RecordForm submitLabel={initialShift ? "Update shift" : "Save shift"} onSubmit={onSubmit}>
+              <Select name="participant" label="Participant" options={participants.map((participant) => participant.name)} defaultValue={initialShift?.participantName ?? ""} />
               <label>
                 <span className="mb-2 block text-sm font-medium text-slate-700">Assign support worker</span>
                 <select
-                  name="worker"
+                  name="workerEmail"
                   required
-                  value={selectedWorker}
-                  onChange={(event) => setSelectedWorker(event.target.value)}
+                  value={selectedWorkerEmail}
+                  onChange={(event) => setSelectedWorkerEmail(event.target.value)}
                   className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15"
                 >
                   {workers.map((worker) => (
-                    <option key={worker.email || worker.name}>{worker.name}</option>
+                    <option key={worker.email || worker.name} value={worker.email}>{worker.name}</option>
                   ))}
                 </select>
               </label>
               <div className="rounded border border-slate-200 bg-slate-50 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-ink">Submitted availability</p>
-                  <span className="text-xs text-slate-500">{selectedWorker || "Select worker"}</span>
+                  <span className="text-xs text-slate-500">{selectedWorker?.name || "Select worker"}</span>
                 </div>
                 <p className="mt-1 text-xs text-slate-500">Unavailable periods are enforced when saving single or recurring shifts.</p>
                 {workerAvailability.length ? (
@@ -2928,14 +3049,14 @@ function ShiftCreateModal({
                   </div>
                 ) : null}
               </div>
-              <Field name="location" label="Location" placeholder="Shift location" />
+              <Field name="location" label="Location" placeholder="Shift location" defaultValue={initialShift?.location ?? ""} />
               <div className="rounded border border-slate-200 bg-white p-3">
                 <p className="text-sm font-semibold text-ink">GPS clock-in geofence</p>
                 <p className="mt-1 text-xs text-slate-500">Enter the allowed shift location coordinates. Workers outside this radius cannot clock in.</p>
                 <div className="mt-3 grid gap-4 sm:grid-cols-3">
-                  <Field name="allowedLatitude" label="Allowed latitude" type="number" placeholder="-33.8688" step="any" />
-                  <Field name="allowedLongitude" label="Allowed longitude" type="number" placeholder="151.2093" step="any" />
-                  <Field name="allowedRadius" label="Radius metres" type="number" defaultValue="250" placeholder="250" min="25" max="5000" />
+                  <Field name="allowedLatitude" label="Allowed latitude" type="number" placeholder="-33.8688" step="any" defaultValue={initialShift?.allowedLatitude ?? ""} />
+                  <Field name="allowedLongitude" label="Allowed longitude" type="number" placeholder="151.2093" step="any" defaultValue={initialShift?.allowedLongitude ?? ""} />
+                  <Field name="allowedRadius" label="Radius metres" type="number" defaultValue={String(initialShift?.allowedRadiusM || "250")} placeholder="250" min="25" max="5000" />
                 </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -2948,7 +3069,7 @@ function ShiftCreateModal({
                   <input name="end" type="datetime-local" required value={endValue} onChange={(event) => setEndValue(event.target.value)} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
                 </label>
               </div>
-              <div className="rounded border border-slate-200 bg-slate-50 p-3">
+              {!initialShift ? <div className="rounded border border-slate-200 bg-slate-50 p-3">
                 <p className="text-sm font-semibold text-ink">Recurring schedule</p>
                 <p className="mt-1 text-xs text-slate-500">Create daily, weekly, fortnightly, or custom repeating shifts from the selected start/end time.</p>
                 <div className="mt-3 grid gap-4 sm:grid-cols-3">
@@ -2956,8 +3077,8 @@ function ShiftCreateModal({
                   <Field name="recurrenceCount" label="Number of shifts" type="number" defaultValue="1" min="1" max="60" />
                   <Field name="customIntervalDays" label="Custom interval days" type="number" defaultValue="7" min="1" max="365" />
                 </div>
-              </div>
-              <Select name="status" label="Shift status" options={statuses} />
+              </div> : null}
+              <Select name="status" label="Shift status" options={statuses} defaultValue={initialShift?.status || "Draft"} />
             </RecordForm>
           ) : (
             <EmptyWorkerState title="Participant and worker records required" message="Create at least one participant and one support worker before adding a shift." />

@@ -159,6 +159,81 @@ export async function POST(request: Request) {
   return NextResponse.json({ message: rows.length > 1 ? `${rows.length} recurring shifts saved and notifications recorded.` : "Shift saved and notifications recorded.", id: firstShiftId, seriesId });
 }
 
+export async function PATCH(request: Request) {
+  const auth = await requireApiUser(request);
+  if ("response" in auth) return auth.response;
+  if (!requireRole(auth.user, ["admin", "team_leader"])) {
+    return NextResponse.json({ message: "Only admin or team leader users can update shifts." }, { status: 403 });
+  }
+
+  const body = await request.json();
+  const id = String(body.id ?? "").trim();
+  const participantName = String(body.participant_name ?? "").trim();
+  const workerName = String(body.support_worker_name ?? "").trim();
+  const workerEmail = String(body.support_worker_email ?? "").trim().toLowerCase();
+  const startsAt = String(body.starts_at ?? "").trim();
+  const endsAt = String(body.ends_at ?? "").trim();
+  const location = String(body.location ?? "").trim();
+  const status = String(body.status ?? "Draft").trim() || "Draft";
+  const allowedLatitude = Number(body.allowed_latitude);
+  const allowedLongitude = Number(body.allowed_longitude);
+  const allowedRadiusM = Number(body.allowed_radius_m ?? 250);
+
+  if (!id || !participantName || !workerName || !workerEmail || !startsAt || !endsAt) {
+    return NextResponse.json({ message: "Shift, participant, support worker, worker email, start time, and end time are required." }, { status: 400 });
+  }
+  if (!isValidLatitude(allowedLatitude) || !isValidLongitude(allowedLongitude) || !isValidRadius(allowedRadiusM)) {
+    return NextResponse.json({ message: "Valid GPS latitude, longitude, and an allowed radius between 25 and 5000 metres are required." }, { status: 400 });
+  }
+  const startDate = new Date(startsAt);
+  const endDate = new Date(endsAt);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate <= startDate) {
+    return NextResponse.json({ message: "Start and end time must be valid, and end time must be after start time." }, { status: 400 });
+  }
+
+  const { data: participantBranch } = await auth.client
+    .from("participants")
+    .select("branch_id")
+    .eq("name", participantName)
+    .maybeSingle();
+
+  const update = {
+    branch_id: String(participantBranch?.branch_id ?? "") || null,
+    participant_name: participantName,
+    support_worker_name: workerName,
+    support_worker_email: workerEmail,
+    location,
+    starts_at: startDate.toISOString(),
+    ends_at: endDate.toISOString(),
+    status,
+    allowed_latitude: allowedLatitude,
+    allowed_longitude: allowedLongitude,
+    allowed_radius_m: Math.round(allowedRadiusM)
+  };
+
+  const { data: shift, error } = await auth.client
+    .from("shifts")
+    .update(update)
+    .eq("id", id)
+    .select("id")
+    .single();
+  if (error) return NextResponse.json({ message: error.message }, { status: 400 });
+
+  await recordServerAudit(auth.client, {
+    userId: auth.user.id,
+    userEmail: auth.user.email,
+    userName: auth.user.name,
+    userRole: auth.user.role,
+    action: "shift_update",
+    tableName: "shifts",
+    recordId: shift.id,
+    recordLabel: `${participantName} shift`,
+    metadata: { participantName, workerName, workerEmail, startsAt, endsAt, status, location }
+  });
+
+  return NextResponse.json({ message: "Shift updated.", id: shift.id });
+}
+
 function isValidLatitude(value: number) {
   return Number.isFinite(value) && value >= -90 && value <= 90;
 }
