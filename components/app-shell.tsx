@@ -416,7 +416,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
           </div>
         </aside>
 
-        <div className="flex-1">
+        <div className="flex min-h-screen flex-1 flex-col">
           <header className="sticky top-[65px] z-10 border-b border-slate-200 bg-slate-50/90 px-4 py-4 backdrop-blur lg:top-0 lg:px-8">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div>
@@ -532,7 +532,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
             </div>
           </header>
 
-          <div className="px-4 py-6 lg:px-8">{children}</div>
+          <div className="flex-1 px-4 py-6 lg:px-8">{children}</div>
           <CopyrightFooter />
         </div>
       </section>
