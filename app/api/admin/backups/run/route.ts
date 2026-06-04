@@ -26,6 +26,7 @@ const backupTables = [
   "module_records",
   "invoices",
   "invoice_items",
+  "payroll_exports",
   "care_plans",
   "medication_records",
   "medication_events",

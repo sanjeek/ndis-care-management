@@ -667,6 +667,29 @@ create table if not exists public.invoice_items (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.payroll_exports (
+  id uuid primary key default gen_random_uuid(),
+  export_number text not null unique,
+  period_start date not null,
+  period_end date not null,
+  generated_by uuid references auth.users(id) on delete set null,
+  generated_by_email text,
+  generated_by_name text,
+  status text not null default 'generated',
+  shift_count integer not null default 0,
+  worker_count integer not null default 0,
+  total_hours numeric not null default 0,
+  regular_hours numeric not null default 0,
+  overtime_hours numeric not null default 0,
+  travel_km numeric not null default 0,
+  travel_amount numeric not null default 0,
+  payroll_amount numeric not null default 0,
+  exported_shift_ids uuid[] not null default '{}'::uuid[],
+  csv_text text not null default '',
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
 alter table public.invoices
 add column if not exists branch_id uuid references public.organisation_branches(id) on delete set null;
 
@@ -969,6 +992,7 @@ alter table public.medication_events enable row level security;
 alter table public.ndis_funding_records enable row level security;
 alter table public.invoices enable row level security;
 alter table public.invoice_items enable row level security;
+alter table public.payroll_exports enable row level security;
 alter table public.service_agreements enable row level security;
 alter table public.care_documents enable row level security;
 alter table public.audit_logs enable row level security;
@@ -1004,6 +1028,7 @@ alter table public.medication_events force row level security;
 alter table public.ndis_funding_records force row level security;
 alter table public.invoices force row level security;
 alter table public.invoice_items force row level security;
+alter table public.payroll_exports force row level security;
 alter table public.service_agreements force row level security;
 alter table public.care_documents force row level security;
 alter table public.audit_logs force row level security;
@@ -1132,6 +1157,8 @@ drop policy if exists "Admins can manage invoices" on public.invoices;
 drop policy if exists "Team leaders can read invoices" on public.invoices;
 drop policy if exists "Admins can manage invoice items" on public.invoice_items;
 drop policy if exists "Team leaders can read invoice items" on public.invoice_items;
+drop policy if exists "Admins can manage payroll exports" on public.payroll_exports;
+drop policy if exists "Team leaders can read payroll exports" on public.payroll_exports;
 drop policy if exists "Admins can manage service agreements" on public.service_agreements;
 drop policy if exists "Team leaders can read service agreements" on public.service_agreements;
 drop policy if exists "Admins can manage care documents" on public.care_documents;
@@ -1801,6 +1828,17 @@ with check (public.is_admin());
 
 create policy "Team leaders can read invoice items"
 on public.invoice_items for select
+to authenticated
+using (public.is_team_leader());
+
+create policy "Admins can manage payroll exports"
+on public.payroll_exports for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create policy "Team leaders can read payroll exports"
+on public.payroll_exports for select
 to authenticated
 using (public.is_team_leader());
 

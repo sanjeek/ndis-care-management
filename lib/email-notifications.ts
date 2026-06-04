@@ -11,7 +11,8 @@ export type EmailNotificationType =
   | "shift_change"
   | "shift_cancellation"
   | "shift_reminder"
-  | "missed_clock_in";
+  | "missed_clock_in"
+  | "payroll_export";
 
 type EmailInput = {
   type: EmailNotificationType;
