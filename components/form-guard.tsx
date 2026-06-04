@@ -16,7 +16,23 @@ function shouldSkipOptionalMarker(control: HTMLInputElement | HTMLSelectElement 
 function firstLabelText(label: HTMLLabelElement) {
   const directSpan = Array.from(label.children).find((child) => child.tagName.toLowerCase() === "span");
   if (directSpan instanceof HTMLElement) return directSpan;
-  return label.querySelector<HTMLElement>("span");
+
+  const nestedSpan = label.querySelector<HTMLElement>("span");
+  if (nestedSpan) return nestedSpan;
+
+  const generatedSpan = label.querySelector<HTMLElement>("[data-field-label-generated='true']");
+  if (generatedSpan) return generatedSpan;
+
+  const textNode = Array.from(label.childNodes).find((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim());
+  if (!textNode?.textContent) return null;
+
+  const labelText = document.createElement("span");
+  labelText.dataset.fieldLabelGenerated = "true";
+  labelText.className = "mb-2 block text-sm font-medium text-slate-700";
+  labelText.textContent = textNode.textContent.trim();
+  textNode.textContent = " ";
+  label.insertBefore(labelText, textNode);
+  return labelText;
 }
 
 function updateFieldLabels(root: ParentNode = document) {
