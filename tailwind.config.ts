@@ -6,13 +6,13 @@ const config: Config = {
     extend: {
       colors: {
         ink: "#172033",
-        gumleaf: "#4f46e5",
-        banksia: "#c88728",
+        gumleaf: "#4b5fe8",
+        banksia: "#b7791f",
         coral: "#d65452",
-        harbour: "#2563eb"
+        harbour: "#0e8fb4"
       },
       boxShadow: {
-        panel: "0 18px 45px rgba(37, 99, 235, 0.10)"
+        panel: "0 14px 34px rgba(75, 95, 232, 0.055)"
       }
     }
   },

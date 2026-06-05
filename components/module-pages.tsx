@@ -446,11 +446,11 @@ function AlertsPanel({ alerts }: { alerts: Array<{ title: string; message: strin
 
 function ShiftOverviewChart({ shifts }: { shifts: ShiftRecord[] }) {
   const rows = [
-    { label: "Confirmed", count: shifts.filter((shift) => shift.status.toLowerCase() === "confirmed").length, tone: "bg-gumleaf" },
-    { label: "In progress", count: shifts.filter((shift) => shift.status.toLowerCase() === "in progress").length, tone: "bg-harbour" },
-    { label: "Completed", count: shifts.filter((shift) => ["completed", "approved for payroll"].includes(shift.status.toLowerCase())).length, tone: "bg-[#22c55e]" },
-    { label: "Unfilled", count: shifts.filter((shift) => isUnfilledShift(shift)).length, tone: "bg-coral" },
-    { label: "Cancelled", count: shifts.filter((shift) => shift.status.toLowerCase() === "cancelled").length, tone: "bg-slate-400" }
+    { label: "Confirmed", count: shifts.filter((shift) => shift.status.toLowerCase() === "confirmed").length, tone: "bg-indigo-300" },
+    { label: "In progress", count: shifts.filter((shift) => shift.status.toLowerCase() === "in progress").length, tone: "bg-sky-300" },
+    { label: "Completed", count: shifts.filter((shift) => ["completed", "approved for payroll"].includes(shift.status.toLowerCase())).length, tone: "bg-emerald-300" },
+    { label: "Unfilled", count: shifts.filter((shift) => isUnfilledShift(shift)).length, tone: "bg-rose-300" },
+    { label: "Cancelled", count: shifts.filter((shift) => shift.status.toLowerCase() === "cancelled").length, tone: "bg-slate-300" }
   ];
   const max = Math.max(1, ...rows.map((row) => row.count));
 
@@ -463,7 +463,7 @@ function ShiftOverviewChart({ shifts }: { shifts: ShiftRecord[] }) {
               <span className="font-semibold text-slate-700">{row.label}</span>
               <span className="text-slate-500">{row.count}</span>
             </div>
-            <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-3 overflow-hidden rounded-full bg-indigo-50">
               <div className={`h-full rounded-full ${row.tone}`} style={{ width: `${Math.max(4, (row.count / max) * 100)}%` }} />
             </div>
           </div>
@@ -479,7 +479,7 @@ function UpcomingPlanReviews({ reviews }: { reviews: DashboardPlanReview[] }) {
       {reviews.length ? (
         <div className="grid gap-3">
           {reviews.map((review) => (
-            <Link key={review.id} href="/care-plans" className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm hover:bg-white hover:shadow-sm">
+            <Link key={review.id} href="/care-plans" className="rounded-lg border border-indigo-100 bg-indigo-50/35 p-3 text-sm hover:bg-white hover:shadow-sm">
               <p className="font-semibold text-ink">{review.participantName}</p>
               <p className="mt-1 text-slate-600">{review.title || "Care plan review"}</p>
               <span className="mt-2 inline-flex rounded bg-harbour/10 px-2.5 py-1 text-xs font-semibold text-harbour">{dateOnly(review.reviewDate)}</span>
@@ -499,7 +499,7 @@ function ComplianceExpiry({ alerts }: { alerts: DashboardComplianceAlert[] }) {
       {alerts.length ? (
         <div className="grid gap-3">
           {alerts.map((alert) => (
-            <Link key={`${alert.worker}-${alert.label}`} href="/support-workers" className={`rounded-lg border p-3 text-sm hover:shadow-sm ${alert.status === "expired" ? "border-coral/25 bg-coral/5" : "border-banksia/30 bg-banksia/10"}`}>
+            <Link key={`${alert.worker}-${alert.label}`} href="/support-workers" className={`rounded-lg border p-3 text-sm hover:shadow-sm ${alert.status === "expired" ? "border-rose-200 bg-rose-50/65" : "border-amber-200 bg-amber-50/70"}`}>
               <p className="font-semibold text-ink">{alert.worker}</p>
               <p className="mt-1 text-slate-600">{alert.label}: {alert.message}</p>
             </Link>
@@ -518,7 +518,7 @@ function RecentActivityList({ activities }: { activities: DashboardActivity[] })
       {activities.length ? (
         <div className="grid gap-3">
           {activities.map((activity) => (
-            <div key={activity.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+            <div key={activity.id} className="rounded-lg border border-indigo-100 bg-indigo-50/35 p-3 text-sm">
               <p className="font-semibold text-ink">{friendlyActivity(activity.action)}</p>
               <p className="mt-1 text-slate-600">{activity.label || "Record updated"}</p>
               <p className="mt-2 text-xs text-slate-500">{activity.actor || "CareOS"} | {dateTimeOrFallback(activity.createdAt)}</p>
@@ -534,10 +534,10 @@ function RecentActivityList({ activities }: { activities: DashboardActivity[] })
 
 function DashboardPanel({ title, icon: Icon, children }: { title: string; icon: LucideIcon; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-panel">
+    <section className="rounded-lg border border-indigo-100/80 bg-white p-5 shadow-panel">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-ink">{title}</h2>
-        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gumleaf/10 text-gumleaf">
+        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-gumleaf ring-1 ring-indigo-100">
           <Icon className="h-5 w-5" />
         </span>
       </div>
@@ -557,10 +557,10 @@ function buildDashboardAlerts(unfilledShifts: number, pendingIncidents: number, 
 }
 
 function alertToneClass(tone: "coral" | "banksia" | "gumleaf" | "harbour") {
-  if (tone === "coral") return "border-coral/25 bg-coral/5";
-  if (tone === "banksia") return "border-banksia/35 bg-banksia/10";
-  if (tone === "harbour") return "border-harbour/25 bg-harbour/5";
-  return "border-gumleaf/25 bg-gumleaf/5";
+  if (tone === "coral") return "border-rose-200 bg-rose-50/65";
+  if (tone === "banksia") return "border-amber-200 bg-amber-50/70";
+  if (tone === "harbour") return "border-sky-200 bg-sky-50/70";
+  return "border-indigo-200 bg-indigo-50/70";
 }
 
 function isUnfilledShift(shift: ShiftRecord) {
@@ -602,13 +602,13 @@ function ManagementAnalytics({ metrics, todaysShiftCount }: { metrics: Dashboard
   ];
 
   return (
-    <section className="mt-6 rounded border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="mt-6 rounded border border-indigo-100/80 bg-white p-5 shadow-panel">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-ink">Management analytics</h2>
           <p className="mt-1 text-sm text-slate-500">Service delivery, workforce performance, risk, funding, and attendance from live records.</p>
         </div>
-        <span className="inline-flex w-fit items-center gap-2 rounded bg-gumleaf/10 px-3 py-1.5 text-xs font-semibold text-gumleaf">
+        <span className="inline-flex w-fit items-center gap-2 rounded bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-gumleaf ring-1 ring-indigo-100">
           <CalendarDays className="h-4 w-4" />
           {todaysShiftCount} today
         </span>
@@ -616,13 +616,13 @@ function ManagementAnalytics({ metrics, todaysShiftCount }: { metrics: Dashboard
       <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr_0.9fr]">
         <div className="space-y-4 lg:col-span-2">
           {rows.map((row) => (
-            <div key={row.label} className="rounded border border-slate-200 bg-slate-50 p-4">
+            <div key={row.label} className="rounded border border-indigo-100 bg-indigo-50/35 p-4">
               <div className="flex items-center justify-between gap-3 text-sm">
                 <p className="font-semibold text-ink">{row.label}</p>
                 <p className="font-semibold text-gumleaf">{row.value}%</p>
               </div>
-              <div className="mt-3 h-2 overflow-hidden rounded bg-slate-200">
-                <div className="h-full bg-gumleaf" style={{ width: `${Math.min(100, Math.max(0, row.value))}%` }} />
+              <div className="mt-3 h-2 overflow-hidden rounded bg-indigo-100/70">
+                <div className="h-full bg-indigo-300" style={{ width: `${Math.min(100, Math.max(0, row.value))}%` }} />
               </div>
               <p className="mt-2 text-sm text-slate-600">{row.detail}</p>
             </div>
@@ -641,7 +641,7 @@ function ManagementAnalytics({ metrics, todaysShiftCount }: { metrics: Dashboard
 
 function AnalyticsMini({ title, value, detail }: { title: string; value: string; detail: string }) {
   return (
-    <div className="rounded border border-slate-200 bg-slate-50 p-4">
+    <div className="rounded border border-indigo-100 bg-indigo-50/35 p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</p>
       <p className="mt-2 text-2xl font-semibold text-ink">{value}</p>
       <p className="mt-1 text-sm text-slate-600">{detail}</p>
@@ -2857,7 +2857,7 @@ function EmptyState({ title, message }: { title: string; message: string }) {
 
 function EmptyWorkerState({ title, message }: { title: string; message: string }) {
   return (
-    <div className="mt-4 rounded border border-dashed border-slate-300 bg-slate-50 p-4 text-sm">
+    <div className="mt-4 rounded border border-dashed border-indigo-100 bg-indigo-50/35 p-4 text-sm">
       <p className="font-semibold text-ink">{title}</p>
       <p className="mt-1 leading-6 text-slate-600">{message}</p>
     </div>
@@ -2875,11 +2875,11 @@ function QuickActions() {
     { label: "Create Invoice", icon: ClipboardPlus, href: "/invoices" }
   ];
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
+    <div className="rounded-lg border border-indigo-100/80 bg-white p-4 shadow-panel">
       <h2 className="font-semibold text-ink">Quick Actions</h2>
       <div className="mt-4 grid gap-3">
         {actions.map((action) => (
-          <Link key={action.label} href={action.href} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-3 text-left text-sm font-medium text-slate-700 transition hover:border-gumleaf/40 hover:bg-gumleaf/5">
+          <Link key={action.label} href={action.href} className="flex items-center justify-between rounded-lg border border-indigo-100 bg-white px-3 py-3 text-left text-sm font-medium text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50/60">
             <span className="flex items-center gap-3">
               <action.icon className="h-4 w-4 text-gumleaf" />
               {action.label}
@@ -2894,15 +2894,15 @@ function QuickActions() {
 
 function ShiftTable({ title, shifts, emptyMessage, renderActions }: { title: string; shifts: ShiftRecord[]; emptyMessage: string; renderActions?: (shift: ShiftRecord) => React.ReactNode }) {
   return (
-    <div className="rounded border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+    <div className="rounded border border-indigo-100/80 bg-white shadow-panel">
+      <div className="flex items-center justify-between border-b border-indigo-100 bg-[#fbfdff] px-4 py-3">
         <h2 className="font-semibold text-ink">{title}</h2>
         <CalendarPlus className="h-5 w-5 text-gumleaf" />
       </div>
       {shifts.length ? (
         <div className="overflow-x-auto scrollbar-subtle">
           <table className="min-w-[720px] w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <thead className="bg-indigo-50/35 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-4 py-3">Time</th>
                 <th className="px-4 py-3">Participant</th>

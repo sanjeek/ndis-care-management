@@ -9,15 +9,15 @@ type StatCardProps = {
 };
 
 const toneClasses: Record<string, string> = {
-  gumleaf: "bg-gumleaf/10 text-gumleaf",
-  harbour: "bg-harbour/10 text-harbour",
-  banksia: "bg-banksia/15 text-banksia",
-  coral: "bg-coral/10 text-coral"
+  gumleaf: "bg-indigo-50 text-gumleaf ring-1 ring-indigo-100",
+  harbour: "bg-sky-50 text-harbour ring-1 ring-sky-100",
+  banksia: "bg-amber-50 text-banksia ring-1 ring-amber-100",
+  coral: "bg-rose-50 text-coral ring-1 ring-rose-100"
 };
 
 export function StatCard({ label, value, delta, tone, icon: Icon }: StatCardProps) {
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
+    <article className="rounded-lg border border-indigo-100/80 bg-white p-4 shadow-panel">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-semibold text-slate-500">{label}</p>

@@ -340,12 +340,12 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f8fc]">
+    <main className="min-h-screen bg-[#f8fbff]">
       <section className="flex min-h-screen w-full flex-col lg:flex-row">
-        <aside className="sticky top-0 z-20 flex flex-col border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:h-screen lg:w-72 lg:border-b-0 lg:border-r lg:px-5 lg:py-5">
+        <aside className="sticky top-0 z-20 flex flex-col border-b border-indigo-100/80 bg-[#fbfdff]/95 px-4 py-3 backdrop-blur lg:h-screen lg:w-72 lg:border-b-0 lg:border-r lg:px-5 lg:py-5">
           <div className="flex items-center justify-between gap-4">
             <Link href={defaultRouteForRole(userRole)} className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-gumleaf to-harbour text-sm font-bold text-white shadow-panel">CO</span>
+              <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-sm font-bold text-gumleaf shadow-[0_8px_18px_rgba(75,95,232,0.08)]">CO</span>
               <span>
                 <span className="block text-base font-semibold text-ink">CareOS</span>
                 <span className="block text-xs text-slate-500">NDIS operations</span>
@@ -367,7 +367,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                     href={item.href}
                     onClick={() => setOpen(false)}
                     className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
-                      active ? "bg-gumleaf text-white shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-ink"
+                      active ? "border border-indigo-100 bg-indigo-50 text-gumleaf shadow-none" : "text-slate-600 hover:bg-indigo-50/70 hover:text-ink"
                     }`}
                   >
                     <item.icon className="h-4 w-4" />
@@ -384,7 +384,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                     type="button"
                     onClick={() => setOpenNavGroup(isOpen ? "" : group.label)}
                     className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition ${
-                      group.active ? "bg-gumleaf/10 text-gumleaf" : "text-slate-600 hover:bg-slate-100 hover:text-ink"
+                      group.active ? "border border-indigo-100 bg-indigo-50 text-gumleaf" : "text-slate-600 hover:bg-indigo-50/70 hover:text-ink"
                     }`}
                     aria-expanded={isOpen}
                   >
@@ -405,7 +405,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                               setOpenNavGroup(group.label);
                             }}
                             className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
-                              active ? "bg-slate-100 text-gumleaf" : "text-slate-600 hover:bg-slate-100 hover:text-ink"
+                              active ? "bg-white text-gumleaf ring-1 ring-indigo-100" : "text-slate-600 hover:bg-indigo-50/70 hover:text-ink"
                             }`}
                           >
                             <item.icon className="h-3.5 w-3.5" />
@@ -420,7 +420,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
             })}
           </nav>
 
-          <div className="mt-4 hidden rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 lg:block">
+          <div className="mt-4 hidden rounded-lg border border-indigo-100 bg-indigo-50/35 px-3 py-2.5 lg:block">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Account</p>
             <p className="mt-1 truncate text-xs font-semibold text-ink">{userName}</p>
             <p className="truncate text-[11px] text-slate-500">{userEmail}</p>
@@ -429,7 +429,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
         </aside>
 
         <div className="flex min-h-screen flex-1 flex-col">
-          <header className="sticky top-[65px] z-10 border-b border-slate-200 bg-slate-50/90 px-4 py-4 backdrop-blur lg:top-0 lg:px-8">
+          <header className="sticky top-[65px] z-10 border-b border-indigo-100/80 bg-[#fbfdff]/95 px-4 py-4 backdrop-blur lg:top-0 lg:px-8">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div>
                 <p className="text-sm font-medium text-gumleaf">{eyebrow}</p>
@@ -438,7 +438,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <div className="relative sm:w-96">
                   <form
-                    className="flex min-w-0 items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 shadow-sm"
+                    className="flex min-w-0 items-center gap-2 rounded border border-indigo-100 bg-white px-3 py-2 shadow-[0_8px_18px_rgba(15,23,42,0.035)]"
                     onSubmit={(event) => {
                       event.preventDefault();
                       if (searchResults[0]) openSearchResult(searchResults[0]);
@@ -457,7 +457,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                     />
                   </form>
                   {searchOpen && (search.trim().length > 0 || searchResults.length > 0) ? (
-                    <div className="absolute right-0 z-40 mt-2 w-[min(32rem,calc(100vw-2rem))] rounded border border-slate-200 bg-white shadow-2xl">
+                    <div className="absolute right-0 z-40 mt-2 w-[min(32rem,calc(100vw-2rem))] rounded border border-indigo-100 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.09)]">
                       <div className="border-b border-slate-200 px-4 py-3">
                         <p className="font-semibold text-ink">Global search</p>
                         <p className="text-xs text-slate-500">Results are filtered by your account permissions.</p>
@@ -489,11 +489,11 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                   ) : null}
                 </div>
                 {canAccessRoute(userRole, "/messages") ? (
-                  <Link href="/messages" className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2.5 text-slate-700 shadow-sm hover:bg-slate-50" aria-label="Open messages">
+                  <Link href="/messages" className="inline-flex items-center justify-center rounded-lg border border-indigo-100 bg-white p-2.5 text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.035)] hover:bg-indigo-50/60" aria-label="Open messages">
                     <MessageSquare className="h-4 w-4" />
                   </Link>
                 ) : null}
-                <label className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm md:flex">
+                <label className="hidden items-center gap-2 rounded-lg border border-indigo-100 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.035)] md:flex">
                   <CalendarDays className="h-4 w-4 text-gumleaf" />
                   <span className="sr-only">Selected date</span>
                   <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} className="border-0 bg-transparent p-0 text-sm font-semibold text-slate-700 outline-none" />
@@ -502,7 +502,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                   <button
                     type="button"
                     onClick={() => setNotificationsOpen(!notificationsOpen)}
-                    className="relative inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2.5 text-slate-700 shadow-sm hover:bg-slate-50"
+                    className="relative inline-flex items-center justify-center rounded-lg border border-indigo-100 bg-white p-2.5 text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.035)] hover:bg-indigo-50/60"
                     aria-label="Open notifications"
                   >
                     <Bell className="h-4 w-4" />
@@ -513,7 +513,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                     ) : null}
                   </button>
                   {notificationsOpen ? (
-                    <div className="absolute right-0 z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded border border-slate-200 bg-white shadow-2xl">
+                    <div className="absolute right-0 z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded border border-indigo-100 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.09)]">
                       <div className="border-b border-slate-200 px-4 py-3">
                         <p className="font-semibold text-ink">Notifications</p>
                         <p className="text-xs text-slate-500">{unreadCount ? `${unreadCount} unread` : "No unread notifications"}</p>
@@ -545,15 +545,15 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                   <button
                     type="button"
                     onClick={() => setProfileOpen((current) => !current)}
-                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                    className="inline-flex items-center gap-2 rounded-lg border border-indigo-100 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.035)] hover:bg-indigo-50/60"
                     aria-label="Open user profile menu"
                   >
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gumleaf text-xs font-bold text-white">{initials}</span>
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-gumleaf ring-1 ring-indigo-100">{initials}</span>
                     <span className="hidden max-w-32 truncate md:inline">{userName}</span>
                     <ChevronDown className={`h-4 w-4 text-slate-400 transition ${profileOpen ? "rotate-180" : ""}`} />
                   </button>
                   {profileOpen ? (
-                    <div className="absolute right-0 z-30 mt-2 w-72 rounded-lg border border-slate-200 bg-white p-2 shadow-2xl">
+                    <div className="absolute right-0 z-30 mt-2 w-72 rounded-lg border border-indigo-100 bg-white p-2 shadow-[0_18px_44px_rgba(15,23,42,0.09)]">
                       <div className="rounded-lg bg-slate-50 p-3">
                         <p className="font-semibold text-ink">{userName}</p>
                         <p className="mt-1 truncate text-sm text-slate-500">{userEmail}</p>
