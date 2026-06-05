@@ -359,7 +359,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
 
   function downloadCurrentPagePdf() {
     const exportRoot = document.querySelector<HTMLElement>("[data-careos-export]");
-    const lines = buildPagePdfLines({
+    const report = buildPagePdfReport({
       title,
       eyebrow,
       root: exportRoot,
@@ -367,7 +367,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
       userEmail,
       role: friendlyRole(userRole)
     });
-    const pdf = buildTextPdf(`${title} - CareOS NDIS`, lines);
+    const pdf = buildCareOsReportPdf(report);
     const blob = new Blob([pdf], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -686,7 +686,25 @@ function formatCountdown(seconds: number) {
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
-function buildPagePdfLines({
+type PdfFieldRow = {
+  label: string;
+  value: string;
+};
+
+type PagePdfReport = {
+  title: string;
+  eyebrow: string;
+  generatedAt: string;
+  userName: string;
+  userEmail: string;
+  role: string;
+  contentLines: string[];
+  fieldRows: PdfFieldRow[];
+};
+
+type PdfColor = [number, number, number];
+
+function buildPagePdfReport({
   title,
   eyebrow,
   root,
@@ -700,25 +718,24 @@ function buildPagePdfLines({
   userName: string;
   userEmail: string;
   role: string;
-}) {
+}): PagePdfReport {
   const generatedAt = new Intl.DateTimeFormat("en-AU", {
     timeZone: appTimeZone,
     dateStyle: "medium",
     timeStyle: "short"
   }).format(new Date());
   const contentLines = root ? extractVisibleText(root) : [];
-  const fieldLines = root ? extractFormFieldLines(root) : [];
-  return [
-    "CareOS NDIS",
-    `Page: ${title}`,
-    eyebrow ? `Status: ${eyebrow}` : "",
-    `Generated: ${generatedAt}`,
-    `User: ${userName}${userEmail ? ` (${userEmail})` : ""}`,
-    `Role: ${role}`,
-    "",
-    ...contentLines,
-    ...(fieldLines.length ? ["", "Form fields", ...fieldLines] : [])
-  ].filter((line, index, lines) => line || lines[index - 1] !== "");
+  const fieldRows = root ? extractFormFieldRows(root) : [];
+  return {
+    title: cleanPdfText(title),
+    eyebrow: cleanPdfText(eyebrow),
+    generatedAt,
+    userName: cleanPdfText(userName || "CareOS user"),
+    userEmail: cleanPdfText(userEmail),
+    role: cleanPdfText(role),
+    contentLines: uniqueConsecutive(contentLines).slice(0, 180),
+    fieldRows: fieldRows.slice(0, 120)
+  };
 }
 
 function extractVisibleText(root: HTMLElement) {
@@ -730,18 +747,20 @@ function extractVisibleText(root: HTMLElement) {
     .filter(Boolean);
 }
 
-function extractFormFieldLines(root: HTMLElement) {
+function extractFormFieldRows(root: HTMLElement): PdfFieldRow[] {
   const fields = Array.from(root.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input, select, textarea"));
   return fields
     .map((field) => {
-      if (field instanceof HTMLInputElement && ["hidden", "password", "submit", "button"].includes(field.type)) return "";
+      if (field instanceof HTMLInputElement && ["hidden", "password", "submit", "button"].includes(field.type)) return null;
       const label = fieldLabel(field);
       const value = fieldValue(field);
-      if (!label && !value) return "";
-      return `${label || field.name || "Field"}: ${value || "Not completed"}`;
+      if (!label && !value) return null;
+      return {
+        label: cleanPdfText(label || field.name || "Field"),
+        value: cleanPdfText(value || "Not completed")
+      };
     })
-    .map(cleanPdfText)
-    .filter(Boolean);
+    .filter((row): row is PdfFieldRow => Boolean(row));
 }
 
 function fieldLabel(field: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement) {
@@ -763,52 +782,169 @@ function fieldValue(field: HTMLInputElement | HTMLSelectElement | HTMLTextAreaEl
   return field.value.trim();
 }
 
-function buildTextPdf(title: string, lines: string[]) {
-  const wrappedLines = lines.flatMap((line) => wrapPdfLine(line || " ", 92));
-  const pageLineLimit = 48;
-  const pages = chunkLines(wrappedLines.length ? wrappedLines : ["No page content available."], pageLineLimit);
-  const fontObjectNumber = 3 + pages.length * 2;
+function buildCareOsReportPdf(report: PagePdfReport) {
+  const pageWidth = 595;
+  const pageHeight = 842;
+  const margin = 42;
+  const bodyBottom = 76;
+  const bodyWidth = pageWidth - margin * 2;
+  const colors = {
+    ink: [0.09, 0.13, 0.2] as PdfColor,
+    slate: [0.39, 0.45, 0.55] as PdfColor,
+    muted: [0.58, 0.64, 0.72] as PdfColor,
+    line: [0.83, 0.87, 0.94] as PdfColor,
+    paper: [0.98, 0.99, 1] as PdfColor,
+    panel: [0.95, 0.97, 1] as PdfColor,
+    indigo: [0.3, 0.28, 0.88] as PdfColor,
+    indigoSoft: [0.93, 0.94, 1] as PdfColor,
+    gumleaf: [0.14, 0.46, 0.44] as PdfColor,
+    gumleafSoft: [0.91, 0.98, 0.97] as PdfColor,
+    amber: [0.79, 0.45, 0.1] as PdfColor,
+    amberSoft: [1, 0.97, 0.9] as PdfColor,
+    white: [1, 1, 1] as PdfColor
+  };
+  const pageStreams: string[] = [];
+  let commands: string[] = [];
+  let y = 0;
+
+  function startPage(pageNumber: number) {
+    commands = [];
+    drawRect(commands, 0, 0, pageWidth, pageHeight, colors.paper);
+    drawRect(commands, margin - 10, 710, bodyWidth + 20, 96, colors.white, colors.line);
+    drawRect(commands, margin - 10, 710, 8, 96, colors.gumleaf);
+    drawRect(commands, margin + 316, 736, 92, 34, colors.indigoSoft, colors.line);
+    drawRect(commands, margin + 418, 736, 92, 34, colors.gumleafSoft, colors.line);
+    drawText(commands, "CareOS NDIS", margin + 10, 780, 13, "F2", colors.gumleaf);
+    drawText(commands, "Professional provider report", margin + 10, 764, 8.5, "F3", colors.slate);
+    drawWrappedText(commands, report.title || "CareOS report", margin + 10, 742, 290, 21, "F2", colors.ink, 21);
+    drawWrappedText(commands, report.eyebrow || "Showing records from Supabase.", margin + 10, 718, 300, 8.5, "F1", colors.slate, 11);
+    drawText(commands, "Generated", margin + 326, 758, 7.5, "F2", colors.indigo);
+    drawWrappedText(commands, report.generatedAt, margin + 326, 746, 78, 7.5, "F1", colors.ink, 9);
+    drawText(commands, "Role", margin + 428, 758, 7.5, "F2", colors.gumleaf);
+    drawText(commands, report.role || "User", margin + 428, 746, 8.5, "F1", colors.ink);
+    drawLine(commands, margin - 10, 696, margin + bodyWidth + 10, 696, colors.line, 0.8);
+    drawFooter(commands, pageNumber);
+    y = 668;
+  }
+
+  function finishPage() {
+    pageStreams.push(commands.join("\n"));
+  }
+
+  function ensureSpace(requiredHeight: number) {
+    if (y - requiredHeight >= bodyBottom) return;
+    finishPage();
+    startPage(pageStreams.length + 1);
+  }
+
+  function sectionTitle(label: string) {
+    ensureSpace(34);
+    drawText(commands, label, margin, y, 13, "F2", colors.ink);
+    drawLine(commands, margin, y - 8, margin + bodyWidth, y - 8, colors.line, 0.6);
+    y -= 28;
+  }
+
+  function summaryCard(x: number, label: string, value: string, tone: "indigo" | "gumleaf" | "amber") {
+    const fill = tone === "gumleaf" ? colors.gumleafSoft : tone === "amber" ? colors.amberSoft : colors.indigoSoft;
+    const accent = tone === "gumleaf" ? colors.gumleaf : tone === "amber" ? colors.amber : colors.indigo;
+    drawRect(commands, x, y - 58, 158, 58, fill, colors.line);
+    drawRect(commands, x, y - 58, 4, 58, accent);
+    drawText(commands, label, x + 14, y - 20, 7.5, "F2", accent);
+    drawWrappedText(commands, value, x + 14, y - 35, 128, 9, "F1", colors.ink, 11);
+  }
+
+  startPage(1);
+  sectionTitle("Report overview");
+  ensureSpace(76);
+  summaryCard(margin, "PAGE", report.title || "CareOS report", "indigo");
+  summaryCard(margin + 176, "GENERATED FOR", report.userName, "gumleaf");
+  summaryCard(margin + 352, "ACCOUNT", report.userEmail || "No email recorded", "amber");
+  y -= 82;
+
+  sectionTitle("Visible page information");
+  const visibleLines = report.contentLines.length ? report.contentLines : ["No visible page content was available for export."];
+  visibleLines.forEach((line, index) => {
+    const wrapped = wrapPdfText(line, bodyWidth - 42, 9.4);
+    const rowHeight = Math.max(28, 14 + wrapped.length * 12);
+    ensureSpace(rowHeight + 4);
+    drawRect(commands, margin, y - rowHeight, bodyWidth, rowHeight, index % 2 === 0 ? colors.white : colors.panel, colors.line);
+    drawText(commands, String(index + 1).padStart(2, "0"), margin + 12, y - 18, 7.5, "F2", colors.muted);
+    wrapped.forEach((text, lineIndex) => {
+      drawText(commands, text, margin + 42, y - 18 - lineIndex * 12, 9.4, "F1", colors.ink);
+    });
+    y -= rowHeight;
+  });
+
+  if (report.fieldRows.length) {
+    y -= 20;
+    sectionTitle("Form field snapshot");
+    report.fieldRows.forEach((row, index) => {
+      const labelLines = wrapPdfText(row.label, 142, 8.6);
+      const valueLines = wrapPdfText(row.value, bodyWidth - 196, 9);
+      const rowHeight = Math.max(32, 16 + Math.max(labelLines.length, valueLines.length) * 12);
+      ensureSpace(rowHeight + 4);
+      drawRect(commands, margin, y - rowHeight, bodyWidth, rowHeight, index % 2 === 0 ? colors.white : colors.panel, colors.line);
+      labelLines.forEach((text, lineIndex) => {
+        drawText(commands, text, margin + 12, y - 18 - lineIndex * 12, 8.6, "F2", colors.slate);
+      });
+      drawLine(commands, margin + 176, y - rowHeight, margin + 176, y, colors.line, 0.4);
+      valueLines.forEach((text, lineIndex) => {
+        drawText(commands, text, margin + 190, y - 18 - lineIndex * 12, 9, "F1", colors.ink);
+      });
+      y -= rowHeight;
+    });
+  }
+
+  finishPage();
+
+  const fontObjectNumber = 3 + pageStreams.length * 2;
   const objects: string[] = ["<< /Type /Catalog /Pages 2 0 R >>", ""];
   const pageRefs: string[] = [];
 
-  pages.forEach((pageLines, index) => {
+  pageStreams.forEach((stream, index) => {
     const pageObjectNumber = 3 + index * 2;
     const contentObjectNumber = pageObjectNumber + 1;
     pageRefs.push(`${pageObjectNumber} 0 R`);
-    const stream = [
-      "BT",
-      "/F1 10 Tf",
-      "50 790 Td",
-      "14 TL",
-      ...pageLines.map((line) => `(${pdfEscape(line)}) Tj T*`),
-      "ET"
-    ].join("\n");
-    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontObjectNumber} 0 R >> >> /Contents ${contentObjectNumber} 0 R >>`);
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontObjectNumber} 0 R /F2 ${fontObjectNumber + 1} 0 R /F3 ${fontObjectNumber + 2} 0 R >> >> /Contents ${contentObjectNumber} 0 R >>`);
     objects.push(`<< /Length ${byteLength(stream)} >>\nstream\n${stream}\nendstream`);
   });
 
-  objects[1] = `<< /Type /Pages /Kids [${pageRefs.join(" ")}] /Count ${pages.length} >>`;
+  objects[1] = `<< /Type /Pages /Kids [${pageRefs.join(" ")}] /Count ${pageStreams.length} >>`;
   objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique >>");
   return buildPdfFile(objects);
 }
 
-function buildPdfFile(objects: string[]) {
-  let pdf = "%PDF-1.4\n";
-  const offsets: number[] = [];
-  objects.forEach((object, index) => {
-    offsets.push(byteLength(pdf));
-    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
-  });
-  const xref = byteLength(pdf);
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  offsets.forEach((offset) => {
-    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
-  });
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
-  return pdf;
+function drawFooter(commands: string[], pageNumber: number) {
+  const line: PdfColor = [0.83, 0.87, 0.94];
+  const slate: PdfColor = [0.39, 0.45, 0.55];
+  drawLine(commands, 42, 54, 553, 54, line, 0.6);
+  drawText(commands, "Copyright (c) 2026 CareOS NDIS. All rights reserved.", 42, 36, 8, "F1", slate);
+  drawText(commands, `Version 0.1.0 | Page ${pageNumber}`, 461, 36, 8, "F1", slate);
 }
 
-function wrapPdfLine(line: string, maxLength: number) {
+function drawRect(commands: string[], x: number, y: number, width: number, height: number, fill: PdfColor, stroke?: PdfColor) {
+  commands.push(`q ${color(fill)} rg ${num(x)} ${num(y)} ${num(width)} ${num(height)} re f Q`);
+  if (stroke) commands.push(`q ${color(stroke)} RG ${num(x)} ${num(y)} ${num(width)} ${num(height)} re S Q`);
+}
+
+function drawLine(commands: string[], x1: number, y1: number, x2: number, y2: number, stroke: PdfColor, width = 1) {
+  commands.push(`q ${color(stroke)} RG ${num(width)} w ${num(x1)} ${num(y1)} m ${num(x2)} ${num(y2)} l S Q`);
+}
+
+function drawText(commands: string[], text: string, x: number, y: number, size: number, font: "F1" | "F2" | "F3", fill: PdfColor) {
+  commands.push(`BT /${font} ${num(size)} Tf ${color(fill)} rg ${num(x)} ${num(y)} Td (${pdfEscape(text)}) Tj ET`);
+}
+
+function drawWrappedText(commands: string[], text: string, x: number, y: number, width: number, size: number, font: "F1" | "F2" | "F3", fill: PdfColor, lineHeight: number) {
+  const lines = wrapPdfText(text, width, size);
+  lines.forEach((line, index) => drawText(commands, line, x, y - index * lineHeight, size, font, fill));
+  return y - lines.length * lineHeight;
+}
+
+function wrapPdfText(line: string, width: number, fontSize: number) {
+  const maxLength = Math.max(18, Math.floor(width / (fontSize * 0.52)));
   const clean = cleanPdfText(line);
   if (!clean) return [""];
   const words = clean.split(/\s+/);
@@ -830,12 +966,36 @@ function wrapPdfLine(line: string, maxLength: number) {
   return lines.length ? lines : [clean.slice(0, maxLength)];
 }
 
-function chunkLines(lines: string[], size: number) {
-  const chunks: string[][] = [];
-  for (let index = 0; index < lines.length; index += size) {
-    chunks.push(lines.slice(index, index + size));
-  }
-  return chunks;
+function uniqueConsecutive(lines: string[]) {
+  const result: string[] = [];
+  lines.forEach((line) => {
+    if (line && line !== result[result.length - 1]) result.push(line);
+  });
+  return result;
+}
+
+function color(value: PdfColor) {
+  return value.map((channel) => num(channel)).join(" ");
+}
+
+function num(value: number) {
+  return Number(value.toFixed(3)).toString();
+}
+
+function buildPdfFile(objects: string[]) {
+  let pdf = "%PDF-1.4\n";
+  const offsets: number[] = [];
+  objects.forEach((object, index) => {
+    offsets.push(byteLength(pdf));
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xref = byteLength(pdf);
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.forEach((offset) => {
+    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return pdf;
 }
 
 function pdfEscape(value: string) {
