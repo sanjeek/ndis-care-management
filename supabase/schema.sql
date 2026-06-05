@@ -307,8 +307,24 @@ create table if not exists public.participant_checklists (
   assigned_worker_name text not null,
   assigned_worker_email text not null,
   due_date date,
+  checklist_category text not null default 'custom',
+  priority text not null default 'medium' check (priority in ('low', 'medium', 'high', 'critical')),
+  recurrence_pattern text not null default 'once' check (recurrence_pattern in ('once', 'per_shift', 'daily', 'weekly', 'fortnightly', 'monthly')),
+  shift_id uuid,
+  service_context text,
+  location_context text,
   checklist_items text not null,
+  pre_shift_checks text,
+  support_instructions text,
+  risk_controls text,
+  evidence_required text not null default 'progress_note',
   completion_status text not null default 'open' check (completion_status in ('open', 'in_progress', 'completed', 'cancelled')),
+  completed_items text,
+  completion_percentage numeric not null default 0 check (completion_percentage >= 0 and completion_percentage <= 100),
+  completion_notes text,
+  worker_signature_required boolean not null default false,
+  participant_signature_required boolean not null default false,
+  escalation_required boolean not null default false,
   notes text,
   completed_at timestamptz,
   completed_by uuid references auth.users(id) on delete set null,
@@ -318,6 +334,30 @@ create table if not exists public.participant_checklists (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.participant_checklists add column if not exists checklist_category text not null default 'custom';
+alter table public.participant_checklists add column if not exists priority text not null default 'medium';
+alter table public.participant_checklists add column if not exists recurrence_pattern text not null default 'once';
+alter table public.participant_checklists add column if not exists shift_id uuid;
+alter table public.participant_checklists add column if not exists service_context text;
+alter table public.participant_checklists add column if not exists location_context text;
+alter table public.participant_checklists add column if not exists pre_shift_checks text;
+alter table public.participant_checklists add column if not exists support_instructions text;
+alter table public.participant_checklists add column if not exists risk_controls text;
+alter table public.participant_checklists add column if not exists evidence_required text not null default 'progress_note';
+alter table public.participant_checklists add column if not exists completed_items text;
+alter table public.participant_checklists add column if not exists completion_percentage numeric not null default 0;
+alter table public.participant_checklists add column if not exists completion_notes text;
+alter table public.participant_checklists add column if not exists worker_signature_required boolean not null default false;
+alter table public.participant_checklists add column if not exists participant_signature_required boolean not null default false;
+alter table public.participant_checklists add column if not exists escalation_required boolean not null default false;
+
+alter table public.participant_checklists drop constraint if exists participant_checklists_priority_check;
+alter table public.participant_checklists add constraint participant_checklists_priority_check check (priority in ('low', 'medium', 'high', 'critical'));
+alter table public.participant_checklists drop constraint if exists participant_checklists_recurrence_pattern_check;
+alter table public.participant_checklists add constraint participant_checklists_recurrence_pattern_check check (recurrence_pattern in ('once', 'per_shift', 'daily', 'weekly', 'fortnightly', 'monthly'));
+alter table public.participant_checklists drop constraint if exists participant_checklists_completion_percentage_check;
+alter table public.participant_checklists add constraint participant_checklists_completion_percentage_check check (completion_percentage >= 0 and completion_percentage <= 100);
 
 create table if not exists public.shifts (
   id uuid primary key default gen_random_uuid(),
@@ -1148,6 +1188,12 @@ on public.visitor_logs (visit_date, status);
 
 create index if not exists participant_checklists_worker_idx
 on public.participant_checklists (assigned_worker_email, completion_status);
+
+create index if not exists participant_checklists_due_idx
+on public.participant_checklists (due_date, completion_status, priority);
+
+create index if not exists participant_checklists_category_idx
+on public.participant_checklists (checklist_category, recurrence_pattern);
 
 create index if not exists shift_attachments_shift_idx
 on public.shift_attachments (shift_id, support_worker_email);

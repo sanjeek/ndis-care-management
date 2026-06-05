@@ -231,7 +231,7 @@ const moduleConfig: Record<ModuleKey, ModuleConfig> = {
   checklists: {
     title: "Participant Checklists",
     eyebrow: "Assign participant-specific tasks, routines, and required completion checks.",
-    description: "Workers can see and complete checklists assigned to their login. Admin can manage all checklists.",
+    description: "Create NDIS support checklists with categories, priorities, evidence, risk controls, and worker completion tracking.",
     icon: ClipboardList,
     endpoint: "/api/operations/checklists",
     submitLabel: "Create checklist",
@@ -241,21 +241,39 @@ const moduleConfig: Record<ModuleKey, ModuleConfig> = {
       { name: "participant_name", label: "Participant", type: "participant" },
       { name: "assigned_worker_email", label: "Assigned support worker", type: "worker", required: false },
       { name: "checklist_title", label: "Checklist title", type: "text" },
+      { name: "checklist_category", label: "Checklist category", type: "select", options: ["Daily care routine", "Personal care", "Medication prompt", "Meal support", "Community access", "Transport", "Home safety", "Behaviour support", "Manual handling", "Appointment support", "Shift handover", "Goal activity", "Incident follow-up", "Custom"] },
+      { name: "priority", label: "Priority", type: "select", options: ["low", "medium", "high", "critical"] },
       { name: "due_date", label: "Due date", type: "date", required: false },
-      { name: "checklist_items", label: "Checklist items", type: "textarea", placeholder: "One item per line" },
+      { name: "recurrence_pattern", label: "Recurrence", type: "select", options: ["once", "per_shift", "daily", "weekly", "fortnightly", "monthly"] },
+      { name: "service_context", label: "Service context", type: "select", options: ["before_shift", "during_shift", "end_of_shift", "daily_routine", "community_access", "appointment", "sleepover", "plan_review"] },
+      { name: "shift_id", label: "Linked shift", type: "shift", required: false },
+      { name: "location_context", label: "Location or setting", type: "text", placeholder: "Participant home, community venue, appointment, vehicle", required: false },
+      { name: "checklist_items", label: "Checklist items", type: "textarea", placeholder: "One item per line, for example:\nConfirm participant wellbeing\nComplete personal care routine\nRecord outcome in progress note" },
+      { name: "pre_shift_checks", label: "Pre-shift checks", type: "textarea", placeholder: "Medication chart available, PPE ready, transport plan confirmed", required: false },
+      { name: "support_instructions", label: "Support instructions", type: "textarea", placeholder: "Step-by-step support expectations, preferences, prompts, and communication needs" },
+      { name: "risk_controls", label: "Risk controls", type: "textarea", placeholder: "Known risks, triggers, manual handling controls, escalation instructions", required: false },
+      { name: "evidence_required", label: "Evidence required", type: "select", options: ["none", "progress_note", "photo", "signature", "case_note", "incident_follow_up"] },
+      { name: "worker_signature_required", label: "Worker signature", type: "select", options: ["no", "yes"] },
+      { name: "participant_signature_required", label: "Participant signature", type: "select", options: ["no", "yes"] },
+      { name: "escalation_required", label: "Escalation required", type: "select", options: ["no", "yes"] },
       { name: "completion_status", label: "Status", type: "select", options: ["open", "in_progress", "completed", "cancelled"] },
       { name: "notes", label: "Notes", type: "textarea", required: false }
     ],
     summary: [
       { label: "Checklists", value: (records) => String(records.length) },
-      { label: "Open", value: (records) => String(records.filter((row) => String(row.completion_status ?? "") !== "completed").length) },
+      { label: "Due / overdue", value: (records) => String(records.filter((row) => checklistDue(row)).length) },
+      { label: "High priority", value: (records) => String(records.filter((row) => ["high", "critical"].includes(String(row.priority ?? "").toLowerCase()) && !["completed", "cancelled"].includes(String(row.completion_status ?? "").toLowerCase())).length) },
       { label: "Completed", value: (records) => String(records.filter((row) => String(row.completion_status ?? "") === "completed").length) }
     ],
     columns: [
       { label: "Checklist", value: (row) => String(row.checklist_title ?? "") },
+      { label: "Category", value: (row) => friendlyChecklistText(row.checklist_category) },
       { label: "Participant", value: (row) => String(row.participant_name ?? "") },
       { label: "Worker", value: (row) => String(row.assigned_worker_name ?? row.assigned_worker_email ?? "") },
-      { label: "Status", value: (row) => String(row.completion_status ?? "") }
+      { label: "Due", value: (row) => dateLabel(row.due_date) },
+      { label: "Priority", value: (row) => friendlyChecklistText(row.priority) },
+      { label: "Progress", value: (row) => `${checklistProgress(row)}%` },
+      { label: "Status", value: (row) => friendlyChecklistText(row.completion_status) }
     ]
   }
 };
@@ -267,6 +285,7 @@ export function OperationsModulePage({ module }: { module: ModuleKey }) {
   const [workers, setWorkers] = useState<OptionRow[]>([]);
   const [shifts, setShifts] = useState<OptionRow[]>([]);
   const [canManage, setCanManage] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [notice, setNotice] = useState(`Loading ${config.title}.`);
 
   const Icon = config.icon;
@@ -298,6 +317,7 @@ export function OperationsModulePage({ module }: { module: ModuleKey }) {
     setWorkers(workerOptions);
     setShifts(result.shifts ?? []);
     setCanManage(Boolean(result.canManage));
+    setCurrentUserEmail(String(result.currentUser?.email ?? "").toLowerCase());
     setNotice((result.records ?? []).length ? `${config.title} loaded from Supabase.` : config.emptyMessage);
   }, [config]);
 
@@ -338,9 +358,37 @@ export function OperationsModulePage({ module }: { module: ModuleKey }) {
     }
   }
 
+  async function updateChecklist(event: FormEvent<HTMLFormElement>, id: string) {
+    event.preventDefault();
+    if (!event.currentTarget.reportValidity()) return;
+    if (!supabase) return;
+    const token = (await supabase.auth.getSession()).data.session?.access_token;
+    if (!token) {
+      setNotice("Please sign in again before updating the checklist.");
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    const payload = {
+      id,
+      completion_status: String(form.get("completion_status") ?? ""),
+      completion_percentage: String(form.get("completion_percentage") ?? ""),
+      completed_items: String(form.get("completed_items") ?? ""),
+      completion_notes: String(form.get("completion_notes") ?? ""),
+      notes: String(form.get("notes") ?? "")
+    };
+    const response = await fetch(config.endpoint, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json().catch(() => ({ message: "Could not update checklist." }));
+    setNotice(result.message);
+    if (response.ok) await refresh();
+  }
+
   return (
     <AppShell title={config.title} eyebrow={notice}>
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map((metric) => (
           <section key={metric.label} className="rounded border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
@@ -391,6 +439,13 @@ export function OperationsModulePage({ module }: { module: ModuleKey }) {
                       </div>
                     ))}
                   </div>
+                  {module === "checklists" ? (
+                    <ChecklistRecordDetails
+                      record={record}
+                      canUpdate={canManage || String(record.assigned_worker_email ?? "").toLowerCase() === currentUserEmail}
+                      onUpdate={updateChecklist}
+                    />
+                  ) : null}
                 </article>
               ))}
             </div>
@@ -403,12 +458,133 @@ export function OperationsModulePage({ module }: { module: ModuleKey }) {
   );
 }
 
+function ChecklistRecordDetails({
+  record,
+  canUpdate,
+  onUpdate
+}: {
+  record: Record<string, unknown>;
+  canUpdate: boolean;
+  onUpdate: (event: FormEvent<HTMLFormElement>, id: string) => Promise<void>;
+}) {
+  const id = String(record.id ?? "");
+  const items = lines(record.checklist_items);
+  const completedItems = lines(record.completed_items);
+  const progress = checklistProgress(record);
+  return (
+    <div className="mt-4 border-t border-slate-200 pt-4">
+      <div className="grid gap-3 lg:grid-cols-3">
+        <ChecklistInfoBlock title="Service context" value={friendlyChecklistText(record.service_context)} />
+        <ChecklistInfoBlock title="Recurrence" value={friendlyChecklistText(record.recurrence_pattern)} />
+        <ChecklistInfoBlock title="Evidence" value={friendlyChecklistText(record.evidence_required)} />
+      </div>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_1fr]">
+        <div className="rounded border border-slate-200 bg-white p-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-ink">Checklist items</h3>
+            <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{items.length} item{items.length === 1 ? "" : "s"}</span>
+          </div>
+          {items.length ? (
+            <ul className="mt-3 grid gap-2">
+              {items.map((item, itemIndex) => (
+                <li key={`${item}-${itemIndex}`} className="flex gap-2 rounded border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-gumleaf" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 rounded border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-500">No checklist items recorded.</p>
+          )}
+        </div>
+
+        <div className="rounded border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-ink">NDIS support context</h3>
+          <div className="mt-3 grid gap-3">
+            <ChecklistText title="Pre-shift checks" value={record.pre_shift_checks} />
+            <ChecklistText title="Support instructions" value={record.support_instructions} />
+            <ChecklistText title="Risk controls" value={record.risk_controls} />
+            <ChecklistText title="Location" value={record.location_context} />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-ink">Completion tracking</h3>
+            <p className="mt-1 text-xs text-slate-500">{completedItems.length ? `${completedItems.length} completed item${completedItems.length === 1 ? "" : "s"} recorded` : "No completed items recorded yet"}</p>
+          </div>
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${progress >= 100 ? "bg-green-50 text-green-700" : progress > 0 ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600"}`}>{progress}% complete</span>
+        </div>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+          <div className="h-full rounded-full bg-gumleaf" style={{ width: `${progress}%` }} />
+        </div>
+
+        {canUpdate && id ? (
+          <form onSubmit={(event) => onUpdate(event, id)} className="mt-4 grid gap-3">
+            <div className="grid gap-3 md:grid-cols-[180px_160px_1fr]">
+              <label>
+                <span className="field-label-required mb-2 block text-sm font-medium text-slate-700">Status</span>
+                <select name="completion_status" required defaultValue={String(record.completion_status ?? "open")} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15">
+                  <option value="open">Open</option>
+                  <option value="in_progress">In progress</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </label>
+              <label>
+                <span className="field-label-required mb-2 block text-sm font-medium text-slate-700">Progress</span>
+                <input name="completion_percentage" type="number" min="0" max="100" step="1" required defaultValue={String(progress)} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
+              </label>
+              <label>
+                <span className="field-label-optional mb-2 block text-sm font-medium text-slate-700">Completion notes</span>
+                <input name="completion_notes" defaultValue={String(record.completion_notes ?? "")} placeholder="Outcome, exception, or handover note" className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
+              </label>
+            </div>
+            <label>
+              <span className="field-label-optional mb-2 block text-sm font-medium text-slate-700">Completed items</span>
+              <textarea name="completed_items" rows={3} defaultValue={String(record.completed_items ?? "")} placeholder="One completed item per line" className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
+            </label>
+            <label>
+              <span className="field-label-optional mb-2 block text-sm font-medium text-slate-700">General notes</span>
+              <textarea name="notes" rows={3} defaultValue={String(record.notes ?? "")} placeholder="Additional checklist notes" className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
+            </label>
+            <button className="inline-flex min-h-11 w-fit items-center justify-center rounded bg-gumleaf px-4 py-2 text-sm font-semibold text-white hover:bg-[#1d625d]">Update checklist</button>
+          </form>
+        ) : (
+          <p className="mt-4 rounded border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-500">Only the assigned support worker, admin, or team leader can update this checklist.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ChecklistInfoBlock({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="rounded border border-slate-200 bg-white p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</p>
+      <p className="mt-1 text-sm font-medium text-slate-700">{value || "Not recorded"}</p>
+    </div>
+  );
+}
+
+function ChecklistText({ title, value }: { title: string; value: unknown }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</p>
+      <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">{String(value ?? "").trim() || "Not recorded"}</p>
+    </div>
+  );
+}
+
 function OperationField({ field, participants, workers, shifts }: { field: FieldConfig; participants: OptionRow[]; workers: OptionRow[]; shifts: OptionRow[] }) {
   const required = field.required !== false;
   if (field.type === "textarea") {
     return (
       <label>
-        <span className="mb-2 block text-sm font-medium text-slate-700">{field.label}</span>
+        <span className={`${required ? "field-label-required" : "field-label-optional"} mb-2 block text-sm font-medium text-slate-700`}>{field.label}</span>
         <textarea name={field.name} required={required} rows={4} placeholder={field.placeholder} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
       </label>
     );
@@ -427,7 +603,7 @@ function OperationField({ field, participants, workers, shifts }: { field: Field
   }
   return (
     <label>
-      <span className="mb-2 block text-sm font-medium text-slate-700">{field.label}</span>
+      <span className={`${required ? "field-label-required" : "field-label-optional"} mb-2 block text-sm font-medium text-slate-700`}>{field.label}</span>
       <input name={field.name} type={field.type} required={required} min={field.type === "number" ? "0" : undefined} step={field.type === "number" ? "0.1" : undefined} placeholder={field.placeholder} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
     </label>
   );
@@ -436,7 +612,7 @@ function OperationField({ field, participants, workers, shifts }: { field: Field
 function SelectField({ name, label, options, required, renderLabel }: { name: string; label: string; options: string[]; required: boolean; renderLabel?: (value: string) => string }) {
   return (
     <label>
-      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+      <span className={`${required ? "field-label-required" : "field-label-optional"} mb-2 block text-sm font-medium text-slate-700`}>{label}</span>
       <select name={name} required={required} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15">
         {!required ? <option value="">Not recorded</option> : null}
         {options.filter(Boolean).map((option) => (
@@ -460,4 +636,41 @@ function isDueSoon(value: unknown) {
   if (Number.isNaN(date.getTime())) return false;
   const days = (date.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
   return days >= 0 && days <= 45;
+}
+
+function checklistDue(row: Record<string, unknown>) {
+  const status = String(row.completion_status ?? "").toLowerCase();
+  if (status === "completed" || status === "cancelled") return false;
+  if (!row.due_date) return false;
+  const date = new Date(String(row.due_date));
+  if (Number.isNaN(date.getTime())) return false;
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  return date.getTime() <= today.getTime();
+}
+
+function checklistProgress(row: Record<string, unknown>) {
+  const explicit = Number(row.completion_percentage ?? 0);
+  if (Number.isFinite(explicit) && explicit > 0) return Math.min(100, Math.max(0, Math.round(explicit)));
+  if (String(row.completion_status ?? "").toLowerCase() === "completed") return 100;
+  const total = lines(row.checklist_items).length;
+  const completed = lines(row.completed_items).length;
+  if (!total) return 0;
+  return Math.min(100, Math.round((completed / total) * 100));
+}
+
+function lines(value: unknown) {
+  return String(value ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function friendlyChecklistText(value: unknown) {
+  const text = String(value ?? "").trim();
+  if (!text) return "Not recorded";
+  return text
+    .replaceAll("_", " ")
+    .replace(/\s+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
