@@ -33,7 +33,7 @@ import { AppShell } from "@/components/app-shell";
 import { InvoiceManagementPage } from "@/components/invoice-management-page";
 import { StatCard } from "@/components/stat-card";
 import { recordAudit, type AuditPayload } from "@/lib/audit";
-import { roleForUser, type UserRole } from "@/lib/auth";
+import { isAdminRole, roleForUser, type UserRole } from "@/lib/auth";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 type ParticipantRecord = {
@@ -663,7 +663,8 @@ export function ParticipantsPage() {
 
   const refresh = useCallback(async () => {
     const context = await getCurrentUserContext();
-    setCanManageParticipants(context.role === "admin");
+    const canManage = isAdminRole(context.role);
+    setCanManageParticipants(canManage);
     const rows = context.role === "support_worker" && context.email
       ? await loadParticipantsForShifts(await loadShifts(context.email))
       : await loadParticipants();
@@ -707,47 +708,81 @@ export function ParticipantsPage() {
   return (
     <AppShell title="Participants" eyebrow={notice}>
       {canManageParticipants ? (
-        <RecordForm submitLabel="Add participant" onSubmit={submit}>
-          <Field name="name" label="Participant profile" placeholder="Full name" />
-          <Field name="ndis" label="NDIS number" placeholder="NDIS participant number" />
-          <Field name="plan" label="Plan type" placeholder="NDIS managed, plan managed, or self managed" />
-          <Field name="dateOfBirth" label="Date of birth" type="date" />
-          <Field name="emergency" label="Emergency contact" placeholder="Name and phone number" />
-          <Area name="emergencyContacts" label="Emergency contacts" placeholder="Primary and secondary contacts, relationship, phone, and email" />
-          <Area name="needs" label="Support needs" placeholder="Support needs, routines, risks, and goals" />
-          <Area name="supportPlans" label="Support plans" placeholder="Current support plan details, routines, funded supports, and review dates" />
-          <Area name="goals" label="Participant goals" placeholder="NDIS goals, short-term goals, and progress measures" />
-          <Area name="riskInformation" label="Risk information" placeholder="Known risks, triggers, behaviour support, safeguarding, and mitigation actions" />
-          <Area name="medicalNotes" label="Medical notes" placeholder="Medical conditions, medication notes, mobility, swallowing, seizures, or care alerts" />
-          <Area name="allergies" label="Allergies" placeholder="Food, medication, environmental allergies, and response plan" />
-          <Area name="communicationPreferences" label="Communication preferences" placeholder="Preferred language, communication method, interpreter needs, and decision supports" />
-        </RecordForm>
+        <section className="rounded border border-indigo-100 bg-white p-5 shadow-panel">
+          <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-ink">New participant</h2>
+              <p className="mt-1 text-sm text-slate-500">Add a participant record to the database. Required fields are marked with an asterisk.</p>
+            </div>
+            <span className="w-fit rounded bg-[#eef7f5] px-3 py-1 text-xs font-semibold text-[#2f766f] ring-1 ring-[#cfe9e4]">Admin action</span>
+          </div>
+          <RecordForm submitLabel="Add participant" onSubmit={submit}>
+            <Field name="name" label="Participant profile" placeholder="Full name" />
+            <Field name="ndis" label="NDIS number" placeholder="NDIS participant number" />
+            <Field name="plan" label="Plan type" placeholder="NDIS managed, plan managed, or self managed" />
+            <Field name="dateOfBirth" label="Date of birth" type="date" />
+            <Field name="emergency" label="Emergency contact" placeholder="Name and phone number" />
+            <Area name="emergencyContacts" label="Emergency contacts" placeholder="Primary and secondary contacts, relationship, phone, and email" />
+            <Area name="needs" label="Support needs" placeholder="Support needs, routines, risks, and goals" />
+            <Area name="supportPlans" label="Support plans" placeholder="Current support plan details, routines, funded supports, and review dates" />
+            <Area name="goals" label="Participant goals" placeholder="NDIS goals, short-term goals, and progress measures" />
+            <Area name="riskInformation" label="Risk information" placeholder="Known risks, triggers, behaviour support, safeguarding, and mitigation actions" />
+            <Area name="medicalNotes" label="Medical notes" placeholder="Medical conditions, medication notes, mobility, swallowing, seizures, or care alerts" />
+            <Area name="allergies" label="Allergies" placeholder="Food, medication, environmental allergies, and response plan" />
+            <Area name="communicationPreferences" label="Communication preferences" placeholder="Preferred language, communication method, interpreter needs, and decision supports" />
+          </RecordForm>
+        </section>
       ) : (
         <section className="mb-6 rounded border border-gumleaf/25 bg-gumleaf/5 p-4 text-sm text-slate-700">
           Support worker access is restricted to participants linked to your assigned shifts. Add and edit controls are available to admin users only.
         </section>
       )}
       {participants.length ? (
-        <div className="mt-6 grid gap-4 lg:grid-cols-3">
-          {participants.map((participant) => (
-            <article key={`${participant.ndis}-${participant.name}`} className="rounded border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold text-ink">{participant.name}</h2>
-                  <p className="text-sm text-slate-500">NDIS {participant.ndis || "not recorded"}</p>
-                </div>
-                <span className="rounded bg-harbour/10 px-2 py-1 text-xs font-semibold text-harbour">{participant.plan || "Plan not recorded"}</span>
-              </div>
-              <Info label="Emergency contact" value={participant.emergency || "Not recorded"} />
-              <Info label="Support needs" value={participant.needs || "Not recorded"} />
-              <Info label="Goals" value={participant.goals || "Not recorded"} />
-              <Info label="Documents / Notes" value={`${participant.docs} documents, ${participant.notes} progress notes`} />
-              <Link href={`/participants/${participant.id}`} className="mt-4 inline-flex rounded border border-gumleaf/30 px-3 py-2 text-sm font-semibold text-gumleaf hover:bg-gumleaf/5">
-                Open profile
-              </Link>
-            </article>
-          ))}
-        </div>
+        <section className="mt-6 overflow-hidden rounded border border-indigo-100 bg-white shadow-panel">
+          <div className="flex items-center justify-between border-b border-indigo-100 bg-[#fbfdff] px-4 py-3">
+            <h2 className="font-semibold text-ink">All participants</h2>
+            <span className="rounded bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-indigo-100">{participants.length} records</span>
+          </div>
+          <div className="overflow-x-auto scrollbar-subtle">
+            <table className="min-w-[980px] w-full border-collapse text-left text-sm">
+              <thead className="border-b border-indigo-100 bg-indigo-50/35 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="border-r border-indigo-100 px-4 py-3">Participant</th>
+                  <th className="border-r border-indigo-100 px-4 py-3">NDIS number</th>
+                  <th className="border-r border-indigo-100 px-4 py-3">Plan type</th>
+                  <th className="border-r border-indigo-100 px-4 py-3">Emergency contact</th>
+                  <th className="border-r border-indigo-100 px-4 py-3">Support needs</th>
+                  <th className="border-r border-indigo-100 px-4 py-3">Docs / Notes</th>
+                  <th className="px-4 py-3">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-indigo-50">
+                {participants.map((participant) => (
+                  <tr key={`${participant.ndis}-${participant.name}`} className="transition hover:bg-[#fbfffe]">
+                    <td className="border-r border-indigo-50 px-4 py-4">
+                      <p className="font-semibold text-ink">{participant.name}</p>
+                      <p className="mt-1 text-xs text-slate-500">{participant.dateOfBirth ? `DOB ${dateOnly(participant.dateOfBirth)}` : "Date of birth not recorded"}</p>
+                    </td>
+                    <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{participant.ndis || "Not recorded"}</td>
+                    <td className="border-r border-indigo-50 px-4 py-4">
+                      <span className="rounded bg-harbour/10 px-2.5 py-1 text-xs font-semibold text-harbour">{participant.plan || "Not recorded"}</span>
+                    </td>
+                    <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{participant.emergency || "Not recorded"}</td>
+                    <td className="max-w-[260px] border-r border-indigo-50 px-4 py-4 text-slate-700">
+                      <span className="line-clamp-2">{participant.needs || "Not recorded"}</span>
+                    </td>
+                    <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{participant.docs} documents, {participant.notes} notes</td>
+                    <td className="px-4 py-4">
+                      <Link href={`/participants/${participant.id}`} className="inline-flex rounded border border-[#cfe9e4] bg-[#eef7f5] px-3 py-2 text-xs font-semibold text-[#2f766f] hover:bg-[#dff0ec]">
+                        Open profile
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       ) : (
         <EmptyState
           title={canManageParticipants ? "No participants yet" : "No assigned participants"}
@@ -918,7 +953,7 @@ export function CarePlansPage() {
     if (ok) await refresh();
   }
 
-  const canManage = context.role === "admin";
+  const canManage = isAdminRole(context.role);
 
   return (
     <AppShell title="Care Plans" eyebrow={notice}>

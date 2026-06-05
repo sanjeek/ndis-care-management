@@ -34,6 +34,10 @@ export function defaultRouteForRole(role: UserRole) {
   return role === "support_worker" ? "/worker-portal" : "/dashboard";
 }
 
+export function isAdminRole(role: UserRole | string) {
+  return role === "admin" || role === "super_admin";
+}
+
 export function visibleNavForRole<T extends { href: string }>(role: UserRole, items: T[]) {
   if (role === "super_admin" || role === "admin") return items;
   if (role === "team_leader") return teamLeaderNavOrder.map((href) => items.find((item) => item.href === href)).filter((item): item is T => Boolean(item));

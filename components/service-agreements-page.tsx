@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ClipboardPlus, Download, FileSignature, RefreshCw, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { roleForUser, type UserRole } from "@/lib/auth";
+import { isAdminRole, roleForUser, type UserRole } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 
 type ParticipantOption = {
@@ -50,7 +50,7 @@ export function ServiceAgreementsPage() {
   const [signingAgreement, setSigningAgreement] = useState<ServiceAgreement | null>(null);
   const [notice, setNotice] = useState("Loading service agreements.");
 
-  const canManage = role === "admin";
+  const canManage = isAdminRole(role);
   const renewalDue = useMemo(() => agreements.filter(isRenewalDue), [agreements]);
   const signed = agreements.filter((agreement) => agreement.status === "signed").length;
 

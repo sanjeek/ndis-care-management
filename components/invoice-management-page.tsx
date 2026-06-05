@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ClipboardPlus, ReceiptText, Route, WalletCards } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { roleForUser, type UserRole } from "@/lib/auth";
+import { isAdminRole, roleForUser, type UserRole } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 
 type InvoiceRecord = {
@@ -52,7 +52,7 @@ export function InvoiceManagementPage() {
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [notice, setNotice] = useState("Loading invoices.");
 
-  const canManage = role === "admin";
+  const canManage = isAdminRole(role);
   const totals = useMemo(() => ({
     invoices: invoices.length,
     total: invoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0),

@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ClipboardPlus, Gauge, Landmark, WalletCards } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { roleForUser, type UserRole } from "@/lib/auth";
+import { isAdminRole, roleForUser, type UserRole } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 
 type ParticipantOption = {
@@ -56,7 +56,7 @@ export function FundingManagementPage() {
   const [records, setRecords] = useState<FundingRecord[]>([]);
   const [notice, setNotice] = useState("Loading NDIS funding records.");
 
-  const canManage = role === "admin";
+  const canManage = isAdminRole(role);
   const summaries = useMemo(() => summariseFunding(records), [records]);
   const totals = useMemo(() => {
     const planBudget = summaries.reduce((sum, row) => sum + row.planTotalBudget, 0);
