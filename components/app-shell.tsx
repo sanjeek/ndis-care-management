@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, CalendarDays, ChevronDown, LogOut, Menu, MessageSquare, Search, UserCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { navItems } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
 import { canAccessRoute, defaultRouteForRole, friendlyRole, roleForUser, type UserRole, visibleNavForRole } from "@/lib/auth";
 import { CopyrightFooter } from "@/components/copyright-footer";
 import { recordAudit } from "@/lib/audit";
+import { clearServerSession, syncServerSession } from "@/lib/session-sync";
 
 const inactivityLimitMs = 30 * 60 * 1000;
 const warningBeforeLogoutMs = 5 * 60 * 1000;
@@ -50,6 +51,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchNotice, setSearchNotice] = useState("");
   const [openNavGroup, setOpenNavGroup] = useState("");
+  const lastServerSessionSync = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -94,6 +96,8 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
       }
 
       setSessionMarker(role);
+      await syncServerSession(role);
+      lastServerSessionSync.current = Date.now();
       setUserEmail(user.email ?? "");
       setUserName(String(user.user_metadata?.full_name || profileName || user.email || user.id));
       setUserRole(role);
@@ -111,6 +115,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
     const { data: authListener } = supabase?.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT") {
         clearSessionMarker();
+        void clearServerSession();
         redirectToLogin();
         return;
       }
@@ -157,6 +162,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
         metadata: { reason: "inactivity_timeout", inactivityMinutes: 30, pathname: window.location.pathname }
       });
       await supabase?.auth.signOut();
+      await clearServerSession();
       clearSessionMarker();
       window.location.replace("/login?reason=session-expired");
     }
@@ -181,6 +187,11 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
     function markActivity() {
       window.localStorage.setItem(lastActivityKey, String(Date.now()));
       setSessionMarker(userRole);
+      const now = Date.now();
+      if (now - lastServerSessionSync.current > 5 * 60 * 1000) {
+        lastServerSessionSync.current = now;
+        void syncServerSession(userRole);
+      }
       setShowIdleWarning(false);
       setSecondsUntilLogout(warningBeforeLogoutMs / 1000);
       scheduleTimers();
@@ -301,6 +312,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
       });
       await supabase.auth.signOut();
     }
+    await clearServerSession();
     clearSessionMarker();
     window.location.href = "/login";
   }
@@ -308,6 +320,8 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
   function staySignedIn() {
     window.localStorage.setItem(lastActivityKey, String(Date.now()));
     setSessionMarker(userRole);
+    lastServerSessionSync.current = Date.now();
+    void syncServerSession(userRole);
     setShowIdleWarning(false);
     setSecondsUntilLogout(warningBeforeLogoutMs / 1000);
   }
@@ -614,12 +628,14 @@ function formatCountdown(seconds: number) {
 
 function setSessionMarker(role: UserRole) {
   if (typeof document === "undefined") return;
-  document.cookie = `careos-session=active; path=/; max-age=${Math.floor(inactivityLimitMs / 1000)}; SameSite=Lax`;
-  document.cookie = `careos-role=${encodeURIComponent(role)}; path=/; max-age=${Math.floor(inactivityLimitMs / 1000)}; SameSite=Lax`;
+  document.cookie = `careos-client-session=active; path=/; max-age=${Math.floor(inactivityLimitMs / 1000)}; SameSite=Lax`;
+  document.cookie = `careos-client-role=${encodeURIComponent(role)}; path=/; max-age=${Math.floor(inactivityLimitMs / 1000)}; SameSite=Lax`;
 }
 
 function clearSessionMarker() {
   if (typeof document === "undefined") return;
+  document.cookie = "careos-client-session=; path=/; max-age=0; SameSite=Lax";
+  document.cookie = "careos-client-role=; path=/; max-age=0; SameSite=Lax";
   document.cookie = "careos-session=; path=/; max-age=0; SameSite=Lax";
   document.cookie = "careos-role=; path=/; max-age=0; SameSite=Lax";
 }

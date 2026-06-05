@@ -7,6 +7,7 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { canAccessRoute, defaultRouteForRole, roleForUser, type UserRole } from "@/lib/auth";
 import { CopyrightFooter } from "@/components/copyright-footer";
 import { recordAudit } from "@/lib/audit";
+import { syncServerSession } from "@/lib/session-sync";
 
 export function LoginCard() {
   const [email, setEmail] = useState("");
@@ -32,6 +33,12 @@ export function LoginCard() {
           role = roleForUser(profile?.role, data.session.user.email);
         }
         setSessionMarker(role);
+        const synced = await syncServerSession(role);
+        if (!synced) {
+          await client.auth.signOut();
+          setMessage("Login session found, but CareOS could not create a secure server session. Check Supabase environment variables and try again.");
+          return;
+        }
         window.location.replace(getSafeNextPath(role));
       }
     });
@@ -105,6 +112,12 @@ export function LoginCard() {
     });
     window.localStorage.setItem("careos:last-activity", String(Date.now()));
     setSessionMarker(role);
+    const synced = await syncServerSession(role);
+    if (!synced) {
+      await client.auth.signOut();
+      setMessage("Login succeeded, but CareOS could not create a secure server session. Check Supabase environment variables and try again.");
+      return;
+    }
     window.location.replace(getSafeNextPath(role));
   }
 
@@ -225,6 +238,6 @@ function getSafeNextPath(role: UserRole = "admin") {
 
 function setSessionMarker(role: UserRole) {
   if (typeof document === "undefined") return;
-  document.cookie = "careos-session=active; path=/; max-age=1800; SameSite=Lax";
-  document.cookie = `careos-role=${encodeURIComponent(role)}; path=/; max-age=1800; SameSite=Lax`;
+  document.cookie = "careos-client-session=active; path=/; max-age=1800; SameSite=Lax";
+  document.cookie = `careos-client-role=${encodeURIComponent(role)}; path=/; max-age=1800; SameSite=Lax`;
 }

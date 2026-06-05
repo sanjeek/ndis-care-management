@@ -6,6 +6,7 @@ import { Eye, EyeOff, LockKeyhole, ShieldCheck } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { CopyrightFooter } from "@/components/copyright-footer";
 import { recordAudit } from "@/lib/audit";
+import { clearServerSession } from "@/lib/session-sync";
 
 type RecoveryState = "checking" | "ready" | "invalid" | "complete";
 
@@ -114,6 +115,7 @@ export function ResetPasswordCard() {
       metadata: { operation: "password_reset_recovery" }
     });
     await supabase.auth.signOut();
+    await clearServerSession();
     setLoading(false);
     setRecoveryState("complete");
     setMessage("Password updated. You can now sign in with your new password.");
