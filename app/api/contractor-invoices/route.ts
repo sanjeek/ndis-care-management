@@ -3,6 +3,10 @@ import { defaultContractorRates, generateContractorInvoices, listContractorInvoi
 import { requireApiUser, requireRole } from "@/lib/api-auth";
 
 export async function GET(request: Request) {
+  if (!contractorInvoicesEnabled()) {
+    return NextResponse.json({ message: "Contractor invoices are currently disabled." }, { status: 404 });
+  }
+
   const auth = await requireApiUser(request);
   if ("response" in auth) return auth.response;
   if (!requireRole(auth.user, ["admin", "team_leader"])) {
@@ -18,6 +22,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (!contractorInvoicesEnabled()) {
+    return NextResponse.json({ message: "Contractor invoices are currently disabled." }, { status: 404 });
+  }
+
   const auth = await requireApiUser(request);
   if ("response" in auth) return auth.response;
   if (!requireRole(auth.user, ["admin"])) {
@@ -66,4 +74,8 @@ function splitEmails(value: unknown) {
     .split(",")
     .map((email) => email.trim().toLowerCase())
     .filter((email) => /\S+@\S+\.\S+/.test(email));
+}
+
+function contractorInvoicesEnabled() {
+  return process.env.NEXT_PUBLIC_ENABLE_CONTRACTOR_INVOICES === "true";
 }

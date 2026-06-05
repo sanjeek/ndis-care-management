@@ -12,6 +12,10 @@ export async function POST(request: Request) {
 }
 
 async function runWeeklyContractorInvoices(request: Request) {
+  if (process.env.NEXT_PUBLIC_ENABLE_CONTRACTOR_INVOICES !== "true") {
+    return NextResponse.json({ message: "Contractor invoices are currently disabled." }, { status: 404 });
+  }
+
   const url = new URL(request.url);
   const cronSecret = process.env.CRON_SECRET;
   const suppliedSecret = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || url.searchParams.get("secret");

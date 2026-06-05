@@ -168,19 +168,6 @@ export async function GET(request: Request) {
       href: "/invoices"
     })));
 
-    const { data: contractorInvoices } = await auth.client
-      .from("contractor_invoices")
-      .select("id, invoice_number, worker_name, worker_email, worker_abn, status, total_amount")
-      .or(`invoice_number.ilike.${term},worker_name.ilike.${term},worker_email.ilike.${term},worker_abn.ilike.${term},status.ilike.${term}`)
-      .order("created_at", { ascending: false })
-      .limit(8);
-    results.push(...(contractorInvoices ?? []).map((row) => ({
-      id: `contractor-invoice-${row.id}`,
-      type: "Contractor invoice",
-      title: String(row.invoice_number ?? "Contractor invoice"),
-      subtitle: [row.worker_name, row.worker_email, row.status, currency(row.total_amount)].filter(Boolean).join(" | "),
-      href: "/contractor-invoices"
-    })));
   }
 
   if (isAdmin) {

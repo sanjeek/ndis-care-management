@@ -6,7 +6,6 @@ const privatePrefixes = [
   "/branches",
   "/care-plans",
   "/checklists",
-  "/contractor-invoices",
   "/dashboard",
   "/documents",
   "/emergency-contacts",
