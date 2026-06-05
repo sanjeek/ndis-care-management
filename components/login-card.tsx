@@ -191,12 +191,12 @@ export function LoginCard() {
                 type="checkbox"
                 checked={remember}
                 onChange={(event) => setRemember(event.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-gumleaf focus:ring-gumleaf"
+                className="h-4 w-4 rounded border-slate-300 accent-[#2f7d73] focus:ring-[#2f7d73]"
               />
               Remember me
             </label>}
             <button
-              className="ml-auto font-medium text-gumleaf hover:text-ink"
+              className="ml-auto font-medium text-[#2f766f] hover:text-ink"
               type="button"
               onClick={() => {
                 setForgotMode((current) => !current);
@@ -208,14 +208,14 @@ export function LoginCard() {
           </div>
 
           <button
-            className="flex w-full items-center justify-center rounded bg-gumleaf px-4 py-3 font-semibold text-white shadow-sm transition hover:bg-[#1d625d] disabled:cursor-not-allowed disabled:opacity-70"
+            className="flex w-full items-center justify-center rounded border border-[#cfe9e4] bg-[#eef7f5] px-4 py-3 font-semibold text-[#236f69] shadow-[0_10px_24px_rgba(47,125,115,0.10)] transition hover:bg-[#dff0ec] focus:outline-none focus:ring-2 focus:ring-[#2f7d73]/20 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
             type="submit"
             disabled={loading}
           >
             {loading ? "Please wait..." : forgotMode ? "Send reset email" : "Sign in"}
           </button>
           <div className="mt-5 grid gap-3 text-center text-sm">
-            <Link className="font-semibold text-gumleaf hover:text-ink" href="/register">
+            <Link className="font-semibold text-[#2f766f] hover:text-ink" href="/register">
               Register a new provider account
             </Link>
           </div>

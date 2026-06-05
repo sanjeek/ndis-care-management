@@ -55,16 +55,13 @@ export function RegisterCard() {
             <PasswordInput show={showPassword} setShow={setShowPassword} />
           </div>
 
-          <button className="mt-6 w-full rounded bg-gumleaf px-4 py-3 font-semibold text-white hover:bg-[#1d625d]" disabled={loading}>
+          <button className="mt-6 w-full rounded border border-[#cfe9e4] bg-[#eef7f5] px-4 py-3 font-semibold text-[#236f69] shadow-[0_10px_24px_rgba(47,125,115,0.10)] transition hover:bg-[#dff0ec] focus:outline-none focus:ring-2 focus:ring-[#2f7d73]/20 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400" disabled={loading}>
             {loading ? "Creating account..." : "Register user"}
           </button>
 
           <div className="mt-5 flex justify-between text-sm">
-            <Link className="font-semibold text-gumleaf hover:text-ink" href="/">
+            <Link className="font-semibold text-[#2f766f] hover:text-ink" href="/">
               Back to sign in
-            </Link>
-            <Link className="font-semibold text-ink hover:text-gumleaf" href="/dashboard">
-              Dashboard
             </Link>
           </div>
           <CopyrightFooter />
