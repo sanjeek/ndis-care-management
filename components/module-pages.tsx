@@ -392,12 +392,12 @@ export function DashboardPage() {
   const pendingTimesheets = useMemo(() => shifts.filter((shift) => isPendingTimesheetShift(shift)).length, [shifts]);
   const dashboardAlerts = useMemo(() => buildDashboardAlerts(unfilledShifts, metrics.pendingIncidents, pendingTimesheets, overview), [metrics.pendingIncidents, overview, pendingTimesheets, unfilledShifts]);
   const metricCards = [
-    { label: "Today's Shifts", value: String(todaysShifts.length), delta: todaysShifts.length ? "Scheduled for today" : "No shifts today", tone: "harbour", icon: CalendarDays },
-    { label: "Unfilled Shifts", value: String(unfilledShifts), delta: unfilledShifts ? "Need allocation" : "No unfilled shifts", tone: "coral", icon: AlertTriangle },
-    { label: "Active Participants", value: String(metrics.activeParticipants), delta: metrics.activeParticipants ? "Participant records" : "No active participants", tone: "gumleaf", icon: ShieldCheck },
-    { label: "Staff On Duty", value: String(staffOnDuty), delta: staffOnDuty ? "Workers rostered today" : "No staff on duty", tone: "banksia", icon: Users },
-    { label: "Pending Timesheets", value: String(pendingTimesheets), delta: pendingTimesheets ? "Need review" : "No pending review", tone: "harbour", icon: ClipboardPlus },
-    { label: "Incidents Requiring Review", value: String(metrics.pendingIncidents), delta: metrics.pendingIncidents ? "Open incident records" : "No pending incidents", tone: "coral", icon: AlertTriangle }
+    { label: "Today's Shifts", value: String(todaysShifts.length), delta: todaysShifts.length ? "Scheduled for today" : "No shifts today", tone: "harbour", icon: CalendarDays, href: "/rostering", actionLabel: "Open roster" },
+    { label: "Unfilled Shifts", value: String(unfilledShifts), delta: unfilledShifts ? "Need allocation" : "No unfilled shifts", tone: "coral", icon: AlertTriangle, href: "/rostering?status=unfilled", actionLabel: "Allocate" },
+    { label: "Active Participants", value: String(metrics.activeParticipants), delta: metrics.activeParticipants ? "Participant records" : "No active participants", tone: "gumleaf", icon: ShieldCheck, href: "/participants", actionLabel: "Open" },
+    { label: "Staff On Duty", value: String(staffOnDuty), delta: staffOnDuty ? "Workers rostered today" : "No staff on duty", tone: "banksia", icon: Users, href: "/support-workers", actionLabel: "View staff" },
+    { label: "Pending Timesheets", value: String(pendingTimesheets), delta: pendingTimesheets ? "Need review" : "No pending review", tone: "harbour", icon: ClipboardPlus, href: "/timesheets", actionLabel: "Review" },
+    { label: "Incidents Requiring Review", value: String(metrics.pendingIncidents), delta: metrics.pendingIncidents ? "Open incident records" : "No pending incidents", tone: "coral", icon: AlertTriangle, href: "/incident-reports", actionLabel: "Review" }
   ];
 
   return (
@@ -408,7 +408,14 @@ export function DashboardPage() {
         ))}
       </div>
       <div className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_0.8fr]">
-        <ShiftTable title="Today's Schedule" shifts={todaysShifts} emptyMessage="No shifts are scheduled for today." />
+        <ShiftTable
+          title="Today's Schedule"
+          shifts={todaysShifts}
+          emptyMessage="No shifts are scheduled for today."
+          actionHref="/rostering?new=shift"
+          actionLabel="Create shift"
+          rowHref={(shift) => `/rostering?shift=${encodeURIComponent(shift.id)}`}
+        />
         <AlertsPanel alerts={dashboardAlerts} />
       </div>
       <div className="mt-6 grid gap-6 xl:grid-cols-[0.75fr_1.25fr]">
@@ -1443,6 +1450,8 @@ export function RosteringPage() {
   const [editingShift, setEditingShift] = useState<ShiftRecord | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [rosterLoaded, setRosterLoaded] = useState(false);
+  const handledRouteAction = useRef("");
 
   const filteredShifts = useMemo(() => filterRosterShifts(shifts, searchTerm, statusFilter), [shifts, searchTerm, statusFilter]);
 
@@ -1454,11 +1463,49 @@ export function RosteringPage() {
     setAvailability(loadedAvailability);
     setLeaveRequests(loadedLeave);
     setNotice(loadedShifts.length ? "Showing shifts from the database." : "No shifts yet. Add a shift to build the roster.");
+    setRosterLoaded(true);
   }, []);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("status");
+    if (status && rosterStatusFilters.some((item) => normaliseRosterText(item.value) === normaliseRosterText(status))) {
+      setStatusFilter(status);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const createAction = params.get("new");
+    const shiftId = params.get("shift");
+    const actionKey = `${createAction ?? ""}:${shiftId ?? ""}`;
+    if (actionKey === ":" || handledRouteAction.current === actionKey) return;
+
+    if (createAction === "shift") {
+      handledRouteAction.current = actionKey;
+      setEditingShift(null);
+      setCreateOpen(true);
+      return;
+    }
+
+    if (shiftId) {
+      if (!rosterLoaded) return;
+      handledRouteAction.current = actionKey;
+      const selectedShift = shifts.find((shift) => shift.id === shiftId);
+      if (selectedShift) {
+        setCreateOpen(false);
+        setEditingShift(selectedShift);
+      } else {
+        setNotice("Shift link opened, but that shift could not be found.");
+      }
+    }
+  }, [rosterLoaded, shifts]);
 
   async function submit(form: FormData) {
     const start = get(form, "start");
@@ -2866,7 +2913,7 @@ function EmptyWorkerState({ title, message }: { title: string; message: string }
 
 function QuickActions() {
   const actions = [
-    { label: "Create Shift", icon: CalendarPlus, href: "/rostering" },
+    { label: "Create Shift", icon: CalendarPlus, href: "/rostering?new=shift" },
     { label: "Add Participant", icon: ShieldCheck, href: "/participants" },
     { label: "Add Support Worker", icon: Users, href: "/support-workers" },
     { label: "New Progress Note", icon: FilePlus2, href: "/progress-notes" },
@@ -2892,12 +2939,37 @@ function QuickActions() {
   );
 }
 
-function ShiftTable({ title, shifts, emptyMessage, renderActions }: { title: string; shifts: ShiftRecord[]; emptyMessage: string; renderActions?: (shift: ShiftRecord) => React.ReactNode }) {
+function ShiftTable({
+  title,
+  shifts,
+  emptyMessage,
+  renderActions,
+  actionHref,
+  actionLabel = "Open action",
+  rowHref
+}: {
+  title: string;
+  shifts: ShiftRecord[];
+  emptyMessage: string;
+  renderActions?: (shift: ShiftRecord) => React.ReactNode;
+  actionHref?: string;
+  actionLabel?: string;
+  rowHref?: (shift: ShiftRecord) => string;
+}) {
+  const hasRowAction = Boolean(renderActions || rowHref);
   return (
     <div className="rounded border border-indigo-100/80 bg-white shadow-panel">
       <div className="flex items-center justify-between border-b border-indigo-100 bg-[#fbfdff] px-4 py-3">
         <h2 className="font-semibold text-ink">{title}</h2>
-        <CalendarPlus className="h-5 w-5 text-gumleaf" />
+        {actionHref ? (
+          <Link href={actionHref} className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#eef7f5] text-[#2f766f] ring-1 ring-[#cfe9e4] transition hover:bg-[#dff0ec] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2f7d73]/20" aria-label={actionLabel}>
+            <CalendarPlus className="h-5 w-5" />
+          </Link>
+        ) : (
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-gumleaf ring-1 ring-indigo-100">
+            <CalendarPlus className="h-5 w-5" />
+          </span>
+        )}
       </div>
       {shifts.length ? (
         <div className="overflow-x-auto scrollbar-subtle">
@@ -2910,12 +2982,12 @@ function ShiftTable({ title, shifts, emptyMessage, renderActions }: { title: str
                 <th className="px-4 py-3">Location</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Approval</th>
-                {renderActions ? <th className="px-4 py-3">Action</th> : null}
+                {hasRowAction ? <th className="px-4 py-3">Action</th> : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {shifts.map((shift, index) => (
-                <tr key={`${shift.time}-${shift.participantName}-${index}`}>
+                <tr key={`${shift.time}-${shift.participantName}-${index}`} className={rowHref ? "transition hover:bg-[#fbfffe]" : undefined}>
                   <td className="px-4 py-4 font-medium text-ink">{shift.time}</td>
                   <td className="px-4 py-4 text-slate-700">{shift.participant}</td>
                   <td className="px-4 py-4 text-slate-700">{shift.worker || "Unassigned"}</td>
@@ -2932,7 +3004,15 @@ function ShiftTable({ title, shifts, emptyMessage, renderActions }: { title: str
                       </span>
                     </div>
                   </td>
-                  {renderActions ? <td className="px-4 py-4">{renderActions(shift)}</td> : null}
+                  {hasRowAction ? (
+                    <td className="px-4 py-4">
+                      {renderActions ? renderActions(shift) : rowHref ? (
+                        <Link href={rowHref(shift)} className="inline-flex rounded border border-[#cfe9e4] bg-[#eef7f5] px-3 py-2 text-xs font-semibold text-[#2f766f] hover:bg-[#dff0ec]">
+                          Open shift
+                        </Link>
+                      ) : null}
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>

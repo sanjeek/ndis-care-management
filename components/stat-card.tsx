@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 
 type StatCardProps = {
@@ -6,6 +7,8 @@ type StatCardProps = {
   delta: string;
   tone: string;
   icon: LucideIcon;
+  href?: string;
+  actionLabel?: string;
 };
 
 const toneClasses: Record<string, string> = {
@@ -15,9 +18,9 @@ const toneClasses: Record<string, string> = {
   coral: "bg-rose-50 text-coral ring-1 ring-rose-100"
 };
 
-export function StatCard({ label, value, delta, tone, icon: Icon }: StatCardProps) {
-  return (
-    <article className="rounded-lg border border-indigo-100/80 bg-white p-4 shadow-panel">
+export function StatCard({ label, value, delta, tone, icon: Icon, href, actionLabel = "Open details" }: StatCardProps) {
+  const content = (
+    <>
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-semibold text-slate-500">{label}</p>
@@ -27,7 +30,26 @@ export function StatCard({ label, value, delta, tone, icon: Icon }: StatCardProp
           <Icon className="h-5 w-5" />
         </span>
       </div>
-      <p className="mt-4 text-sm text-slate-600">{delta}</p>
+      <div className="mt-4 flex items-end justify-between gap-3">
+        <p className="text-sm text-slate-600">{delta}</p>
+        {href ? <span className="text-xs font-semibold text-[#2f766f] opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">{actionLabel}</span> : null}
+      </div>
+    </>
+  );
+
+  const cardClass = "group rounded-lg border border-indigo-100/80 bg-white p-4 shadow-panel transition hover:-translate-y-0.5 hover:border-[#cfe9e4] hover:bg-[#fbfffe] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2f7d73]/20";
+
+  if (href) {
+    return (
+      <Link href={href} className={`block ${cardClass}`} aria-label={`${label}. ${actionLabel}`}>
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <article className={cardClass}>
+      {content}
     </article>
   );
 }
