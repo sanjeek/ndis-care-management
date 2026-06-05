@@ -76,6 +76,21 @@ drop constraint if exists profiles_role_check;
 alter table public.profiles
 add constraint profiles_role_check check (role in ('super_admin', 'admin', 'support_worker', 'team_leader', 'family'));
 
+create table if not exists public.organisation_settings (
+  id uuid primary key default gen_random_uuid(),
+  setting_category text not null,
+  setting_key text not null,
+  setting_value text,
+  details text,
+  status text not null default 'active' check (status in ('active', 'planned', 'coming_soon', 'disabled', 'archived')),
+  is_sensitive boolean not null default false,
+  updated_by uuid references auth.users(id) on delete set null,
+  updated_by_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (setting_category, setting_key)
+);
+
 create table if not exists public.family_members (
   id uuid primary key default gen_random_uuid(),
   family_user_id uuid references auth.users(id) on delete set null,
@@ -135,6 +150,42 @@ add column if not exists drivers_licence_expiry date;
 
 alter table public.support_workers
 add column if not exists training_certificates text;
+
+create table if not exists public.worker_training_records (
+  id uuid primary key default gen_random_uuid(),
+  worker_name text not null,
+  worker_email text not null,
+  training_name text not null,
+  provider text,
+  completion_date date,
+  expiry_date date,
+  certificate_reference text,
+  evidence_location text,
+  mandatory boolean not null default true,
+  status text not null default 'current' check (status in ('current', 'expiring', 'expired', 'planned')),
+  notes text,
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.participant_emergency_contacts (
+  id uuid primary key default gen_random_uuid(),
+  participant_name text not null,
+  contact_name text not null,
+  relationship text,
+  phone text not null,
+  email text,
+  priority text not null default 'primary' check (priority in ('primary', 'secondary', 'other')),
+  consent_to_contact boolean not null default true,
+  notes text,
+  status text not null default 'active' check (status in ('active', 'inactive')),
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
 
 create table if not exists public.worker_invitations (
   id uuid primary key default gen_random_uuid(),
@@ -1074,6 +1125,15 @@ on public.participants (branch_id);
 create index if not exists support_workers_branch_idx
 on public.support_workers (branch_id);
 
+create index if not exists worker_training_records_worker_idx
+on public.worker_training_records (lower(worker_email), status, expiry_date);
+
+create index if not exists participant_emergency_contacts_participant_idx
+on public.participant_emergency_contacts (participant_name, status, priority);
+
+create index if not exists organisation_settings_category_idx
+on public.organisation_settings (setting_category, setting_key, status);
+
 create index if not exists shifts_branch_idx
 on public.shifts (branch_id, starts_at);
 
@@ -1101,8 +1161,11 @@ on public.invoices (branch_id, status);
 alter table public.participants enable row level security;
 alter table public.organisation_branches enable row level security;
 alter table public.profiles enable row level security;
+alter table public.organisation_settings enable row level security;
 alter table public.family_members enable row level security;
 alter table public.support_workers enable row level security;
+alter table public.worker_training_records enable row level security;
+alter table public.participant_emergency_contacts enable row level security;
 alter table public.worker_invitations enable row level security;
 alter table public.worker_availability enable row level security;
 alter table public.worker_leave_requests enable row level security;
@@ -1143,8 +1206,11 @@ alter table public.participant_risk_assessments enable row level security;
 alter table public.participants force row level security;
 alter table public.organisation_branches force row level security;
 alter table public.profiles force row level security;
+alter table public.organisation_settings force row level security;
 alter table public.family_members force row level security;
 alter table public.support_workers force row level security;
+alter table public.worker_training_records force row level security;
+alter table public.participant_emergency_contacts force row level security;
 alter table public.worker_invitations force row level security;
 alter table public.worker_availability force row level security;
 alter table public.worker_leave_requests force row level security;
@@ -1268,6 +1334,8 @@ drop policy if exists "Authenticated users can manage incident reports" on publi
 drop policy if exists "Authenticated users can manage module records" on public.module_records;
 drop policy if exists "Users can read their profile" on public.profiles;
 drop policy if exists "Admins can manage profiles" on public.profiles;
+drop policy if exists "Admins can manage organisation settings" on public.organisation_settings;
+drop policy if exists "Team leaders can read organisation settings" on public.organisation_settings;
 drop policy if exists "Admins can manage family members" on public.family_members;
 drop policy if exists "Family can read own approved participant links" on public.family_members;
 drop policy if exists "Admins can manage participants" on public.participants;
@@ -1275,6 +1343,10 @@ drop policy if exists "Team leaders can read participants" on public.participant
 drop policy if exists "Workers can read assigned participants" on public.participants;
 drop policy if exists "Admins can manage support workers" on public.support_workers;
 drop policy if exists "Workers can read own support worker record" on public.support_workers;
+drop policy if exists "Admins and team leaders can manage worker training records" on public.worker_training_records;
+drop policy if exists "Workers can manage own training records" on public.worker_training_records;
+drop policy if exists "Admins and team leaders can manage participant emergency contacts" on public.participant_emergency_contacts;
+drop policy if exists "Workers can read assigned participant emergency contacts" on public.participant_emergency_contacts;
 drop policy if exists "Admins can manage worker invitations" on public.worker_invitations;
 drop policy if exists "Admins can manage worker availability" on public.worker_availability;
 drop policy if exists "Team leaders can read worker availability" on public.worker_availability;
@@ -1522,6 +1594,17 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+create policy "Admins can manage organisation settings"
+on public.organisation_settings for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create policy "Team leaders can read organisation settings"
+on public.organisation_settings for select
+to authenticated
+using (public.is_team_leader());
+
 create policy "Admins can manage family members"
 on public.family_members for all
 to authenticated
@@ -1573,6 +1656,41 @@ to authenticated
 using (
   public.is_support_worker()
   and lower(email) = public.current_app_email()
+);
+
+create policy "Admins and team leaders can manage worker training records"
+on public.worker_training_records for all
+to authenticated
+using (public.is_admin() or public.is_team_leader())
+with check (public.is_admin() or public.is_team_leader());
+
+create policy "Workers can manage own training records"
+on public.worker_training_records for all
+to authenticated
+using (
+  public.is_support_worker()
+  and lower(worker_email) = public.current_app_email()
+)
+with check (
+  public.is_support_worker()
+  and lower(worker_email) = public.current_app_email()
+);
+
+create policy "Admins and team leaders can manage participant emergency contacts"
+on public.participant_emergency_contacts for all
+to authenticated
+using (public.is_admin() or public.is_team_leader())
+with check (public.is_admin() or public.is_team_leader());
+
+create policy "Workers can read assigned participant emergency contacts"
+on public.participant_emergency_contacts for select
+to authenticated
+using (
+  public.is_support_worker()
+  and participant_name in (
+    select participant_name from public.shifts
+    where lower(support_worker_email) = public.current_app_email()
+  )
 );
 
 create policy "Admins can manage worker invitations"

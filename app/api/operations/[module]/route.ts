@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireApiUser, requireRole } from "@/lib/api-auth";
 import { notifyCareEvent } from "@/lib/care-notifications";
 import { getAdminNotificationRecipients } from "@/lib/email-notifications";
 import { recordServerAudit } from "@/lib/server-audit";
 
-type ModuleKey = "travel" | "participant-matching" | "visitors" | "vehicles" | "checklists";
+type ModuleKey = "travel" | "participant-matching" | "emergency-contacts" | "visitors" | "vehicles" | "training-records" | "checklists";
 
 type ModuleConfig = {
   table: string;
@@ -12,7 +13,9 @@ type ModuleConfig = {
   labelField: string;
   workerEmailField?: string;
   workerNameField?: string;
+  participantNameField?: string;
   managerOnly?: boolean;
+  managerOnlyCreate?: boolean;
   notify?: boolean;
   buildPayload: (body: Record<string, unknown>, user: { id: string; email: string; name: string }) => Record<string, unknown>;
 };
@@ -38,6 +41,27 @@ const modules: Record<ModuleKey, ModuleConfig> = {
       vehicle_registration: clean(body.vehicle_registration).toUpperCase(),
       notes: clean(body.notes),
       status: clean(body.status) || "submitted",
+      created_by: user.id,
+      created_by_email: user.email
+    })
+  },
+  "emergency-contacts": {
+    table: "participant_emergency_contacts",
+    auditAction: "emergency_contact",
+    labelField: "contact_name",
+    participantNameField: "participant_name",
+    managerOnlyCreate: true,
+    notify: true,
+    buildPayload: (body, user) => ({
+      participant_name: clean(body.participant_name),
+      contact_name: clean(body.contact_name),
+      relationship: clean(body.relationship),
+      phone: clean(body.phone),
+      email: clean(body.email).toLowerCase(),
+      priority: clean(body.priority) || "primary",
+      consent_to_contact: clean(body.consent_status) !== "do_not_contact",
+      notes: clean(body.notes),
+      status: clean(body.status) || "active",
       created_by: user.id,
       created_by_email: user.email
     })
@@ -102,6 +126,29 @@ const modules: Record<ModuleKey, ModuleConfig> = {
       created_by_email: user.email
     })
   },
+  "training-records": {
+    table: "worker_training_records",
+    auditAction: "training_record",
+    labelField: "training_name",
+    workerEmailField: "worker_email",
+    workerNameField: "worker_name",
+    notify: true,
+    buildPayload: (body, user) => ({
+      worker_name: clean(body.worker_name) || user.name,
+      worker_email: clean(body.worker_email).toLowerCase() || user.email,
+      training_name: clean(body.training_name),
+      provider: clean(body.provider),
+      completion_date: clean(body.completion_date) || null,
+      expiry_date: clean(body.expiry_date) || null,
+      certificate_reference: clean(body.certificate_reference),
+      evidence_location: clean(body.evidence_location),
+      mandatory: clean(body.mandatory_status) !== "optional",
+      status: clean(body.status) || "current",
+      notes: clean(body.notes),
+      created_by: user.id,
+      created_by_email: user.email
+    })
+  },
   checklists: {
     table: "participant_checklists",
     auditAction: "participant_checklist",
@@ -134,7 +181,11 @@ export async function GET(request: Request, context: { params: Promise<{ module:
 
   let query = auth.client.from(config.table).select("*").order("created_at", { ascending: false }).limit(200);
   if (!canManage && config.workerEmailField) query = query.eq(config.workerEmailField, auth.user.email.toLowerCase());
-  if (!canManage && !config.workerEmailField) return NextResponse.json({ message: "You do not have permission to view this module." }, { status: 403 });
+  if (!canManage && config.participantNameField) {
+    const participantNames = await loadAssignedParticipants(auth.client, auth.user.email.toLowerCase());
+    query = participantNames.length ? query.in(config.participantNameField, participantNames) : query.in(config.participantNameField, ["__none__"]);
+  }
+  if (!canManage && !config.workerEmailField && !config.participantNameField) return NextResponse.json({ message: "You do not have permission to view this module." }, { status: 403 });
 
   const [records, participants, workers, shifts] = await Promise.all([
     query,
@@ -163,7 +214,7 @@ export async function POST(request: Request, context: { params: Promise<{ module
   const config = moduleConfig(moduleKey);
   if (!config) return NextResponse.json({ message: "Unknown operations module." }, { status: 404 });
   const canManage = requireRole(auth.user, ["admin", "team_leader"]);
-  if (config.managerOnly && !canManage) return NextResponse.json({ message: "Manager access is required." }, { status: 403 });
+  if ((config.managerOnly || config.managerOnlyCreate) && !canManage) return NextResponse.json({ message: "Manager access is required." }, { status: 403 });
 
   const body = await request.json();
   const payload = config.buildPayload(body, auth.user);
@@ -213,9 +264,11 @@ function moduleConfig(value: string): ModuleConfig | null {
 
 function requiredValuesPresent(module: string, payload: Record<string, unknown>) {
   if (module === "travel") return Boolean(payload.participant_name && payload.worker_email && payload.travel_date && Number(payload.kilometres) >= 0);
+  if (module === "emergency-contacts") return Boolean(payload.participant_name && payload.contact_name && payload.phone);
   if (module === "participant-matching") return Boolean(payload.participant_name && payload.worker_email && Number(payload.match_score) >= 0);
   if (module === "visitors") return Boolean(payload.visitor_name && payload.visit_date && payload.sign_in_time && payload.purpose);
   if (module === "vehicles") return Boolean(payload.registration && payload.make_model);
+  if (module === "training-records") return Boolean(payload.worker_email && payload.training_name);
   if (module === "checklists") return Boolean(payload.participant_name && payload.checklist_title && payload.assigned_worker_email && payload.checklist_items);
   return false;
 }
@@ -235,5 +288,12 @@ function operationsTitle(module: string) {
 
 function operationsHref(module: string) {
   if (module === "participant-matching") return "/participant-matching";
+  if (module === "emergency-contacts") return "/emergency-contacts";
+  if (module === "training-records") return "/training-records";
   return `/${module}`;
+}
+
+async function loadAssignedParticipants(client: SupabaseClient, email: string) {
+  const { data } = await client.from("shifts").select("participant_name").eq("support_worker_email", email);
+  return Array.from(new Set((data ?? []).map((row) => String(row.participant_name ?? "")).filter(Boolean)));
 }

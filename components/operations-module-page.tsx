@@ -1,11 +1,11 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Bell, Car, ClipboardList, MapPinned, Route, ShieldCheck, UserRoundCheck, UsersRound, type LucideIcon } from "lucide-react";
+import { Bell, Car, ClipboardList, GraduationCap, MapPinned, Phone, Route, ShieldCheck, UserRoundCheck, UsersRound, type LucideIcon } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { supabase } from "@/lib/supabase";
 
-type ModuleKey = "travel" | "participant-matching" | "visitors" | "vehicles" | "checklists";
+type ModuleKey = "travel" | "participant-matching" | "emergency-contacts" | "visitors" | "vehicles" | "training-records" | "checklists";
 type FieldType = "text" | "date" | "time" | "number" | "textarea" | "participant" | "worker" | "shift" | "select";
 
 type FieldConfig = {
@@ -65,6 +65,39 @@ const moduleConfig: Record<ModuleKey, ModuleConfig> = {
       { label: "Worker", value: (row) => String(row.worker_name ?? row.worker_email ?? "") },
       { label: "Date", value: (row) => dateLabel(row.travel_date) },
       { label: "Kilometres", value: (row) => `${Number(row.kilometres ?? 0).toFixed(1)} km` },
+      { label: "Status", value: (row) => String(row.status ?? "") }
+    ]
+  },
+  "emergency-contacts": {
+    title: "Emergency Contacts",
+    eyebrow: "Maintain participant emergency contacts with consent, priority, and relationship details.",
+    description: "Admin can manage contact details. Support workers can view emergency contacts only for participants assigned to their shifts.",
+    icon: Phone,
+    endpoint: "/api/operations/emergency-contacts",
+    submitLabel: "Save emergency contact",
+    emptyTitle: "No emergency contacts",
+    emptyMessage: "Emergency contacts will appear after admin adds participant contact details.",
+    fields: [
+      { name: "participant_name", label: "Participant", type: "participant" },
+      { name: "contact_name", label: "Contact name", type: "text", placeholder: "Full name" },
+      { name: "relationship", label: "Relationship", type: "select", options: ["Parent", "Guardian", "Partner", "Sibling", "Support coordinator", "Plan nominee", "Other"] },
+      { name: "phone", label: "Phone", type: "text", placeholder: "Mobile or landline" },
+      { name: "email", label: "Email", type: "text", required: false },
+      { name: "priority", label: "Priority", type: "select", options: ["primary", "secondary", "other"] },
+      { name: "consent_status", label: "Consent to contact", type: "select", options: ["consent_to_contact", "do_not_contact"] },
+      { name: "notes", label: "Notes", type: "textarea", required: false },
+      { name: "status", label: "Status", type: "select", options: ["active", "inactive"] }
+    ],
+    summary: [
+      { label: "Contacts", value: (records) => String(records.length) },
+      { label: "Primary", value: (records) => String(records.filter((row) => String(row.priority ?? "") === "primary").length) },
+      { label: "Consent", value: (records) => String(records.filter((row) => Boolean(row.consent_to_contact)).length) }
+    ],
+    columns: [
+      { label: "Participant", value: (row) => String(row.participant_name ?? "") },
+      { label: "Contact", value: (row) => String(row.contact_name ?? "") },
+      { label: "Relationship", value: (row) => String(row.relationship ?? "") },
+      { label: "Phone", value: (row) => String(row.phone ?? "") },
       { label: "Status", value: (row) => String(row.status ?? "") }
     ]
   },
@@ -162,6 +195,39 @@ const moduleConfig: Record<ModuleKey, ModuleConfig> = {
       { label: "Status", value: (row) => String(row.status ?? "") }
     ]
   },
+  "training-records": {
+    title: "Training Records",
+    eyebrow: "Track worker training, mandatory certificates, expiry dates, and evidence references.",
+    description: "Support workers can submit their own training evidence. Admin can manage all worker training and expiry alerts.",
+    icon: GraduationCap,
+    endpoint: "/api/operations/training-records",
+    submitLabel: "Save training record",
+    emptyTitle: "No training records",
+    emptyMessage: "Training and certificate records will appear after they are saved.",
+    fields: [
+      { name: "worker_email", label: "Support worker", type: "worker" },
+      { name: "training_name", label: "Training / certificate", type: "text", placeholder: "Medication assistance, CPR, manual handling" },
+      { name: "provider", label: "Training provider", type: "text", required: false },
+      { name: "completion_date", label: "Completion date", type: "date", required: false },
+      { name: "expiry_date", label: "Expiry date", type: "date", required: false },
+      { name: "certificate_reference", label: "Certificate reference", type: "text", required: false },
+      { name: "evidence_location", label: "Evidence location", type: "text", required: false },
+      { name: "mandatory_status", label: "Requirement", type: "select", options: ["required", "optional"] },
+      { name: "status", label: "Status", type: "select", options: ["current", "expiring", "expired", "planned"] },
+      { name: "notes", label: "Notes", type: "textarea", required: false }
+    ],
+    summary: [
+      { label: "Records", value: (records) => String(records.length) },
+      { label: "Mandatory", value: (records) => String(records.filter((row) => Boolean(row.mandatory)).length) },
+      { label: "Due soon", value: (records) => String(records.filter((row) => isDueSoon(row.expiry_date)).length) }
+    ],
+    columns: [
+      { label: "Worker", value: (row) => String(row.worker_name ?? row.worker_email ?? "") },
+      { label: "Training", value: (row) => String(row.training_name ?? "") },
+      { label: "Expiry", value: (row) => dateLabel(row.expiry_date) },
+      { label: "Status", value: (row) => String(row.status ?? "") }
+    ]
+  },
   checklists: {
     title: "Participant Checklists",
     eyebrow: "Assign participant-specific tasks, routines, and required completion checks.",
@@ -224,7 +290,12 @@ export function OperationsModulePage({ module }: { module: ModuleKey }) {
     }
     setRecords(result.records ?? []);
     setParticipants(result.participants ?? []);
-    setWorkers(result.workers ?? []);
+    const workerOptions = (result.workers ?? []).length
+      ? result.workers
+      : result.currentUser
+        ? [{ name: result.currentUser.name, email: result.currentUser.email }]
+        : [];
+    setWorkers(workerOptions);
     setShifts(result.shifts ?? []);
     setCanManage(Boolean(result.canManage));
     setNotice((result.records ?? []).length ? `${config.title} loaded from Supabase.` : config.emptyMessage);
@@ -290,7 +361,7 @@ export function OperationsModulePage({ module }: { module: ModuleKey }) {
             </div>
             <ShieldCheck className="h-5 w-5 text-gumleaf" />
           </div>
-          {canManage || module === "travel" || module === "checklists" ? (
+          {canManage || module === "travel" || module === "training-records" || module === "checklists" ? (
             <form onSubmit={submit} className="grid gap-4">
               {config.fields.map((field) => <OperationField key={field.name} field={field} participants={participants} workers={workers} shifts={shifts} />)}
               <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d625d]">
@@ -381,4 +452,12 @@ function dateLabel(value: unknown) {
   const date = new Date(String(value));
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function isDueSoon(value: unknown) {
+  if (!value) return false;
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return false;
+  const days = (date.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+  return days >= 0 && days <= 45;
 }

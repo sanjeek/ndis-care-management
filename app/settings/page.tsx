@@ -1,5 +1,5 @@
-import { SimpleModulePage } from "@/components/module-pages";
+import { SettingsConsolePage } from "@/components/settings-console-page";
 
 export default function Page() {
-  return <SimpleModulePage kind="settings" />;
+  return <SettingsConsolePage />;
 }

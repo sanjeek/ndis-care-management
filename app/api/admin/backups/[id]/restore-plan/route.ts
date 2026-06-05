@@ -4,9 +4,12 @@ import { recordServerAudit } from "@/lib/server-audit";
 
 const restoreOrder = [
   "profiles",
+  "organisation_settings",
   "organisation_branches",
   "participants",
   "support_workers",
+  "worker_training_records",
+  "participant_emergency_contacts",
   "worker_invitations",
   "worker_availability",
   "worker_leave_requests",

@@ -61,6 +61,42 @@ export async function GET(request: Request) {
     })));
   }
 
+  if (isAdmin || role === "support_worker") {
+    let training = auth.client
+      .from("worker_training_records")
+      .select("id, worker_name, worker_email, training_name, provider, status, expiry_date")
+      .or(`worker_name.ilike.${term},worker_email.ilike.${term},training_name.ilike.${term},provider.ilike.${term},status.ilike.${term}`)
+      .order("expiry_date", { ascending: true, nullsFirst: false })
+      .limit(8);
+    if (role === "support_worker") training = training.eq("worker_email", email);
+    const { data } = await training;
+    results.push(...(data ?? []).map((row) => ({
+      id: `training-${row.id}`,
+      type: "Training",
+      title: String(row.training_name ?? "Training record"),
+      subtitle: [row.worker_name, row.status, row.expiry_date].filter(Boolean).join(" | "),
+      href: "/training-records"
+    })));
+  }
+
+  if (isManager || role === "support_worker") {
+    let contacts = auth.client
+      .from("participant_emergency_contacts")
+      .select("id, participant_name, contact_name, relationship, phone, status")
+      .or(`participant_name.ilike.${term},contact_name.ilike.${term},relationship.ilike.${term},phone.ilike.${term},status.ilike.${term}`)
+      .order("participant_name", { ascending: true })
+      .limit(8);
+    if (role === "support_worker") contacts = contacts.in("participant_name", assignedParticipants.length ? assignedParticipants : ["__none__"]);
+    const { data } = await contacts;
+    results.push(...(data ?? []).map((row) => ({
+      id: `emergency-contact-${row.id}`,
+      type: "Emergency contact",
+      title: String(row.contact_name ?? "Emergency contact"),
+      subtitle: [row.participant_name, row.relationship, row.phone].filter(Boolean).join(" | "),
+      href: "/emergency-contacts"
+    })));
+  }
+
   if (isManager || role === "support_worker" || role === "family") {
     let shifts = auth.client
       .from("shifts")
