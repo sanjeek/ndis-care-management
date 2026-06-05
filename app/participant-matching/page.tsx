@@ -1,5 +1,5 @@
-import { OperationsModulePage } from "@/components/operations-module-page";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <OperationsModulePage module="participant-matching" />;
+  redirect("/participants");
 }

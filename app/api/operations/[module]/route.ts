@@ -5,7 +5,7 @@ import { notifyCareEvent } from "@/lib/care-notifications";
 import { getAdminNotificationRecipients } from "@/lib/email-notifications";
 import { recordServerAudit } from "@/lib/server-audit";
 
-type ModuleKey = "travel" | "participant-matching" | "emergency-contacts" | "visitors" | "vehicles" | "training-records" | "checklists";
+type ModuleKey = "travel" | "emergency-contacts" | "visitors" | "vehicles" | "training-records" | "checklists";
 
 type ModuleConfig = {
   table: string;
@@ -62,25 +62,6 @@ const modules: Record<ModuleKey, ModuleConfig> = {
       consent_to_contact: clean(body.consent_status) !== "do_not_contact",
       notes: clean(body.notes),
       status: clean(body.status) || "active",
-      created_by: user.id,
-      created_by_email: user.email
-    })
-  },
-  "participant-matching": {
-    table: "participant_matches",
-    auditAction: "participant_matching",
-    labelField: "participant_name",
-    managerOnly: true,
-    notify: true,
-    buildPayload: (body, user) => ({
-      participant_name: clean(body.participant_name),
-      worker_name: clean(body.worker_name),
-      worker_email: clean(body.worker_email).toLowerCase(),
-      match_score: numberValue(body.match_score),
-      matching_preferences: clean(body.matching_preferences),
-      support_need_alignment: clean(body.support_need_alignment),
-      restrictions: clean(body.restrictions),
-      status: clean(body.status) || "recommended",
       created_by: user.id,
       created_by_email: user.email
     })
@@ -355,7 +336,6 @@ function moduleConfig(value: string): ModuleConfig | null {
 function requiredValuesPresent(module: string, payload: Record<string, unknown>) {
   if (module === "travel") return Boolean(payload.participant_name && payload.worker_email && payload.travel_date && Number(payload.kilometres) >= 0);
   if (module === "emergency-contacts") return Boolean(payload.participant_name && payload.contact_name && payload.phone);
-  if (module === "participant-matching") return Boolean(payload.participant_name && payload.worker_email && Number(payload.match_score) >= 0);
   if (module === "visitors") return Boolean(payload.visitor_name && payload.visit_date && payload.sign_in_time && payload.purpose);
   if (module === "vehicles") return Boolean(payload.registration && payload.make_model);
   if (module === "training-records") return Boolean(payload.worker_email && payload.training_name);
@@ -484,7 +464,6 @@ function operationsTitle(module: string) {
 }
 
 function operationsHref(module: string) {
-  if (module === "participant-matching") return "/participant-matching";
   if (module === "emergency-contacts") return "/participants";
   if (module === "training-records") return "/training-records";
   return `/${module}`;

@@ -1,11 +1,11 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Bell, Car, ClipboardList, GraduationCap, MapPinned, Phone, Route, ShieldCheck, UserRoundCheck, UsersRound, type LucideIcon } from "lucide-react";
+import { Bell, Car, ClipboardList, GraduationCap, MapPinned, Phone, Route, ShieldCheck, UsersRound, type LucideIcon } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { supabase } from "@/lib/supabase";
 
-type ModuleKey = "travel" | "participant-matching" | "emergency-contacts" | "visitors" | "vehicles" | "training-records" | "checklists";
+type ModuleKey = "travel" | "emergency-contacts" | "visitors" | "vehicles" | "training-records" | "checklists";
 type FieldType = "text" | "date" | "time" | "number" | "textarea" | "participant" | "worker" | "shift" | "select";
 
 type FieldConfig = {
@@ -98,36 +98,6 @@ const moduleConfig: Record<ModuleKey, ModuleConfig> = {
       { label: "Contact", value: (row) => String(row.contact_name ?? "") },
       { label: "Relationship", value: (row) => String(row.relationship ?? "") },
       { label: "Phone", value: (row) => String(row.phone ?? "") },
-      { label: "Status", value: (row) => String(row.status ?? "") }
-    ]
-  },
-  "participant-matching": {
-    title: "Participant Matching",
-    eyebrow: "Match participant preferences, support needs, and worker suitability.",
-    description: "Coordinator records show why a worker is recommended, restricted, or unsuitable for a participant.",
-    icon: UserRoundCheck,
-    endpoint: "/api/operations/participant-matching",
-    submitLabel: "Save match",
-    emptyTitle: "No participant matches",
-    emptyMessage: "Matching recommendations will appear here after a coordinator creates them.",
-    fields: [
-      { name: "participant_name", label: "Participant", type: "participant" },
-      { name: "worker_email", label: "Support worker", type: "worker" },
-      { name: "match_score", label: "Match score", type: "number", placeholder: "85" },
-      { name: "matching_preferences", label: "Participant preferences", type: "textarea" },
-      { name: "support_need_alignment", label: "Support need alignment", type: "textarea" },
-      { name: "restrictions", label: "Restrictions or conflicts", type: "textarea", required: false },
-      { name: "status", label: "Status", type: "select", options: ["recommended", "review_required", "restricted", "inactive"] }
-    ],
-    summary: [
-      { label: "Matches", value: (records) => String(records.length) },
-      { label: "Recommended", value: (records) => String(records.filter((row) => String(row.status ?? "") === "recommended").length) },
-      { label: "Avg score", value: (records) => records.length ? Math.round(records.reduce((sum, row) => sum + Number(row.match_score ?? 0), 0) / records.length).toString() : "0" }
-    ],
-    columns: [
-      { label: "Participant", value: (row) => String(row.participant_name ?? "") },
-      { label: "Worker", value: (row) => String(row.worker_name ?? row.worker_email ?? "") },
-      { label: "Score", value: (row) => `${Number(row.match_score ?? 0)}%` },
       { label: "Status", value: (row) => String(row.status ?? "") }
     ]
   },

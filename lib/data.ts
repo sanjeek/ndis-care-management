@@ -53,7 +53,6 @@ export const navItems = [
   { label: "Invoices", href: "/invoices", icon: ReceiptText },
   { label: "NDIS Funding", href: "/funding", icon: CircleDollarSign },
   { label: "Support Coordination", href: "/support-coordination", icon: Network },
-  { label: "Participant Matching", href: "/participant-matching", icon: UserCog },
   { label: "Service Agreements", href: "/service-agreements", icon: FileSignature },
   { label: "Documents", href: "/documents", icon: WalletCards },
   { label: "Shift Attachments", href: "/shift-attachments", icon: Paperclip },
