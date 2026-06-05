@@ -93,7 +93,7 @@ export async function GET(request: Request) {
       type: "Emergency contact",
       title: String(row.contact_name ?? "Emergency contact"),
       subtitle: [row.participant_name, row.relationship, row.phone].filter(Boolean).join(" | "),
-      href: "/emergency-contacts"
+      href: "/participants"
     })));
   }
 

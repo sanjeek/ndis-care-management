@@ -288,7 +288,7 @@ function operationsTitle(module: string) {
 
 function operationsHref(module: string) {
   if (module === "participant-matching") return "/participant-matching";
-  if (module === "emergency-contacts") return "/emergency-contacts";
+  if (module === "emergency-contacts") return "/participants";
   if (module === "training-records") return "/training-records";
   return `/${module}`;
 }

@@ -20,6 +20,7 @@ import {
   KeyRound,
   LockKeyhole,
   MoreVertical,
+  Phone,
   Plus,
   Search,
   ShieldCheck,
@@ -53,6 +54,20 @@ type ParticipantRecord = {
   communicationPreferences: string;
   docs: number;
   notes: number;
+};
+
+type EmergencyContactRecord = {
+  id: string;
+  participantName: string;
+  contactName: string;
+  relationship: string;
+  phone: string;
+  email: string;
+  priority: string;
+  consentToContact: boolean;
+  notes: string;
+  status: string;
+  createdAt: string;
 };
 
 type ParticipantDocument = {
@@ -658,9 +673,11 @@ function AnalyticsMini({ title, value, detail }: { title: string; value: string;
 
 export function ParticipantsPage() {
   const [participants, setParticipants] = useState<ParticipantRecord[]>([]);
+  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContactRecord[]>([]);
   const [notice, setNotice] = useState("Loading participant records from Supabase.");
   const [canManageParticipants, setCanManageParticipants] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [contactCreateOpen, setContactCreateOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     const context = await getCurrentUserContext();
@@ -669,7 +686,9 @@ export function ParticipantsPage() {
     const rows = context.role === "support_worker" && context.email
       ? await loadParticipantsForShifts(await loadShifts(context.email))
       : await loadParticipants();
+    const contacts = await loadEmergencyContacts(context.role, rows.map((participant) => participant.name));
     setParticipants(rows);
+    setEmergencyContacts(contacts);
     setNotice(
       context.role === "support_worker"
         ? rows.length
@@ -710,6 +729,26 @@ export function ParticipantsPage() {
     return ok;
   }
 
+  async function submitEmergencyContact(form: FormData) {
+    const payload = {
+      participant_name: get(form, "participant"),
+      contact_name: get(form, "contactName"),
+      relationship: get(form, "relationship"),
+      phone: get(form, "phone"),
+      email: get(form, "email"),
+      priority: get(form, "priority"),
+      consent_status: get(form, "consentStatus"),
+      notes: get(form, "notes"),
+      status: get(form, "status")
+    };
+    const ok = await postJson("/api/operations/emergency-contacts", payload, setNotice);
+    if (ok) {
+      await refresh();
+      setContactCreateOpen(false);
+    }
+    return ok;
+  }
+
   return (
     <AppShell title="Participants" eyebrow={notice}>
       {canManageParticipants ? (
@@ -719,14 +758,24 @@ export function ParticipantsPage() {
               <h2 className="text-lg font-semibold text-ink">Participant records</h2>
               <p className="mt-1 text-sm text-slate-500">Add, review, and open participant profiles from one table.</p>
             </div>
-            <button
-              type="button"
-              onClick={() => setCreateOpen(true)}
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-gumleaf px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-harbour sm:w-auto"
-            >
-              <Plus className="h-4 w-4" />
-              New participant
-            </button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => setContactCreateOpen(true)}
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-[#cfe9e4] bg-[#eef7f5] px-4 py-2.5 text-sm font-semibold text-[#2f766f] shadow-sm transition hover:bg-[#dff0ec] sm:w-auto"
+              >
+                <Phone className="h-4 w-4" />
+                New emergency contact
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreateOpen(true)}
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-gumleaf px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-harbour sm:w-auto"
+              >
+                <Plus className="h-4 w-4" />
+                New participant
+              </button>
+            </div>
           </div>
         </section>
       ) : (
@@ -735,6 +784,7 @@ export function ParticipantsPage() {
         </section>
       )}
       {createOpen ? <ParticipantCreateModal onClose={() => setCreateOpen(false)} onSubmit={submit} /> : null}
+      {contactCreateOpen ? <EmergencyContactCreateModal participants={participants} onClose={() => setContactCreateOpen(false)} onSubmit={submitEmergencyContact} /> : null}
       {participants.length ? (
         <section className="mt-6 overflow-hidden rounded border border-indigo-100 bg-white shadow-panel">
           <div className="flex items-center justify-between border-b border-indigo-100 bg-[#fbfdff] px-4 py-3">
@@ -765,7 +815,16 @@ export function ParticipantsPage() {
                     <td className="border-r border-indigo-50 px-4 py-4">
                       <span className="rounded bg-harbour/10 px-2.5 py-1 text-xs font-semibold text-harbour">{participant.plan || "Not recorded"}</span>
                     </td>
-                    <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{participant.emergency || "Not recorded"}</td>
+                    <td className="max-w-[260px] border-r border-indigo-50 px-4 py-4 text-slate-700">
+                      {participant.emergency || participant.emergencyContacts ? (
+                        <div className="space-y-1">
+                          <p className="font-medium text-ink">{participant.emergency || "Primary contact not recorded"}</p>
+                          <p className="line-clamp-2 text-xs leading-5 text-slate-500">{participant.emergencyContacts || "Additional contacts not recorded"}</p>
+                        </div>
+                      ) : (
+                        "Not recorded"
+                      )}
+                    </td>
                     <td className="max-w-[260px] border-r border-indigo-50 px-4 py-4 text-slate-700">
                       <span className="line-clamp-2">{participant.needs || "Not recorded"}</span>
                     </td>
@@ -787,6 +846,7 @@ export function ParticipantsPage() {
           message={canManageParticipants ? "Participant records will appear here after they are added to the database." : "Participant records appear here only when you are assigned to their shifts."}
         />
       )}
+      <EmergencyContactsTable contacts={emergencyContacts} canManage={canManageParticipants} onAdd={() => setContactCreateOpen(true)} />
     </AppShell>
   );
 }
@@ -836,6 +896,150 @@ function ParticipantCreateModal({
       </div>
     </div>
   );
+}
+
+function EmergencyContactCreateModal({
+  participants,
+  onClose,
+  onSubmit
+}: {
+  participants: ParticipantRecord[];
+  onClose: () => void;
+  onSubmit: (form: FormData) => Promise<boolean | void>;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/45 px-4 py-6 backdrop-blur-sm sm:items-center">
+      <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-indigo-100 bg-[#fbfdff] px-5 py-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gumleaf">Participant module</p>
+            <h2 className="mt-1 text-xl font-semibold text-ink">New emergency contact</h2>
+            <p className="mt-1 text-sm text-slate-500">Save emergency contact details against a participant profile.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-indigo-100 bg-white text-slate-500 transition hover:bg-indigo-50 hover:text-ink"
+            aria-label="Close emergency contact form"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="max-h-[76vh] overflow-y-auto p-5 scrollbar-subtle">
+          {participants.length ? (
+            <RecordForm submitLabel="Save emergency contact" onSubmit={onSubmit}>
+              <Select name="participant" label="Participant" options={participants.map((participant) => participant.name)} />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field name="contactName" label="Contact name" placeholder="Full name" />
+                <Select name="relationship" label="Relationship" options={["Parent", "Guardian", "Partner", "Sibling", "Support coordinator", "Plan nominee", "Other"]} />
+                <Field name="phone" label="Phone" placeholder="Mobile or landline" />
+                <Field name="email" label="Email" placeholder="name@example.com" required={false} />
+                <Select name="priority" label="Priority" options={["primary", "secondary", "other"]} />
+                <Select name="consentStatus" label="Consent to contact" options={["consent_to_contact", "do_not_contact"]} renderLabel={friendlyConsentStatus} />
+                <Select name="status" label="Status" options={["active", "inactive"]} />
+              </div>
+              <OptionalArea name="notes" label="Notes" placeholder="Availability, best time to call, language preference, or contact instructions" />
+            </RecordForm>
+          ) : (
+            <EmptyWorkerState title="Participant required" message="Create a participant before adding emergency contacts." />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmergencyContactsTable({
+  contacts,
+  canManage,
+  onAdd
+}: {
+  contacts: EmergencyContactRecord[];
+  canManage: boolean;
+  onAdd: () => void;
+}) {
+  return (
+    <section className="mt-6 overflow-hidden rounded border border-indigo-100 bg-white shadow-panel">
+      <div className="flex flex-col gap-3 border-b border-indigo-100 bg-[#fbfdff] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-semibold text-ink">Emergency contacts</h2>
+          <p className="mt-1 text-sm text-slate-500">Participant emergency contacts are managed inside the Participants page.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="rounded bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-indigo-100">{contacts.length} records</span>
+          {canManage ? (
+            <button
+              type="button"
+              onClick={onAdd}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#cfe9e4] bg-[#eef7f5] px-3 py-2 text-xs font-semibold text-[#2f766f] transition hover:bg-[#dff0ec]"
+            >
+              <Phone className="h-4 w-4" />
+              Add contact
+            </button>
+          ) : null}
+        </div>
+      </div>
+      {contacts.length ? (
+        <div className="overflow-x-auto scrollbar-subtle">
+          <table className="w-full min-w-[1040px] border-collapse text-left text-sm">
+            <thead className="border-b border-indigo-100 bg-indigo-50/35 text-xs uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="border-r border-indigo-100 px-4 py-3">Participant</th>
+                <th className="border-r border-indigo-100 px-4 py-3">Contact</th>
+                <th className="border-r border-indigo-100 px-4 py-3">Relationship</th>
+                <th className="border-r border-indigo-100 px-4 py-3">Phone</th>
+                <th className="border-r border-indigo-100 px-4 py-3">Email</th>
+                <th className="border-r border-indigo-100 px-4 py-3">Priority</th>
+                <th className="border-r border-indigo-100 px-4 py-3">Consent</th>
+                <th className="border-r border-indigo-100 px-4 py-3">Status</th>
+                <th className="px-4 py-3">Notes</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-indigo-50">
+              {contacts.map((contact) => (
+                <tr key={contact.id} className="transition hover:bg-[#fbfffe]">
+                  <td className="border-r border-indigo-50 px-4 py-4 font-semibold text-ink">{contact.participantName || "Not recorded"}</td>
+                  <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{contact.contactName || "Not recorded"}</td>
+                  <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{contact.relationship || "Not recorded"}</td>
+                  <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{contact.phone || "Not recorded"}</td>
+                  <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{contact.email || "Not recorded"}</td>
+                  <td className="border-r border-indigo-50 px-4 py-4">
+                    <span className={emergencyPriorityClass(contact.priority)}>{contact.priority || "other"}</span>
+                  </td>
+                  <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{contact.consentToContact ? "Consent to contact" : "Do not contact"}</td>
+                  <td className="border-r border-indigo-50 px-4 py-4">
+                    <span className={contact.status === "active" ? "rounded bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700" : "rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600"}>
+                      {contact.status || "active"}
+                    </span>
+                  </td>
+                  <td className="max-w-[300px] px-4 py-4 text-slate-700">
+                    <span className="line-clamp-2">{contact.notes || "Not recorded"}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="p-4">
+          <EmptyWorkerState
+            title="No emergency contacts"
+            message={canManage ? "Add participant emergency contacts from this page." : "Emergency contacts for your assigned participants will appear here."}
+          />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function friendlyConsentStatus(value: string) {
+  return value === "do_not_contact" ? "Do not contact" : "Consent to contact";
+}
+
+function emergencyPriorityClass(priority: string) {
+  if (priority === "primary") return "rounded bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700";
+  if (priority === "secondary") return "rounded bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700";
+  return "rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600";
 }
 
 export function ParticipantProfilePage({ participantId }: { participantId: string }) {
@@ -3997,6 +4201,36 @@ async function loadParticipants(): Promise<ParticipantRecord[]> {
   const { data, error } = await supabase.from("participants").select("*").order("created_at", { ascending: false });
   if (error || !data) return [];
   return data.map(mapParticipantRow);
+}
+
+async function loadEmergencyContacts(role: UserRole, participantNames: string[]): Promise<EmergencyContactRecord[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  const assignedNames = participantNames.filter(Boolean);
+  let query = supabase
+    .from("participant_emergency_contacts")
+    .select("*")
+    .order("priority", { ascending: true })
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (role === "support_worker") {
+    if (!assignedNames.length) return [];
+    query = query.in("participant_name", assignedNames);
+  }
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: String(row.id ?? ""),
+    participantName: String(row.participant_name ?? ""),
+    contactName: String(row.contact_name ?? ""),
+    relationship: String(row.relationship ?? ""),
+    phone: String(row.phone ?? ""),
+    email: String(row.email ?? ""),
+    priority: String(row.priority ?? "primary"),
+    consentToContact: Boolean(row.consent_to_contact),
+    notes: String(row.notes ?? ""),
+    status: String(row.status ?? "active"),
+    createdAt: String(row.created_at ?? "")
+  }));
 }
 
 async function loadParticipantById(participantId: string): Promise<ParticipantRecord | null> {

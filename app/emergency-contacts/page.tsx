@@ -1,5 +1,5 @@
-import { OperationsModulePage } from "@/components/operations-module-page";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <OperationsModulePage module="emergency-contacts" />;
+  redirect("/participants");
 }
