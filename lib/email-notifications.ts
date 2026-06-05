@@ -14,6 +14,7 @@ export type EmailNotificationType =
   | "shift_acceptance"
   | "shift_reminder"
   | "missed_clock_in"
+  | "contractor_invoice"
   | "payroll_export"
   | "operations_update";
 
@@ -23,6 +24,7 @@ type EmailInput = {
   subject: string;
   text: string;
   html?: string;
+  replyTo?: string;
   metadata?: Record<string, unknown>;
 };
 
@@ -87,7 +89,8 @@ export async function sendCareNotification(client: SupabaseClient, input: EmailI
           to: recipient,
           subject: input.subject,
           text: input.text,
-          html: input.html || textToHtml(input.text)
+          html: input.html || textToHtml(input.text),
+          ...(input.replyTo ? { reply_to: input.replyTo } : {})
         })
       });
       const result = await response.json().catch(() => ({}));

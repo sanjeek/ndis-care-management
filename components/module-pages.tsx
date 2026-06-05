@@ -104,6 +104,7 @@ type CarePlanRecord = {
 type WorkerRecord = {
   name: string;
   email: string;
+  abn: string;
   role: string;
   availability: string;
   qualifications: string;
@@ -1277,6 +1278,7 @@ export function WorkersPage() {
     const next = {
       name: get(form, "name"),
       email: get(form, "email"),
+      abn: get(form, "abn"),
       role: get(form, "role"),
       availability: get(form, "availability"),
       qualifications: get(form, "qualifications"),
@@ -1362,6 +1364,7 @@ export function WorkersPage() {
       <RecordForm submitLabel="Add worker and send invite" onSubmit={submit}>
         <Field name="name" label="Staff profile" placeholder="Full name" />
         <Field name="email" label="Email invite address" type="email" placeholder="worker@example.com" />
+        <Field name="abn" label="ABN" placeholder="11 digit Australian Business Number" />
         <Field name="role" label="Role" placeholder="Disability Support Worker" />
         <Field name="availability" label="Availability" placeholder="Available days and hours" />
         <Area name="qualifications" label="Qualifications" placeholder="Qualifications, training, clearances, and checks" />
@@ -1382,6 +1385,7 @@ export function WorkersPage() {
               <h2 className="font-semibold text-ink">{worker.name}</h2>
               <p className="text-sm text-slate-500">{worker.role || "Role not recorded"}</p>
               <Info label="Invite email" value={worker.email || "Not recorded"} />
+              <Info label="ABN" value={worker.abn || "Not recorded"} />
               <Info label="Availability" value={worker.availability || "Not recorded"} />
               <Info label="Qualifications" value={worker.qualifications || "Not recorded"} />
               <Info label="Compliance" value={worker.compliance || "Not recorded"} />
@@ -4397,6 +4401,7 @@ async function loadWorkers(): Promise<WorkerRecord[]> {
     return {
       name,
       email: String(row.email ?? ""),
+      abn: String(row.abn ?? ""),
       role: String(row.role ?? ""),
       availability: String(row.availability ?? ""),
       qualifications: String(row.qualifications ?? ""),

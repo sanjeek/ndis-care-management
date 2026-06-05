@@ -1056,7 +1056,7 @@ const navGroupDefinitions = [
   { label: "Workforce", hrefs: ["/support-workers", "/training-records", "/admin/users", "/worker-portal", "/my-shifts", "/travel", "/profile"] },
   { label: "Rostering", hrefs: ["/rostering", "/timesheets", "/payroll"] },
   { label: "Service Delivery", hrefs: ["/progress-notes", "/incident-reports", "/support-coordination", "/tasks", "/messages", "/visitors", "/vehicles"] },
-  { label: "Finance", hrefs: ["/invoices", "/funding", "/service-agreements"] },
+  { label: "Finance", hrefs: ["/invoices", "/contractor-invoices", "/funding", "/service-agreements"] },
   { label: "Reports", hrefs: ["/admin/compliance", "/admin/audit", "/admin/reminders"] },
   { label: "Documents", hrefs: ["/documents", "/shift-attachments"] },
   { label: "Administration", hrefs: ["/branches", "/admin/backups", "/settings"] }

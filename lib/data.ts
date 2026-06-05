@@ -51,6 +51,7 @@ export const navItems = [
   { label: "Incident Reports", href: "/incident-reports", icon: AlertTriangle },
   { label: "Risk Assessments", href: "/risk-assessments", icon: ClipboardList },
   { label: "Invoices", href: "/invoices", icon: ReceiptText },
+  { label: "Contractor Invoices", href: "/contractor-invoices", icon: ReceiptText },
   { label: "NDIS Funding", href: "/funding", icon: CircleDollarSign },
   { label: "Support Coordination", href: "/support-coordination", icon: Network },
   { label: "Service Agreements", href: "/service-agreements", icon: FileSignature },

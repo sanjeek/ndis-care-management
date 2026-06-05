@@ -114,6 +114,7 @@ create table if not exists public.support_workers (
   branch_id uuid references public.organisation_branches(id) on delete set null,
   name text not null,
   email text not null,
+  abn text,
   role text not null,
   availability text not null,
   qualifications text not null,
@@ -129,6 +130,9 @@ create table if not exists public.support_workers (
 
 alter table public.support_workers
 add column if not exists email text;
+
+alter table public.support_workers
+add column if not exists abn text;
 
 alter table public.support_workers
 add column if not exists branch_id uuid references public.organisation_branches(id) on delete set null;
@@ -892,6 +896,60 @@ create table if not exists public.payroll_exports (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.public_holidays (
+  id uuid primary key default gen_random_uuid(),
+  holiday_date date not null,
+  name text not null,
+  state text,
+  notes text,
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.contractor_invoices (
+  id uuid primary key default gen_random_uuid(),
+  invoice_number text not null unique,
+  worker_name text not null,
+  worker_email text not null,
+  worker_abn text,
+  period_start date not null,
+  period_end date not null,
+  issue_date date not null default current_date,
+  due_date date,
+  total_hours numeric not null default 0 check (total_hours >= 0),
+  total_amount numeric not null default 0 check (total_amount >= 0),
+  status text not null default 'generated' check (status in ('generated', 'email_pending', 'emailed', 'paid', 'void')),
+  email_to text,
+  emailed_at timestamptz,
+  generated_by uuid references auth.users(id) on delete set null,
+  generated_by_email text,
+  generated_by_name text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.contractor_invoice_items (
+  id uuid primary key default gen_random_uuid(),
+  contractor_invoice_id uuid not null references public.contractor_invoices(id) on delete cascade,
+  shift_id uuid references public.shifts(id) on delete set null,
+  participant_name text not null,
+  shift_date date not null,
+  start_time text not null,
+  end_time text not null,
+  location text,
+  shift_status text,
+  approval_status text,
+  day_type text not null default 'weekday' check (day_type in ('weekday', 'saturday', 'sunday', 'public_holiday')),
+  public_holiday_name text,
+  hours numeric not null default 0 check (hours >= 0),
+  rate numeric not null default 0 check (rate >= 0),
+  amount numeric not null default 0 check (amount >= 0),
+  created_at timestamptz not null default now()
+);
+
 alter table public.invoices
 add column if not exists branch_id uuid references public.organisation_branches(id) on delete set null;
 
@@ -1204,6 +1262,21 @@ on public.incident_reports (branch_id, status);
 create index if not exists invoices_branch_idx
 on public.invoices (branch_id, status);
 
+create unique index if not exists public_holidays_date_state_idx
+on public.public_holidays (holiday_date, (coalesce(state, 'national')));
+
+create index if not exists contractor_invoices_worker_period_idx
+on public.contractor_invoices (lower(worker_email), period_start, period_end);
+
+create index if not exists contractor_invoices_status_idx
+on public.contractor_invoices (status, created_at);
+
+create index if not exists contractor_invoice_items_invoice_idx
+on public.contractor_invoice_items (contractor_invoice_id, shift_date);
+
+create index if not exists contractor_invoice_items_shift_idx
+on public.contractor_invoice_items (shift_id);
+
 alter table public.participants enable row level security;
 alter table public.organisation_branches enable row level security;
 alter table public.profiles enable row level security;
@@ -1234,6 +1307,9 @@ alter table public.ndis_funding_records enable row level security;
 alter table public.invoices enable row level security;
 alter table public.invoice_items enable row level security;
 alter table public.payroll_exports enable row level security;
+alter table public.public_holidays enable row level security;
+alter table public.contractor_invoices enable row level security;
+alter table public.contractor_invoice_items enable row level security;
 alter table public.service_agreements enable row level security;
 alter table public.care_documents enable row level security;
 alter table public.audit_logs enable row level security;
@@ -1279,6 +1355,9 @@ alter table public.ndis_funding_records force row level security;
 alter table public.invoices force row level security;
 alter table public.invoice_items force row level security;
 alter table public.payroll_exports force row level security;
+alter table public.public_holidays force row level security;
+alter table public.contractor_invoices force row level security;
+alter table public.contractor_invoice_items force row level security;
 alter table public.service_agreements force row level security;
 alter table public.care_documents force row level security;
 alter table public.audit_logs force row level security;
@@ -1446,6 +1525,14 @@ drop policy if exists "Admins can manage invoice items" on public.invoice_items;
 drop policy if exists "Team leaders can read invoice items" on public.invoice_items;
 drop policy if exists "Admins can manage payroll exports" on public.payroll_exports;
 drop policy if exists "Team leaders can read payroll exports" on public.payroll_exports;
+drop policy if exists "Authenticated users can read public holidays" on public.public_holidays;
+drop policy if exists "Admins can manage public holidays" on public.public_holidays;
+drop policy if exists "Admins can manage contractor invoices" on public.contractor_invoices;
+drop policy if exists "Team leaders can read contractor invoices" on public.contractor_invoices;
+drop policy if exists "Workers can read own contractor invoices" on public.contractor_invoices;
+drop policy if exists "Admins can manage contractor invoice items" on public.contractor_invoice_items;
+drop policy if exists "Team leaders can read contractor invoice items" on public.contractor_invoice_items;
+drop policy if exists "Workers can read own contractor invoice items" on public.contractor_invoice_items;
 drop policy if exists "Admins can manage service agreements" on public.service_agreements;
 drop policy if exists "Team leaders can read service agreements" on public.service_agreements;
 drop policy if exists "Admins can manage care documents" on public.care_documents;
@@ -2256,6 +2343,62 @@ create policy "Team leaders can read payroll exports"
 on public.payroll_exports for select
 to authenticated
 using (public.is_team_leader());
+
+create policy "Authenticated users can read public holidays"
+on public.public_holidays for select
+to authenticated
+using (auth.role() = 'authenticated');
+
+create policy "Admins can manage public holidays"
+on public.public_holidays for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create policy "Admins can manage contractor invoices"
+on public.contractor_invoices for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create policy "Team leaders can read contractor invoices"
+on public.contractor_invoices for select
+to authenticated
+using (public.is_team_leader());
+
+create policy "Workers can read own contractor invoices"
+on public.contractor_invoices for select
+to authenticated
+using (public.is_support_worker() and lower(worker_email) = public.current_app_email());
+
+create policy "Admins can manage contractor invoice items"
+on public.contractor_invoice_items for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create policy "Team leaders can read contractor invoice items"
+on public.contractor_invoice_items for select
+to authenticated
+using (
+  public.is_team_leader()
+  and exists (
+    select 1 from public.contractor_invoices
+    where contractor_invoices.id = contractor_invoice_items.contractor_invoice_id
+  )
+);
+
+create policy "Workers can read own contractor invoice items"
+on public.contractor_invoice_items for select
+to authenticated
+using (
+  public.is_support_worker()
+  and exists (
+    select 1 from public.contractor_invoices
+    where contractor_invoices.id = contractor_invoice_items.contractor_invoice_id
+      and lower(contractor_invoices.worker_email) = public.current_app_email()
+  )
+);
 
 create policy "Admins can manage service agreements"
 on public.service_agreements for all
