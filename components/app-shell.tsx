@@ -50,7 +50,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchNotice, setSearchNotice] = useState("");
-  const [openNavGroup, setOpenNavGroup] = useState("");
+  const [openNavGroup, setOpenNavGroup] = useState<string | null>(null);
   const lastServerSessionSync = useRef(0);
 
   useEffect(() => {
@@ -293,6 +293,10 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
   const activeNavGroup = groupedNavItems.find((group) => group.active)?.label ?? "";
   const unreadCount = notifications.filter((notification) => !notification.readAt).length;
 
+  useEffect(() => {
+    setOpenNavGroup(null);
+  }, [pathname]);
+
   const initials = useMemo(() => {
     return userName
       .split(" ")
@@ -390,7 +394,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                 );
               }
 
-              const isOpen = group.label === (openNavGroup || activeNavGroup);
+              const isOpen = group.label === (openNavGroup ?? activeNavGroup);
               const Icon = group.icon;
               return (
                 <div key={group.label} className="grid gap-1">
