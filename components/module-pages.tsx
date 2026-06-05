@@ -2973,27 +2973,27 @@ function ShiftTable({
       </div>
       {shifts.length ? (
         <div className="overflow-x-auto scrollbar-subtle">
-          <table className="min-w-[720px] w-full text-left text-sm">
-            <thead className="bg-indigo-50/35 text-xs uppercase tracking-wide text-slate-500">
+          <table className="min-w-[720px] w-full border-collapse text-left text-sm">
+            <thead className="border-b border-indigo-100 bg-indigo-50/35 text-xs uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="px-4 py-3">Time</th>
-                <th className="px-4 py-3">Participant</th>
-                <th className="px-4 py-3">Support worker</th>
-                <th className="px-4 py-3">Location</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Approval</th>
+                <th className="border-r border-indigo-100 px-4 py-3">Time</th>
+                <th className="border-r border-indigo-100 px-4 py-3">Participant</th>
+                <th className="border-r border-indigo-100 px-4 py-3">Support worker</th>
+                <th className="border-r border-indigo-100 px-4 py-3">Location</th>
+                <th className="border-r border-indigo-100 px-4 py-3">Status</th>
+                <th className="border-r border-indigo-100 px-4 py-3">Approval</th>
                 {hasRowAction ? <th className="px-4 py-3">Action</th> : null}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-indigo-50">
               {shifts.map((shift, index) => (
                 <tr key={`${shift.time}-${shift.participantName}-${index}`} className={rowHref ? "transition hover:bg-[#fbfffe]" : undefined}>
-                  <td className="whitespace-nowrap px-4 py-4 font-medium text-ink">{shift.time}</td>
-                  <td className="px-4 py-4 text-slate-700">{shift.participant}</td>
-                  <td className="px-4 py-4 text-slate-700">{shift.worker || "Unassigned"}</td>
-                  <td className="px-4 py-4 text-slate-700">{shift.location || "Not recorded"}</td>
-                  <td className="px-4 py-4"><span className="rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{shift.status || "Draft"}</span></td>
-                  <td className="px-4 py-4">
+                  <td className="whitespace-nowrap border-r border-indigo-50 px-4 py-4 font-medium text-ink">{shift.time}</td>
+                  <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{shift.participant}</td>
+                  <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{shift.worker || "Unassigned"}</td>
+                  <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{shift.location || "Not recorded"}</td>
+                  <td className="border-r border-indigo-50 px-4 py-4"><span className="rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{shift.status || "Draft"}</span></td>
+                  <td className="border-r border-indigo-50 px-4 py-4">
                     <div className="flex flex-col gap-1">
                       <span className={`w-fit rounded px-2.5 py-1 text-xs font-semibold ${approvalBadgeClass(shift.approvalStatus)}`}>{approvalLabel(shift.approvalStatus)}</span>
                       {shift.submittedAt ? <span className="text-xs text-slate-500">Submitted {dateOnly(shift.submittedAt)}</span> : null}
