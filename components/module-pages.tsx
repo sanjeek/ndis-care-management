@@ -660,6 +660,7 @@ export function ParticipantsPage() {
   const [participants, setParticipants] = useState<ParticipantRecord[]>([]);
   const [notice, setNotice] = useState("Loading participant records from Supabase.");
   const [canManageParticipants, setCanManageParticipants] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     const context = await getCurrentUserContext();
@@ -702,41 +703,38 @@ export function ParticipantsPage() {
       communication_preferences: get(form, "communicationPreferences")
     };
     const ok = await postJson("/api/participants", payload, setNotice);
-    if (ok) await refresh();
+    if (ok) {
+      await refresh();
+      setCreateOpen(false);
+    }
+    return ok;
   }
 
   return (
     <AppShell title="Participants" eyebrow={notice}>
       {canManageParticipants ? (
-        <section className="rounded border border-indigo-100 bg-white p-5 shadow-panel">
-          <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <section className="mb-6 rounded border border-indigo-100 bg-white p-5 shadow-panel">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-ink">New participant</h2>
-              <p className="mt-1 text-sm text-slate-500">Add a participant record to the database. Required fields are marked with an asterisk.</p>
+              <h2 className="text-lg font-semibold text-ink">Participant records</h2>
+              <p className="mt-1 text-sm text-slate-500">Add, review, and open participant profiles from one table.</p>
             </div>
-            <span className="w-fit rounded bg-[#eef7f5] px-3 py-1 text-xs font-semibold text-[#2f766f] ring-1 ring-[#cfe9e4]">Admin action</span>
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-gumleaf px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-harbour sm:w-auto"
+            >
+              <Plus className="h-4 w-4" />
+              New participant
+            </button>
           </div>
-          <RecordForm submitLabel="Add participant" onSubmit={submit}>
-            <Field name="name" label="Participant profile" placeholder="Full name" />
-            <Field name="ndis" label="NDIS number" placeholder="NDIS participant number" />
-            <Field name="plan" label="Plan type" placeholder="NDIS managed, plan managed, or self managed" />
-            <Field name="dateOfBirth" label="Date of birth" type="date" />
-            <Field name="emergency" label="Emergency contact" placeholder="Name and phone number" />
-            <Area name="emergencyContacts" label="Emergency contacts" placeholder="Primary and secondary contacts, relationship, phone, and email" />
-            <Area name="needs" label="Support needs" placeholder="Support needs, routines, risks, and goals" />
-            <Area name="supportPlans" label="Support plans" placeholder="Current support plan details, routines, funded supports, and review dates" />
-            <Area name="goals" label="Participant goals" placeholder="NDIS goals, short-term goals, and progress measures" />
-            <Area name="riskInformation" label="Risk information" placeholder="Known risks, triggers, behaviour support, safeguarding, and mitigation actions" />
-            <Area name="medicalNotes" label="Medical notes" placeholder="Medical conditions, medication notes, mobility, swallowing, seizures, or care alerts" />
-            <Area name="allergies" label="Allergies" placeholder="Food, medication, environmental allergies, and response plan" />
-            <Area name="communicationPreferences" label="Communication preferences" placeholder="Preferred language, communication method, interpreter needs, and decision supports" />
-          </RecordForm>
         </section>
       ) : (
         <section className="mb-6 rounded border border-gumleaf/25 bg-gumleaf/5 p-4 text-sm text-slate-700">
           Support worker access is restricted to participants linked to your assigned shifts. Add and edit controls are available to admin users only.
         </section>
       )}
+      {createOpen ? <ParticipantCreateModal onClose={() => setCreateOpen(false)} onSubmit={submit} /> : null}
       {participants.length ? (
         <section className="mt-6 overflow-hidden rounded border border-indigo-100 bg-white shadow-panel">
           <div className="flex items-center justify-between border-b border-indigo-100 bg-[#fbfdff] px-4 py-3">
@@ -790,6 +788,53 @@ export function ParticipantsPage() {
         />
       )}
     </AppShell>
+  );
+}
+
+function ParticipantCreateModal({
+  onClose,
+  onSubmit
+}: {
+  onClose: () => void;
+  onSubmit: (form: FormData) => Promise<boolean | void>;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/45 px-4 py-6 backdrop-blur-sm sm:items-center">
+      <div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-indigo-100 bg-[#fbfdff] px-5 py-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gumleaf">Admin action</p>
+            <h2 className="mt-1 text-xl font-semibold text-ink">New participant</h2>
+            <p className="mt-1 text-sm text-slate-500">Create a participant profile. Required fields must be completed before saving.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-indigo-100 bg-white text-slate-500 transition hover:bg-indigo-50 hover:text-ink"
+            aria-label="Close new participant form"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="max-h-[76vh] overflow-y-auto p-5 scrollbar-subtle">
+          <RecordForm submitLabel="Add participant" onSubmit={onSubmit}>
+            <Field name="name" label="Participant profile" placeholder="Full name" />
+            <Field name="ndis" label="NDIS number" placeholder="NDIS participant number" />
+            <Field name="plan" label="Plan type" placeholder="NDIS managed, plan managed, or self managed" />
+            <Field name="dateOfBirth" label="Date of birth" type="date" />
+            <Field name="emergency" label="Emergency contact" placeholder="Name and phone number" />
+            <Area name="emergencyContacts" label="Emergency contacts" placeholder="Primary and secondary contacts, relationship, phone, and email" />
+            <Area name="needs" label="Support needs" placeholder="Support needs, routines, risks, and goals" />
+            <Area name="supportPlans" label="Support plans" placeholder="Current support plan details, routines, funded supports, and review dates" />
+            <Area name="goals" label="Participant goals" placeholder="NDIS goals, short-term goals, and progress measures" />
+            <Area name="riskInformation" label="Risk information" placeholder="Known risks, triggers, behaviour support, safeguarding, and mitigation actions" />
+            <Area name="medicalNotes" label="Medical notes" placeholder="Medical conditions, medication notes, mobility, swallowing, seizures, or care alerts" />
+            <Area name="allergies" label="Allergies" placeholder="Food, medication, environmental allergies, and response plan" />
+            <Area name="communicationPreferences" label="Communication preferences" placeholder="Preferred language, communication method, interpreter needs, and decision supports" />
+          </RecordForm>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -3727,12 +3772,14 @@ function ShiftCreateModal({
   );
 }
 
-function RecordForm({ children, submitLabel, onSubmit }: { children: React.ReactNode; submitLabel: string; onSubmit: (form: FormData) => Promise<void> }) {
+function RecordForm({ children, submitLabel, onSubmit }: { children: React.ReactNode; submitLabel: string; onSubmit: (form: FormData) => Promise<boolean | void> }) {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     if (!form.reportValidity()) return;
-    void onSubmit(new FormData(form)).then(() => form.reset());
+    void onSubmit(new FormData(form)).then((shouldReset) => {
+      if (shouldReset !== false) form.reset();
+    });
   }
   return (
     <form onSubmit={handleSubmit} className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
