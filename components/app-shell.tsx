@@ -14,6 +14,7 @@ import { clearServerSession, syncServerSession } from "@/lib/session-sync";
 const inactivityLimitMs = 30 * 60 * 1000;
 const warningBeforeLogoutMs = 5 * 60 * 1000;
 const lastActivityKey = "careos:last-activity";
+const appTimeZone = "Australia/Sydney";
 
 type AppNotification = {
   id: string;
@@ -45,7 +46,8 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(todayInAppTimeZone);
+  const [dateManuallyChanged, setDateManuallyChanged] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -297,6 +299,15 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
     setOpenNavGroup(null);
   }, [pathname]);
 
+  useEffect(() => {
+    if (dateManuallyChanged) return;
+    setSelectedDate(todayInAppTimeZone());
+    const interval = window.setInterval(() => {
+      setSelectedDate(todayInAppTimeZone());
+    }, 60_000);
+    return () => window.clearInterval(interval);
+  }, [dateManuallyChanged]);
+
   const initials = useMemo(() => {
     return userName
       .split(" ")
@@ -514,7 +525,15 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                 <label className="hidden items-center gap-2 rounded-lg border border-indigo-100 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.035)] md:flex">
                   <CalendarDays className="h-4 w-4 text-gumleaf" />
                   <span className="sr-only">Selected date</span>
-                  <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} className="border-0 bg-transparent p-0 text-sm font-semibold text-slate-700 outline-none" />
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(event) => {
+                      setDateManuallyChanged(true);
+                      setSelectedDate(event.target.value);
+                    }}
+                    className="border-0 bg-transparent p-0 text-sm font-semibold text-slate-700 outline-none"
+                  />
                 </label>
                 <div className="relative">
                   <button
@@ -628,6 +647,17 @@ function formatCountdown(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
+function todayInAppTimeZone() {
+  const parts = new Intl.DateTimeFormat("en-AU", {
+    timeZone: appTimeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
 }
 
 function setSessionMarker(role: UserRole) {
