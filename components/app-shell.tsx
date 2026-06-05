@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, CalendarDays, ChevronDown, LogOut, Menu, MessageSquare, Search, UserCircle } from "lucide-react";
+import { Bell, CalendarDays, ChevronDown, Download, LogOut, Menu, MessageSquare, Search, UserCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { navItems } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
@@ -357,6 +357,34 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
     window.location.href = result.href;
   }
 
+  function downloadCurrentPagePdf() {
+    const exportRoot = document.querySelector<HTMLElement>("[data-careos-export]");
+    const lines = buildPagePdfLines({
+      title,
+      eyebrow,
+      root: exportRoot,
+      userName,
+      userEmail,
+      role: friendlyRole(userRole)
+    });
+    const pdf = buildTextPdf(`${title} - CareOS NDIS`, lines);
+    const blob = new Blob([pdf], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${safeFileName(title)}-${todayInAppTimeZone()}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    void recordAudit({
+      action: "download_pdf",
+      tableName: "ui.page_export",
+      recordLabel: title,
+      metadata: { pathname: window.location.pathname, title }
+    });
+  }
+
   if (!authChecked) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
@@ -522,6 +550,15 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                     <MessageSquare className="h-4 w-4" />
                   </Link>
                 ) : null}
+                <button
+                  type="button"
+                  onClick={downloadCurrentPagePdf}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-100 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.035)] hover:bg-indigo-50/60"
+                  aria-label="Download this page as PDF"
+                >
+                  <Download className="h-4 w-4" />
+                  <span className="hidden lg:inline">PDF</span>
+                </button>
                 <label className="hidden items-center gap-2 rounded-lg border border-indigo-100 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.035)] md:flex">
                   <CalendarDays className="h-4 w-4 text-gumleaf" />
                   <span className="sr-only">Selected date</span>
@@ -617,7 +654,7 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
             </div>
           </header>
 
-          <div className="flex-1 px-4 py-6 lg:px-8">{children}</div>
+          <div className="flex-1 px-4 py-6 lg:px-8" data-careos-export>{children}</div>
           <CopyrightFooter />
         </div>
       </section>
@@ -647,6 +684,183 @@ function formatCountdown(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
+function buildPagePdfLines({
+  title,
+  eyebrow,
+  root,
+  userName,
+  userEmail,
+  role
+}: {
+  title: string;
+  eyebrow: string;
+  root: HTMLElement | null;
+  userName: string;
+  userEmail: string;
+  role: string;
+}) {
+  const generatedAt = new Intl.DateTimeFormat("en-AU", {
+    timeZone: appTimeZone,
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date());
+  const contentLines = root ? extractVisibleText(root) : [];
+  const fieldLines = root ? extractFormFieldLines(root) : [];
+  return [
+    "CareOS NDIS",
+    `Page: ${title}`,
+    eyebrow ? `Status: ${eyebrow}` : "",
+    `Generated: ${generatedAt}`,
+    `User: ${userName}${userEmail ? ` (${userEmail})` : ""}`,
+    `Role: ${role}`,
+    "",
+    ...contentLines,
+    ...(fieldLines.length ? ["", "Form fields", ...fieldLines] : [])
+  ].filter((line, index, lines) => line || lines[index - 1] !== "");
+}
+
+function extractVisibleText(root: HTMLElement) {
+  const clone = root.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll("button, input, select, textarea, svg, script, style").forEach((element) => element.remove());
+  return clone.innerText
+    .split(/\n+/)
+    .map((line) => cleanPdfText(line))
+    .filter(Boolean);
+}
+
+function extractFormFieldLines(root: HTMLElement) {
+  const fields = Array.from(root.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input, select, textarea"));
+  return fields
+    .map((field) => {
+      if (field instanceof HTMLInputElement && ["hidden", "password", "submit", "button"].includes(field.type)) return "";
+      const label = fieldLabel(field);
+      const value = fieldValue(field);
+      if (!label && !value) return "";
+      return `${label || field.name || "Field"}: ${value || "Not completed"}`;
+    })
+    .map(cleanPdfText)
+    .filter(Boolean);
+}
+
+function fieldLabel(field: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement) {
+  const explicitLabel = field.id ? document.querySelector<HTMLLabelElement>(`label[for="${cssEscape(field.id)}"]`)?.innerText : "";
+  const wrappingLabel = field.closest("label")?.innerText ?? "";
+  const ariaLabel = field.getAttribute("aria-label") ?? "";
+  const raw = explicitLabel || wrappingLabel || ariaLabel || field.name;
+  return raw
+    .replace(/\s*\*?\s*(Not completed|Leave unchanged)?\s*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function fieldValue(field: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement) {
+  if (field instanceof HTMLSelectElement) return field.selectedOptions[0]?.textContent?.trim() ?? field.value;
+  if (field instanceof HTMLTextAreaElement) return field.value.trim();
+  if (field.type === "checkbox" || field.type === "radio") return field.checked ? "Yes" : "No";
+  if (field.type === "file") return field.files?.length ? `${field.files.length} file selected` : "No file selected";
+  return field.value.trim();
+}
+
+function buildTextPdf(title: string, lines: string[]) {
+  const wrappedLines = lines.flatMap((line) => wrapPdfLine(line || " ", 92));
+  const pageLineLimit = 48;
+  const pages = chunkLines(wrappedLines.length ? wrappedLines : ["No page content available."], pageLineLimit);
+  const fontObjectNumber = 3 + pages.length * 2;
+  const objects: string[] = ["<< /Type /Catalog /Pages 2 0 R >>", ""];
+  const pageRefs: string[] = [];
+
+  pages.forEach((pageLines, index) => {
+    const pageObjectNumber = 3 + index * 2;
+    const contentObjectNumber = pageObjectNumber + 1;
+    pageRefs.push(`${pageObjectNumber} 0 R`);
+    const stream = [
+      "BT",
+      "/F1 10 Tf",
+      "50 790 Td",
+      "14 TL",
+      ...pageLines.map((line) => `(${pdfEscape(line)}) Tj T*`),
+      "ET"
+    ].join("\n");
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontObjectNumber} 0 R >> >> /Contents ${contentObjectNumber} 0 R >>`);
+    objects.push(`<< /Length ${byteLength(stream)} >>\nstream\n${stream}\nendstream`);
+  });
+
+  objects[1] = `<< /Type /Pages /Kids [${pageRefs.join(" ")}] /Count ${pages.length} >>`;
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  return buildPdfFile(objects);
+}
+
+function buildPdfFile(objects: string[]) {
+  let pdf = "%PDF-1.4\n";
+  const offsets: number[] = [];
+  objects.forEach((object, index) => {
+    offsets.push(byteLength(pdf));
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xref = byteLength(pdf);
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.forEach((offset) => {
+    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return pdf;
+}
+
+function wrapPdfLine(line: string, maxLength: number) {
+  const clean = cleanPdfText(line);
+  if (!clean) return [""];
+  const words = clean.split(/\s+/);
+  const lines: string[] = [];
+  let current = "";
+  words.forEach((word) => {
+    if (!current) {
+      current = word;
+      return;
+    }
+    if (`${current} ${word}`.length <= maxLength) {
+      current = `${current} ${word}`;
+      return;
+    }
+    lines.push(current);
+    current = word;
+  });
+  if (current) lines.push(current);
+  return lines.length ? lines : [clean.slice(0, maxLength)];
+}
+
+function chunkLines(lines: string[], size: number) {
+  const chunks: string[][] = [];
+  for (let index = 0; index < lines.length; index += size) {
+    chunks.push(lines.slice(index, index + size));
+  }
+  return chunks;
+}
+
+function pdfEscape(value: string) {
+  return cleanPdfText(value).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+}
+
+function cleanPdfText(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[^\x20-\x7E]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function safeFileName(value: string) {
+  return cleanPdfText(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "careos-page";
+}
+
+function cssEscape(value: string) {
+  if (typeof CSS !== "undefined" && CSS.escape) return CSS.escape(value);
+  return value.replace(/["\\]/g, "\\$&");
+}
+
+function byteLength(value: string) {
+  return new TextEncoder().encode(value).length;
 }
 
 function todayInAppTimeZone() {
