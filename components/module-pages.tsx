@@ -2988,7 +2988,7 @@ function ShiftTable({
             <tbody className="divide-y divide-slate-100">
               {shifts.map((shift, index) => (
                 <tr key={`${shift.time}-${shift.participantName}-${index}`} className={rowHref ? "transition hover:bg-[#fbfffe]" : undefined}>
-                  <td className="px-4 py-4 font-medium text-ink">{shift.time}</td>
+                  <td className="whitespace-nowrap px-4 py-4 font-medium text-ink">{shift.time}</td>
                   <td className="px-4 py-4 text-slate-700">{shift.participant}</td>
                   <td className="px-4 py-4 text-slate-700">{shift.worker || "Unassigned"}</td>
                   <td className="px-4 py-4 text-slate-700">{shift.location || "Not recorded"}</td>
@@ -4813,9 +4813,18 @@ function timeOnly(value: string) {
   if (!value) return "";
   const date = new Date(value);
   if (!Number.isNaN(date.getTime())) {
-    return date.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit", hour12: false });
+    return formatShortTime(date.getHours(), date.getMinutes());
   }
-  return value.split("T")[1] || value;
+  const raw = value.split("T")[1] || value;
+  const match = raw.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return raw;
+  return formatShortTime(Number(match[1]), Number(match[2]));
+}
+
+function formatShortTime(hour24: number, minute: number) {
+  const suffix = hour24 >= 12 ? "pm" : "am";
+  const hour = hour24 % 12 || 12;
+  return `${hour}${minute ? `:${String(minute).padStart(2, "0")}` : ""}${suffix}`;
 }
 
 function dateOnly(value: string) {
