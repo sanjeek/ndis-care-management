@@ -2117,125 +2117,150 @@ export function WorkersPage() {
         <WorkerEditModal worker={editingWorker} onClose={() => setEditingWorker(null)} onSubmit={updateWorker} />
       ) : null}
 
-      <section className="mb-6 rounded border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="font-semibold text-ink">Compliance alerts</h2>
-            <p className="mt-1 text-sm text-slate-500">Alerts show expired records and records expiring within 60 days.</p>
-          </div>
-          <span className={`w-fit rounded px-3 py-1 text-sm font-semibold ${complianceAlerts.length ? "bg-coral/10 text-coral" : "bg-gumleaf/10 text-gumleaf"}`}>
-            {complianceAlerts.length ? `${complianceAlerts.length} alert${complianceAlerts.length === 1 ? "" : "s"}` : "No alerts"}
-          </span>
-        </div>
-        {complianceAlerts.length ? (
-          <div className="mt-4 grid gap-2 lg:grid-cols-2">
-            {complianceAlerts.map((alert) => (
-              <div key={`${alert.worker}-${alert.label}`} className={`rounded border p-3 text-sm ${alert.status === "expired" ? "border-coral/25 bg-coral/5" : "border-banksia/40 bg-banksia/10"}`}>
-                <p className="font-semibold text-ink">{alert.worker}</p>
-                <p className="mt-1 text-slate-700">{alert.label}: {alert.message}</p>
-              </div>
-            ))}
-          </div>
-        ) : null}
-      </section>
+      <div className="grid gap-6 xl:grid-cols-[360px_1fr] xl:items-start">
 
-      <RecordForm submitLabel="Add worker and send invite" onSubmit={submit}>
-        <Field name="name" label="Staff profile" placeholder="Full name" />
-        <Field name="email" label="Email invite address" type="email" placeholder="worker@example.com" />
-        <Field name="role" label="Role" placeholder="Disability Support Worker" />
-        <Field name="availability" label="Availability" placeholder="Available days and hours" />
-        <Area name="qualifications" label="Qualifications" placeholder="Qualifications, training, clearances, and checks" />
-        <Field name="compliance" label="Compliance documents" placeholder="Clear, pending, or renewal details" />
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Field name="policeCheckExpiry" label="Police check expiry" type="date" />
-          <Field name="ndisWorkerScreeningExpiry" label="NDIS worker screening expiry" type="date" />
-          <Field name="firstAidExpiry" label="First aid certificate expiry" type="date" />
-          <Field name="cprExpiry" label="CPR expiry" type="date" />
-          <Field name="driversLicenceExpiry" label="Driver's licence expiry" type="date" />
-          <Field name="workingWithChildrenExpiry" label="Working with children check expiry" type="date" required={false} />
+        {/* LEFT — Add worker form */}
+        <aside className="rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 px-5 py-4">
+            <h2 className="font-semibold text-ink">Add support worker</h2>
+            <p className="mt-1 text-xs text-slate-500">Fill in the details below to create a worker record and send a portal invite.</p>
+          </div>
+          <div className="p-5">
+            <RecordForm submitLabel="Add worker and send invite" onSubmit={submit}>
+              <Field name="name" label="Full name" placeholder="Full name" />
+              <Field name="email" label="Email address" type="email" placeholder="worker@example.com" />
+              <Field name="role" label="Role title" placeholder="Disability Support Worker" />
+              <Field name="availability" label="Availability" placeholder="e.g. Mon–Fri, weekends" />
+              <Area name="qualifications" label="Qualifications" placeholder="Qualifications, training, clearances, and checks" />
+              <Field name="compliance" label="Compliance status" placeholder="Clear, pending, or renewal details" />
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Compliance expiry dates</p>
+              <Field name="policeCheckExpiry" label="Police check" type="date" />
+              <Field name="ndisWorkerScreeningExpiry" label="NDIS worker screening" type="date" />
+              <Field name="firstAidExpiry" label="First aid certificate" type="date" />
+              <Field name="cprExpiry" label="CPR" type="date" />
+              <Field name="driversLicenceExpiry" label="Driver's licence" type="date" />
+              <Field name="workingWithChildrenExpiry" label="Working with children check" type="date" required={false} />
+              <Area name="trainingCertificates" label="Training certificates" placeholder="List certificates, completion dates, renewal due dates, and evidence location" />
+            </RecordForm>
+          </div>
+        </aside>
+
+        {/* RIGHT — Compliance alerts + workers table */}
+        <div className="grid gap-6">
+
+          {/* Compliance alerts */}
+          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-ink">Compliance alerts</h2>
+                <p className="mt-1 text-sm text-slate-500">Expired records and records expiring within 60 days.</p>
+              </div>
+              <span className={`shrink-0 rounded px-3 py-1 text-sm font-semibold ${complianceAlerts.length ? "bg-coral/10 text-coral" : "bg-gumleaf/10 text-gumleaf"}`}>
+                {complianceAlerts.length ? `${complianceAlerts.length} alert${complianceAlerts.length === 1 ? "" : "s"}` : "All clear"}
+              </span>
+            </div>
+            {complianceAlerts.length ? (
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {complianceAlerts.map((alert) => (
+                  <div key={`${alert.worker}-${alert.label}`} className={`rounded border p-3 text-sm ${alert.status === "expired" ? "border-coral/25 bg-coral/5" : "border-banksia/40 bg-banksia/10"}`}>
+                    <p className="font-semibold text-ink">{alert.worker}</p>
+                    <p className="mt-1 text-slate-700">{alert.label}: {alert.message}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </section>
+
+          {/* Workers table */}
+          {workers.length ? (
+            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-slate-200 bg-[#fbfdff] px-5 py-3">
+                <h2 className="font-semibold text-ink">All support workers</h2>
+                <span className="rounded bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-indigo-100">{workers.length} record{workers.length === 1 ? "" : "s"}</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-[680px] w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                      <th className="px-4 py-3">Name</th>
+                      <th className="px-4 py-3">Email</th>
+                      <th className="px-4 py-3">Role</th>
+                      <th className="px-4 py-3">Compliance</th>
+                      <th className="px-4 py-3 text-center">Shifts</th>
+                      <th className="px-4 py-3 text-center">Docs</th>
+                      <th className="px-4 py-3" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {workers.map((worker) => {
+                      const alerts = workerComplianceAlerts(worker);
+                      const expiredCount = alerts.filter((a) => a.status === "expired").length;
+                      const warningCount = alerts.filter((a) => a.status !== "expired").length;
+                      return (
+                        <tr key={worker.id || worker.email} className="hover:bg-slate-50/60">
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-ink">{worker.name}</p>
+                            <p className="text-xs text-slate-500">{worker.availability || "Availability not set"}</p>
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">{worker.email || "—"}</td>
+                          <td className="px-4 py-3 text-slate-600">{worker.role || "—"}</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex rounded px-2 py-0.5 text-xs font-semibold ${
+                              expiredCount ? "bg-coral/10 text-coral" :
+                              warningCount ? "bg-banksia/20 text-banksia" :
+                              "bg-gumleaf/10 text-gumleaf"
+                            }`}>
+                              {expiredCount ? `${expiredCount} expired` : warningCount ? `${warningCount} expiring` : "Clear"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center font-semibold text-ink">{worker.assigned}</td>
+                          <td className="px-4 py-3 text-center">
+                            {[worker.policeCheckExpiry, worker.ndisWorkerScreeningExpiry, worker.firstAidExpiry, worker.cprExpiry, worker.driversLicenceExpiry].filter(Boolean).length}
+                            <span className="text-xs text-slate-400">/5</span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {deletingWorkerId === worker.id ? (
+                                <>
+                                  <span className="text-xs text-slate-500">Delete?</span>
+                                  <button type="button" onClick={() => void deleteWorker(worker.id)}
+                                    className="inline-flex items-center gap-1 rounded border border-coral/30 bg-coral/10 px-2.5 py-1.5 text-xs font-semibold text-coral hover:bg-coral/20">
+                                    Yes, delete
+                                  </button>
+                                  <button type="button" onClick={() => setDeletingWorkerId(null)}
+                                    className="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700">
+                                    Cancel
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button type="button" onClick={() => setEditingWorker(worker)}
+                                    className="inline-flex items-center gap-1.5 rounded border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100">
+                                    <Pencil className="h-3.5 w-3.5" />
+                                    Edit
+                                  </button>
+                                  <button type="button" onClick={() => setDeletingWorkerId(worker.id)}
+                                    className="inline-flex items-center gap-1.5 rounded border border-coral/20 px-2.5 py-1.5 text-xs font-semibold text-coral/80 hover:bg-coral/5">
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    Delete
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <EmptyState title="No support workers yet" message="Fill in the form on the left to add a support worker." />
+          )}
+
         </div>
-        <Area name="trainingCertificates" label="Training certificates" placeholder="List training certificates, completion dates, renewal due dates, and evidence location" />
-      </RecordForm>
-      {workers.length ? (
-        <div className="mt-6 overflow-x-auto rounded border border-slate-200 bg-white shadow-sm">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                <th className="px-4 py-3 font-semibold text-slate-600">Name</th>
-                <th className="px-4 py-3 font-semibold text-slate-600">Email</th>
-                <th className="px-4 py-3 font-semibold text-slate-600">Role</th>
-                <th className="px-4 py-3 font-semibold text-slate-600">Compliance</th>
-                <th className="px-4 py-3 font-semibold text-slate-600 text-center">Shifts</th>
-                <th className="px-4 py-3 font-semibold text-slate-600 text-center">Docs</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {workers.map((worker) => {
-                const alerts = workerComplianceAlerts(worker);
-                const expiredCount = alerts.filter((a) => a.status === "expired").length;
-                const warningCount = alerts.filter((a) => a.status !== "expired").length;
-                return (
-                  <tr key={worker.id || worker.email} className="hover:bg-slate-50/60">
-                    <td className="px-4 py-3">
-                      <p className="font-semibold text-ink">{worker.name}</p>
-                      <p className="text-xs text-slate-500">{worker.availability || "Availability not set"}</p>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{worker.email || "—"}</td>
-                    <td className="px-4 py-3 text-slate-600">{worker.role || "—"}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex rounded px-2 py-0.5 text-xs font-semibold ${
-                        expiredCount ? "bg-coral/10 text-coral" :
-                        warningCount ? "bg-banksia/20 text-banksia" :
-                        "bg-gumleaf/10 text-gumleaf"
-                      }`}>
-                        {expiredCount ? `${expiredCount} expired` : warningCount ? `${warningCount} expiring` : "Clear"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center font-semibold text-ink">{worker.assigned}</td>
-                    <td className="px-4 py-3 text-center">
-                      {[worker.policeCheckExpiry, worker.ndisWorkerScreeningExpiry, worker.firstAidExpiry, worker.cprExpiry, worker.driversLicenceExpiry].filter(Boolean).length}
-                      <span className="text-xs text-slate-400">/5</span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {deletingWorkerId === worker.id ? (
-                          <>
-                            <span className="text-xs text-slate-500">Delete?</span>
-                            <button type="button" onClick={() => void deleteWorker(worker.id)}
-                              className="inline-flex items-center gap-1 rounded border border-coral/30 bg-coral/10 px-2.5 py-1.5 text-xs font-semibold text-coral hover:bg-coral/20">
-                              Yes, delete
-                            </button>
-                            <button type="button" onClick={() => setDeletingWorkerId(null)}
-                              className="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700">
-                              Cancel
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button type="button" onClick={() => setEditingWorker(worker)}
-                              className="inline-flex items-center gap-1.5 rounded border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100">
-                              <Pencil className="h-3.5 w-3.5" />
-                              Edit
-                            </button>
-                            <button type="button" onClick={() => setDeletingWorkerId(worker.id)}
-                              className="inline-flex items-center gap-1.5 rounded border border-coral/20 px-2.5 py-1.5 text-xs font-semibold text-coral/80 hover:bg-coral/5">
-                              <Trash2 className="h-3.5 w-3.5" />
-                              Delete
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <EmptyState title="No support workers yet" message="Support worker records will appear here after they are added to the database." />
-      )}
+      </div>
     </AppShell>
   );
 }
