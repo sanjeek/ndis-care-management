@@ -3959,11 +3959,38 @@ function WorkerPortalQuickActions() {
   );
 }
 
+const WORKER_COMPLIANCE_DOCS = [
+  { key: "policeCheck", name: "policeCheckExpiry", label: "Police check expiry", title: "Police Check" },
+  { key: "ndisScreening", name: "ndisWorkerScreeningExpiry", label: "NDIS worker screening expiry", title: "NDIS Worker Screening" },
+  { key: "firstAid", name: "firstAidExpiry", label: "First aid expiry", title: "First Aid Certificate" },
+  { key: "cpr", name: "cprExpiry", label: "CPR expiry", title: "CPR Certificate" },
+  { key: "driversLicence", name: "driversLicenceExpiry", label: "Driver's licence expiry", title: "Driver's Licence" },
+  { key: "workingWithChildren", name: "workingWithChildrenExpiry", label: "Working with children check expiry", title: "Working with Children Check" },
+] as const;
+
 function WorkerEditModal({ worker, onClose, onSubmit }: { worker: WorkerRecord; onClose: () => void; onSubmit: (form: FormData) => Promise<void> }) {
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    void onSubmit(new FormData(event.currentTarget));
+  const [uploadStates, setUploadStates] = useState<Record<string, "idle" | "uploading" | "done" | "error">>({});
+  const [saving, setSaving] = useState(false);
+  const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  async function handleFileSelect(key: string, docTitle: string, file: File) {
+    if (!supabase) return;
+    setUploadStates((prev) => ({ ...prev, [key]: "uploading" }));
+    const token = (await supabase.auth.getSession()).data.session?.access_token;
+    if (!token) { setUploadStates((prev) => ({ ...prev, [key]: "error" })); return; }
+    const body = new FormData();
+    body.append("file", file);
+    body.append("title", `Worker Compliance: ${docTitle} - ${worker.name}`);
+    const res = await fetch("/api/documents", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body });
+    setUploadStates((prev) => ({ ...prev, [key]: res.ok ? "done" : "error" }));
   }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    void onSubmit(new FormData(event.currentTarget)).finally(() => setSaving(false));
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-ink/45 px-4 py-6 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true">
       <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded border border-slate-200 bg-white shadow-2xl">
@@ -3980,18 +4007,46 @@ function WorkerEditModal({ worker, onClose, onSubmit }: { worker: WorkerRecord; 
           <Field name="availability" label="Availability" defaultValue={worker.availability} required={false} />
           <Area name="qualifications" label="Qualifications" defaultValue={worker.qualifications} required={false} />
           <Field name="compliance" label="Compliance notes" defaultValue={worker.compliance} required={false} />
-          <p className="text-sm font-semibold text-slate-700">Compliance document expiry dates</p>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Field name="policeCheckExpiry" label="Police check expiry" type="date" defaultValue={worker.policeCheckExpiry} required={false} />
-            <Field name="ndisWorkerScreeningExpiry" label="NDIS worker screening expiry" type="date" defaultValue={worker.ndisWorkerScreeningExpiry} required={false} />
-            <Field name="firstAidExpiry" label="First aid expiry" type="date" defaultValue={worker.firstAidExpiry} required={false} />
-            <Field name="cprExpiry" label="CPR expiry" type="date" defaultValue={worker.cprExpiry} required={false} />
-            <Field name="driversLicenceExpiry" label="Driver&apos;s licence expiry" type="date" defaultValue={worker.driversLicenceExpiry} required={false} />
-            <Field name="workingWithChildrenExpiry" label="Working with children check expiry" type="date" defaultValue={worker.workingWithChildrenExpiry} required={false} />
+          <p className="text-sm font-semibold text-slate-700">Compliance documents</p>
+          <p className="text-xs text-slate-500 -mt-2">Update expiry dates and optionally upload a new document file for each compliance item.</p>
+          <div className="grid gap-3">
+            {WORKER_COMPLIANCE_DOCS.map(({ key, name, label, title }) => {
+              const defaultVal = worker[name as keyof WorkerRecord] as string;
+              const upState = uploadStates[key] ?? "idle";
+              return (
+                <div key={key} className="rounded border border-slate-200 bg-slate-50 p-3">
+                  <Field name={name} label={label} type="date" defaultValue={defaultVal} required={false} />
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      ref={(el) => { fileRefs.current[key] = el; }}
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) void handleFileSelect(key, title, file);
+                        e.target.value = "";
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileRefs.current[key]?.click()}
+                      disabled={upState === "uploading"}
+                      className="inline-flex items-center gap-1.5 rounded border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                      {upState === "uploading" ? "Uploading…" : "Upload new document"}
+                    </button>
+                    {upState === "done" && <span className="text-xs font-semibold text-gumleaf">Uploaded</span>}
+                    {upState === "error" && <span className="text-xs font-semibold text-coral">Upload failed — try again</span>}
+                  </div>
+                </div>
+              );
+            })}
           </div>
           <Area name="trainingCertificates" label="Training certificates" defaultValue={worker.trainingCertificates} required={false} />
           <div className="flex gap-3">
-            <button className="min-h-12 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20">Save changes</button>
+            <button disabled={saving} className="min-h-12 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20 disabled:opacity-60">{saving ? "Saving…" : "Save changes"}</button>
             <button type="button" onClick={onClose} className="min-h-12 rounded border border-slate-200 px-4 py-3 text-sm font-semibold text-ink hover:bg-slate-50">Cancel</button>
           </div>
         </form>
