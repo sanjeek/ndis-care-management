@@ -1054,7 +1054,7 @@ const navGroupDefinitions = [
   { label: "Dashboard", hrefs: ["/dashboard"] },
   { label: "Participants", hrefs: ["/participants", "/participant-goals", "/care-plans", "/medications", "/risk-assessments", "/checklists", "/family-portal"] },
   { label: "Workforce", hrefs: ["/support-workers", "/training-records", "/admin/users", "/worker-portal", "/my-shifts", "/travel", "/profile"] },
-  { label: "Rostering", hrefs: ["/rostering", "/timesheets", "/payroll"] },
+  { label: "Rostering", hrefs: ["/rostering", "/participant-matching", "/timesheets", "/payroll"] },
   { label: "Service Delivery", hrefs: ["/progress-notes", "/incident-reports", "/support-coordination", "/tasks", "/messages", "/visitors", "/vehicles"] },
   { label: "Finance", hrefs: ["/invoices", "/funding", "/service-agreements"] },
   { label: "Reports", hrefs: ["/admin/compliance", "/admin/audit", "/admin/reminders"] },

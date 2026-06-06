@@ -17,6 +17,7 @@ const privatePrefixes = [
   "/messages",
   "/my-shifts",
   "/participant-goals",
+  "/participant-matching",
   "/participants",
   "/payroll",
   "/profile",

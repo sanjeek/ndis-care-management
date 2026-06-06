@@ -20,9 +20,13 @@ export async function POST(request: Request) {
   const endsAt = String(body.ends_at ?? "").trim();
   const location = String(body.location ?? "").trim();
   const status = String(body.status ?? "Draft").trim() || "Draft";
-  const allowedLatitude = Number(body.allowed_latitude);
-  const allowedLongitude = Number(body.allowed_longitude);
-  const allowedRadiusM = Number(body.allowed_radius_m ?? 250);
+  const latRaw = String(body.allowed_latitude ?? "").trim();
+  const lngRaw = String(body.allowed_longitude ?? "").trim();
+  const radRaw = String(body.allowed_radius_m ?? "").trim();
+  const allowedLatitude = latRaw ? Number(latRaw) : null;
+  const allowedLongitude = lngRaw ? Number(lngRaw) : null;
+  const allowedRadiusM = radRaw ? Number(radRaw) : null;
+  const hasGps = allowedLatitude !== null && allowedLongitude !== null;
   const recurrenceType = String(body.recurrence_type ?? "single").trim();
   const customIntervalDays = Number(body.custom_interval_days ?? 0);
   const recurrenceCount = Math.min(Math.max(Number(body.recurrence_count ?? 1), 1), 60);
@@ -32,8 +36,11 @@ export async function POST(request: Request) {
   if (!participantName || !startsAt || !endsAt || (!isOpenShift && (!workerName || !workerEmail))) {
     return NextResponse.json({ message: "Participant, start time, and end time are required. Assign a support worker or save the shift as Open/Unfilled." }, { status: 400 });
   }
-  if (!isValidLatitude(allowedLatitude) || !isValidLongitude(allowedLongitude) || !isValidRadius(allowedRadiusM)) {
-    return NextResponse.json({ message: "Valid GPS latitude, longitude, and an allowed radius between 25 and 5000 metres are required." }, { status: 400 });
+  if (hasGps && (!isValidLatitude(allowedLatitude!) || !isValidLongitude(allowedLongitude!))) {
+    return NextResponse.json({ message: "GPS latitude and longitude must be valid coordinates when provided." }, { status: 400 });
+  }
+  if (hasGps && allowedRadiusM !== null && !isValidRadius(allowedRadiusM)) {
+    return NextResponse.json({ message: "GPS radius must be between 25 and 5000 metres." }, { status: 400 });
   }
   if (!recurrence) {
     return NextResponse.json({ message: "Select a valid recurrence: single, daily, weekly, fortnightly, or custom." }, { status: 400 });
@@ -67,7 +74,7 @@ export async function POST(request: Request) {
       status,
       allowed_latitude: allowedLatitude,
       allowed_longitude: allowedLongitude,
-      allowed_radius_m: Math.round(allowedRadiusM),
+      allowed_radius_m: hasGps ? Math.round(allowedRadiusM ?? 250) : null,
       recurrence_series_id: seriesId,
       recurrence_type: recurrence.type,
       recurrence_interval_days: recurrence.intervalDays,
@@ -178,16 +185,23 @@ export async function PATCH(request: Request) {
   const endsAt = String(body.ends_at ?? "").trim();
   const location = String(body.location ?? "").trim();
   const status = String(body.status ?? "Draft").trim() || "Draft";
-  const allowedLatitude = Number(body.allowed_latitude);
-  const allowedLongitude = Number(body.allowed_longitude);
-  const allowedRadiusM = Number(body.allowed_radius_m ?? 250);
+  const pLatRaw = String(body.allowed_latitude ?? "").trim();
+  const pLngRaw = String(body.allowed_longitude ?? "").trim();
+  const pRadRaw = String(body.allowed_radius_m ?? "").trim();
+  const allowedLatitude = pLatRaw ? Number(pLatRaw) : null;
+  const allowedLongitude = pLngRaw ? Number(pLngRaw) : null;
+  const allowedRadiusM = pRadRaw ? Number(pRadRaw) : null;
+  const hasGps = allowedLatitude !== null && allowedLongitude !== null;
 
   const isOpenShift = !workerEmail || status.toLowerCase() === "open" || status.toLowerCase() === "unfilled";
   if (!id || !participantName || !startsAt || !endsAt || (!isOpenShift && (!workerName || !workerEmail))) {
     return NextResponse.json({ message: "Shift, participant, start time, and end time are required. Assign a support worker or save the shift as Open/Unfilled." }, { status: 400 });
   }
-  if (!isValidLatitude(allowedLatitude) || !isValidLongitude(allowedLongitude) || !isValidRadius(allowedRadiusM)) {
-    return NextResponse.json({ message: "Valid GPS latitude, longitude, and an allowed radius between 25 and 5000 metres are required." }, { status: 400 });
+  if (hasGps && (!isValidLatitude(allowedLatitude!) || !isValidLongitude(allowedLongitude!))) {
+    return NextResponse.json({ message: "GPS latitude and longitude must be valid coordinates when provided." }, { status: 400 });
+  }
+  if (hasGps && allowedRadiusM !== null && !isValidRadius(allowedRadiusM)) {
+    return NextResponse.json({ message: "GPS radius must be between 25 and 5000 metres." }, { status: 400 });
   }
   const startDate = new Date(startsAt);
   const endDate = new Date(endsAt);
@@ -212,7 +226,7 @@ export async function PATCH(request: Request) {
     status,
     allowed_latitude: allowedLatitude,
     allowed_longitude: allowedLongitude,
-    allowed_radius_m: Math.round(allowedRadiusM)
+    allowed_radius_m: hasGps ? Math.round(allowedRadiusM ?? 250) : null
   };
 
   const { data: shift, error } = await auth.client

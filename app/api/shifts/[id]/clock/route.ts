@@ -104,19 +104,18 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     isValidLatitude(Number(shift.allowed_latitude)) &&
     isValidLongitude(Number(shift.allowed_longitude)) &&
     Number(shift.allowed_radius_m) > 0;
-  if (!hasGeofence) {
-    return NextResponse.json({ message: "GPS geofence is not configured for this shift. Ask an admin to add allowed latitude, longitude, and radius." }, { status: 400 });
-  }
 
-  const distanceM = Math.round(distanceInMetres(latitude, longitude, Number(shift.allowed_latitude), Number(shift.allowed_longitude)));
-  const radiusM = Number(shift.allowed_radius_m);
+  const distanceM = hasGeofence
+    ? Math.round(distanceInMetres(latitude, longitude, Number(shift.allowed_latitude), Number(shift.allowed_longitude)))
+    : null;
+  const radiusM = hasGeofence ? Number(shift.allowed_radius_m) : null;
 
   const now = new Date().toISOString();
   if (action === "in") {
     if (shift.clock_in_at) {
       return NextResponse.json({ message: "You have already clocked in for this shift." }, { status: 400 });
     }
-    if (distanceM > radiusM) {
+    if (hasGeofence && distanceM !== null && radiusM !== null && distanceM > radiusM) {
       return NextResponse.json({ message: `Clock-in blocked. You are ${distanceM}m from the allowed shift location, outside the ${radiusM}m radius.` }, { status: 403 });
     }
     const update = await admin
@@ -153,11 +152,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         longitude,
         accuracy,
         distanceM,
-        radiusM
+        radiusM,
+        geofenceEnforced: hasGeofence
       }
     });
 
-    return NextResponse.json({ message: `Clock in saved. GPS verified ${distanceM}m from allowed location.` });
+    return NextResponse.json({
+      message: hasGeofence
+        ? `Clock in saved. GPS verified ${distanceM}m from allowed location.`
+        : "Clock in saved. No GPS geofence is configured for this shift."
+    });
   }
 
   if (action === "out") {
