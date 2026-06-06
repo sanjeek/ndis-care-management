@@ -10,9 +10,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "A valid email address is required." }, { status: 400 });
   }
 
+  // Check Resend is configured before doing anything else
+  const apiKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.EMAIL_FROM || process.env.RESEND_FROM_EMAIL;
+  if (!apiKey || !apiKey.startsWith("re_") || !fromEmail) {
+    return NextResponse.json({
+      message: "Email sending is not configured on this server. Contact your administrator to set up Resend."
+    }, { status: 500 });
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
   if (!url || !serviceRole) {
     return NextResponse.json({ message: "Server is not configured. Contact your administrator." }, { status: 500 });
   }
@@ -27,17 +35,14 @@ export async function POST(request: Request) {
     options: { redirectTo: appUrl("/reset-password") }
   });
 
-  if (error) {
-    // Don't reveal whether the email exists — always show success to the user
-    return NextResponse.json({ message: "If that email has an account, a reset link has been sent." });
+  if (error || !data.properties?.action_link) {
+    // Don't reveal whether the account exists
+    return NextResponse.json({ message: "If that email has an account, a reset link has been sent. Check your inbox (and spam folder)." });
   }
 
-  const resetLink = data.properties?.action_link;
-  if (!resetLink) {
-    return NextResponse.json({ message: "If that email has an account, a reset link has been sent." });
-  }
+  const resetLink = data.properties.action_link;
 
-  await sendCareNotification(admin, {
+  const result = await sendCareNotification(admin, {
     type: "password_reset",
     to: [cleanEmail],
     subject: "Reset your CareOS password",
@@ -68,5 +73,11 @@ export async function POST(request: Request) {
     metadata: { email: cleanEmail }
   });
 
-  return NextResponse.json({ message: "If that email has an account, a reset link has been sent." });
+  if (result.sent === 0) {
+    return NextResponse.json({
+      message: "Password reset link generated but the email could not be delivered. Check your Resend configuration and verify the sender domain."
+    }, { status: 500 });
+  }
+
+  return NextResponse.json({ message: "Password reset email sent. Check your inbox (and spam folder)." });
 }
