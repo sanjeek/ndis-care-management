@@ -541,7 +541,7 @@ export function DashboardPage() {
           <StatCard key={metric.label} {...metric} />
         ))}
       </div>
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_0.8fr]">
+      <div className="mt-6 grid gap-6 xl:grid-cols-[2fr_1fr]">
         <ShiftTable
           title="Today's Schedule"
           shifts={todaysShifts}
@@ -675,14 +675,14 @@ function RecentActivityList({ activities }: { activities: DashboardActivity[] })
 
 function DashboardPanel({ title, icon: Icon, children }: { title: string; icon: LucideIcon; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-indigo-100/80 bg-white p-5 shadow-panel">
+    <section className="flex h-full flex-col rounded-lg border border-indigo-100/80 bg-white p-5 shadow-panel">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-ink">{title}</h2>
         <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-gumleaf ring-1 ring-indigo-100">
           <Icon className="h-5 w-5" />
         </span>
       </div>
-      {children}
+      <div className="flex-1">{children}</div>
     </section>
   );
 }
@@ -3951,7 +3951,7 @@ function ShiftTable({
 }) {
   const hasRowAction = Boolean(renderActions || rowHref);
   return (
-    <div className="rounded border border-indigo-100/80 bg-white shadow-panel">
+    <div className="flex h-full flex-col rounded border border-indigo-100/80 bg-white shadow-panel">
       <div className="flex items-center justify-between border-b border-indigo-100 bg-[#fbfdff] px-4 py-3">
         <h2 className="font-semibold text-ink">{title}</h2>
         {actionHref ? (
