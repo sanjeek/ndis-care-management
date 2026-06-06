@@ -35,12 +35,6 @@ textarea {
   font-weight: 700;
 }
 
-.field-label-optional::after {
-  content: " Optional";
-  color: #94a3b8;
-  font-size: 0.72rem;
-  font-weight: 600;
-}
 
 input:user-invalid,
 select:user-invalid,
