@@ -6329,6 +6329,3 @@ function monthYear(date = new Date()) {
   return date.toLocaleDateString("en-AU", { month: "long", year: "numeric" });
 }
 
-function formatToday() {
-  return new Date().toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-}
