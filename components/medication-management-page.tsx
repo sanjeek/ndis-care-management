@@ -50,7 +50,7 @@ export function MedicationManagementPage() {
   const [participants, setParticipants] = useState<ParticipantOption[]>([]);
   const [medications, setMedications] = useState<MedicationRecord[]>([]);
   const [events, setEvents] = useState<MedicationEvent[]>([]);
-  const [notice, setNotice] = useState("Loading medication records.");
+  const [notice, setNotice] = useState("");
 
   const canManageMedicationList = role === "admin" || role === "team_leader";
   const activeMedications = useMemo(() => medications.filter((medication) => medication.status !== "ceased"), [medications]);
@@ -77,7 +77,7 @@ export function MedicationManagementPage() {
     setParticipants((participantRows.data ?? []).map((participant) => ({ name: String(participant.name ?? "") })).filter((participant) => participant.name));
     setMedications((medicationRows.data ?? []).map(mapMedication));
     setEvents((eventRows.data ?? []).map(mapMedicationEvent));
-    setNotice(medicationRows.data?.length ? "Showing medication records from Supabase." : "No medication records yet.");
+    setNotice(medicationRows.data?.length ? "" : "No medication records yet.");
   }, []);
 
   useEffect(() => {

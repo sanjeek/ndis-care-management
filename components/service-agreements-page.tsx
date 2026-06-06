@@ -48,7 +48,7 @@ export function ServiceAgreementsPage() {
   const [participants, setParticipants] = useState<ParticipantOption[]>([]);
   const [agreements, setAgreements] = useState<ServiceAgreement[]>([]);
   const [signingAgreement, setSigningAgreement] = useState<ServiceAgreement | null>(null);
-  const [notice, setNotice] = useState("Loading service agreements.");
+  const [notice, setNotice] = useState("");
 
   const canManage = isAdminRole(role);
   const renewalDue = useMemo(() => agreements.filter(isRenewalDue), [agreements]);
@@ -77,7 +77,7 @@ export function ServiceAgreementsPage() {
       ndisNumber: String(participant.ndis_number ?? "")
     })).filter((participant) => participant.name));
     setAgreements((agreementRows.data ?? []).map(mapAgreement));
-    setNotice(agreementRows.data?.length ? "Showing service agreements from Supabase." : "No service agreements yet.");
+    setNotice(agreementRows.data?.length ? "" : "No service agreements yet.");
   }, []);
 
   useEffect(() => {

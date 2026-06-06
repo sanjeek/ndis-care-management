@@ -54,7 +54,7 @@ export function FundingManagementPage() {
   const [role, setRole] = useState<UserRole>("support_worker");
   const [participants, setParticipants] = useState<ParticipantOption[]>([]);
   const [records, setRecords] = useState<FundingRecord[]>([]);
-  const [notice, setNotice] = useState("Loading NDIS funding records.");
+  const [notice, setNotice] = useState("");
 
   const canManage = isAdminRole(role);
   const summaries = useMemo(() => summariseFunding(records), [records]);
@@ -95,7 +95,7 @@ export function FundingManagementPage() {
       planType: String(participant.plan_type ?? "")
     })).filter((participant) => participant.name));
     setRecords((fundingRows.data ?? []).map(mapFundingRecord));
-    setNotice(fundingRows.data?.length ? "Showing NDIS funding records from Supabase." : "No NDIS funding records yet.");
+    setNotice(fundingRows.data?.length ? "" : "No NDIS funding records yet.");
   }, []);
 
   useEffect(() => {

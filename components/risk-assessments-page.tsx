@@ -33,7 +33,7 @@ const riskLevels = ["low", "medium", "high", "critical"];
 const statuses = ["draft", "review_required", "approved", "archived"];
 
 export function RiskAssessmentsPage() {
-  const [notice, setNotice] = useState("Loading participant risk assessments.");
+  const [notice, setNotice] = useState("");
   const [participants, setParticipants] = useState<ParticipantOption[]>([]);
   const [assessments, setAssessments] = useState<RiskAssessment[]>([]);
   const [editingId, setEditingId] = useState("");
@@ -66,7 +66,7 @@ export function RiskAssessmentsPage() {
     }
     setParticipants(result.participants ?? []);
     setAssessments(result.assessments ?? []);
-    setNotice(result.assessments?.length ? "Risk assessments loaded from Supabase." : "No risk assessments recorded yet.");
+    setNotice(result.assessments?.length ? "" : "No risk assessments recorded yet.");
   }, []);
 
   useEffect(() => {

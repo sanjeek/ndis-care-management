@@ -32,7 +32,7 @@ type WorkerOption = {
 };
 
 export function ParticipantTasksPage() {
-  const [notice, setNotice] = useState("Loading participant tasks.");
+  const [notice, setNotice] = useState("");
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
   const [participants, setParticipants] = useState<ParticipantOption[]>([]);
   const [workers, setWorkers] = useState<WorkerOption[]>([]);
@@ -71,7 +71,7 @@ export function ParticipantTasksPage() {
     setParticipants(result.participants ?? []);
     setWorkers(result.workers ?? []);
     setCanManage(Boolean(result.canManage));
-    setNotice(result.tasks?.length ? "Participant tasks loaded from Supabase." : "No participant tasks yet.");
+    setNotice(result.tasks?.length ? "" : "No participant tasks yet.");
   }, []);
 
   useEffect(() => {

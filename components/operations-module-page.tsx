@@ -288,7 +288,7 @@ export function OperationsModulePage({ module }: { module: ModuleKey }) {
     setShifts(result.shifts ?? []);
     setCanManage(Boolean(result.canManage));
     setCurrentUserEmail(String(result.currentUser?.email ?? "").toLowerCase());
-    setNotice((result.records ?? []).length ? `${config.title} loaded from Supabase.` : config.emptyMessage);
+    setNotice((result.records ?? []).length ? `` : config.emptyMessage);
   }, [config]);
 
   useEffect(() => {

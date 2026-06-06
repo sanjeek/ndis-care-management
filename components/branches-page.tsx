@@ -39,7 +39,7 @@ export function BranchesPage() {
   const [workers, setWorkers] = useState<PersonRecord[]>([]);
   const [reports, setReports] = useState<BranchReport[]>([]);
   const [canManage, setCanManage] = useState(false);
-  const [notice, setNotice] = useState("Loading branch records.");
+  const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
 
   const branchOptions = useMemo(() => branches.map((branch) => ({ label: branch.name, value: branch.id })), [branches]);
@@ -65,7 +65,7 @@ export function BranchesPage() {
     setWorkers(result.workers ?? []);
     setReports(result.reports ?? []);
     setCanManage(Boolean(result.canManage));
-    setNotice(result.branches?.length ? "Showing branch reports from Supabase." : "No branches created yet.");
+    setNotice(result.branches?.length ? "" : "No branches created yet.");
   }, []);
 
   useEffect(() => {

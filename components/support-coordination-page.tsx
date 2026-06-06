@@ -23,7 +23,7 @@ const supportCategories = [
 ];
 
 export function SupportCoordinationPage() {
-  const [notice, setNotice] = useState("Loading support coordination records.");
+  const [notice, setNotice] = useState("");
   const [canManage, setCanManage] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [workers, setWorkers] = useState<Worker[]>([]);
@@ -64,7 +64,7 @@ export function SupportCoordinationPage() {
     setBookings(result.bookings ?? []);
     setMeetings(result.meetings ?? []);
     setActions(result.actions ?? []);
-    setNotice(result.actions?.length || result.contacts?.length ? "Support coordination records loaded from Supabase." : "No support coordination records yet.");
+    setNotice(result.actions?.length || result.contacts?.length ? "" : "No support coordination records yet.");
   }, []);
 
   useEffect(() => {

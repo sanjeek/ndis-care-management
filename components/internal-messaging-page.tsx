@@ -38,7 +38,7 @@ export function InternalMessagingPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<InternalMessage[]>([]);
   const [selectedId, setSelectedId] = useState("");
-  const [notice, setNotice] = useState("Loading internal messages.");
+  const [notice, setNotice] = useState("");
 
   const selected = conversations.find((conversation) => conversation.id === selectedId) ?? conversations[0];
   const threadMessages = useMemo(

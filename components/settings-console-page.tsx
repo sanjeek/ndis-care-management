@@ -32,7 +32,7 @@ const settingAreas = [
 
 export function SettingsConsolePage() {
   const [records, setRecords] = useState<SettingRecord[]>([]);
-  const [notice, setNotice] = useState("Loading organisation settings.");
+  const [notice, setNotice] = useState("");
   const [selectedArea, setSelectedArea] = useState(settingAreas[0]);
   const [canManage, setCanManage] = useState(false);
 
@@ -54,7 +54,7 @@ export function SettingsConsolePage() {
     }
     setRecords(result.records ?? []);
     setCanManage(Boolean(result.canManage));
-    setNotice((result.records ?? []).length ? "Organisation settings loaded from Supabase." : "No organisation settings saved yet.");
+    setNotice((result.records ?? []).length ? "" : "No organisation settings saved yet.");
   }, []);
 
   useEffect(() => {

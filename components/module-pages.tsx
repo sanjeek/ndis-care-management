@@ -494,7 +494,7 @@ export function DashboardPage() {
     complianceAlerts: [],
     recentActivity: []
   });
-  const [notice, setNotice] = useState("Database records only.");
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -512,7 +512,7 @@ export function DashboardPage() {
       setShifts(loadedShifts);
       setMetrics(loadedMetrics);
       setOverview(loadedOverview);
-      setNotice("Showing records from Supabase.");
+      setNotice("");
     }
     void load();
     return () => {
@@ -792,7 +792,7 @@ function AnalyticsMini({ title, value, detail }: { title: string; value: string;
 
 export function ParticipantsPage() {
   const [participants, setParticipants] = useState<ParticipantRecord[]>([]);
-  const [notice, setNotice] = useState("Loading participant records from Supabase.");
+  const [notice, setNotice] = useState("");
   const [canManageParticipants, setCanManageParticipants] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -810,7 +810,7 @@ export function ParticipantsPage() {
           ? "Showing only participants assigned to your shifts."
           : "No participants are assigned to your shifts."
         : rows.length
-          ? "Showing all participant records from the database."
+          ? ""
           : "No participants yet. Add a participant to get started."
     );
   }, []);
@@ -1334,7 +1334,7 @@ export function ParticipantProfilePage({ participantId }: { participantId: strin
   const [canManageProfile, setCanManageProfile] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [contactCreateOpen, setContactCreateOpen] = useState(false);
-  const [notice, setNotice] = useState("Loading participant profile.");
+  const [notice, setNotice] = useState("");
 
   const refresh = useCallback(async () => {
     const context = await getCurrentUserContext();
@@ -1359,7 +1359,7 @@ export function ParticipantProfilePage({ participantId }: { participantId: strin
     setDocuments(docs);
     setTimeline(events);
     setRelatedRecords(related);
-    setNotice("Showing participant profile from Supabase.");
+    setNotice("");
   }, [participantId]);
 
   useEffect(() => {
@@ -1871,7 +1871,7 @@ export function CarePlansPage() {
   const [carePlans, setCarePlans] = useState<CarePlanRecord[]>([]);
   const [participants, setParticipants] = useState<ParticipantRecord[]>([]);
   const [context, setContext] = useState<{ role: UserRole; email: string }>({ role: "support_worker", email: "" });
-  const [notice, setNotice] = useState("Loading care plans from Supabase.");
+  const [notice, setNotice] = useState("");
 
   const refresh = useCallback(async () => {
     const userContext = await getCurrentUserContext();
@@ -1887,7 +1887,7 @@ export function CarePlansPage() {
       loadedPlans.length
         ? userContext.role === "support_worker"
           ? "Showing read-only care plans for your assigned participants."
-          : "Showing provider care plans from the database."
+          : ""
         : "No care plans have been created yet."
     );
   }, []);
@@ -1970,13 +1970,13 @@ export function CarePlansPage() {
 
 export function WorkersPage() {
   const [workers, setWorkers] = useState<WorkerRecord[]>([]);
-  const [notice, setNotice] = useState("Loading support worker records from Supabase.");
+  const [notice, setNotice] = useState("");
   const [inviteLink, setInviteLink] = useState("");
 
   const refresh = useCallback(async () => {
     const rows = await loadWorkers();
     setWorkers(rows);
-    setNotice(rows.length ? "Showing support worker records from the database." : "No support workers yet. Add a worker to create an invite.");
+    setNotice(rows.length ? "" : "No support workers yet. Add a worker to create an invite.");
   }, []);
 
   const complianceAlerts = useMemo(() => workers.flatMap(workerComplianceAlerts), [workers]);
@@ -2120,7 +2120,7 @@ export function WorkerPortalPage() {
   const [availability, setAvailability] = useState<AvailabilityRecord[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRecord[]>([]);
   const [signingShift, setSigningShift] = useState<ShiftRecord | null>(null);
-  const [notice, setNotice] = useState("Loading your worker portal.");
+  const [notice, setNotice] = useState("");
 
   const refresh = useCallback(async () => {
       if (!supabase) return;
@@ -2255,7 +2255,7 @@ export function MyShiftsPage() {
   const [workerName, setWorkerName] = useState("");
   const [visibleShifts, setVisibleShifts] = useState<ShiftRecord[]>([]);
   const [signingShift, setSigningShift] = useState<ShiftRecord | null>(null);
-  const [notice, setNotice] = useState("Loading assigned shifts.");
+  const [notice, setNotice] = useState("");
 
   const refresh = useCallback(async () => {
       if (!supabase) return;
@@ -2328,7 +2328,7 @@ export function MyShiftsPage() {
 export function TimesheetsApprovalPage() {
   const [shifts, setShifts] = useState<ShiftRecord[]>([]);
   const [context, setContext] = useState<{ role: UserRole; email: string }>({ role: "support_worker", email: "" });
-  const [notice, setNotice] = useState("Loading shift approval queue.");
+  const [notice, setNotice] = useState("");
 
   const refresh = useCallback(async () => {
     const userContext = await getCurrentUserContext();
@@ -2442,7 +2442,7 @@ export function RosteringPage() {
   const [workers, setWorkers] = useState<WorkerRecord[]>([]);
   const [availability, setAvailability] = useState<AvailabilityRecord[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRecord[]>([]);
-  const [notice, setNotice] = useState("Loading scheduler records from Supabase.");
+  const [notice, setNotice] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<ShiftRecord | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -2459,7 +2459,7 @@ export function RosteringPage() {
     setWorkers(loadedWorkers);
     setAvailability(loadedAvailability);
     setLeaveRequests(loadedLeave);
-    setNotice(loadedShifts.length ? "Showing shifts from the database." : "No shifts yet. Add a shift to build the roster.");
+    setNotice(loadedShifts.length ? "" : "No shifts yet. Add a shift to build the roster.");
     setRosterLoaded(true);
   }, []);
 
@@ -2590,7 +2590,7 @@ export function ProgressNotesPage() {
   const [goals, setGoals] = useState<ParticipantGoalOption[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [context, setContext] = useState<{ role: UserRole; email: string; name: string }>({ role: "support_worker", email: "", name: "" });
-  const [notice, setNotice] = useState("Loading progress notes from Supabase.");
+  const [notice, setNotice] = useState("");
 
   const refresh = useCallback(async () => {
     const userContext = await getCurrentUserContext();
@@ -2614,7 +2614,7 @@ export function ProgressNotesPage() {
       loadedNotes.length
         ? userContext.role === "support_worker"
           ? "Showing your submitted progress notes."
-          : "Showing all progress notes from the database."
+          : ""
         : "No progress notes recorded yet."
     );
   }, [selectedTemplateId]);
@@ -3017,7 +3017,7 @@ export function IncidentManagementPage() {
   const [workers, setWorkers] = useState<WorkerRecord[]>([]);
   const [context, setContext] = useState<{ role: UserRole; email: string; name: string }>({ role: "support_worker", email: "", name: "" });
   const [incidentNumber, setIncidentNumber] = useState(() => generateIncidentNumber());
-  const [notice, setNotice] = useState("Loading incident records from Supabase.");
+  const [notice, setNotice] = useState("");
 
   const refresh = useCallback(async () => {
     const userContext = await getCurrentUserContext();
@@ -3036,7 +3036,7 @@ export function IncidentManagementPage() {
       loadedIncidents.length
         ? userContext.role === "support_worker"
           ? "Showing only incidents linked to your assigned participants."
-          : "Showing all incident records from the database."
+          : ""
         : "No incident reports recorded yet."
     );
   }, []);
@@ -3283,7 +3283,7 @@ export function SimpleModulePage({ kind }: { kind: ModuleKind }) {
 }
 
 function SimpleModuleContent({ kind }: { kind: Exclude<ModuleKind, "invoices"> }) {
-  const [notice, setNotice] = useState("Loading records from Supabase.");
+  const [notice, setNotice] = useState("");
   const [items, setItems] = useState<ModuleItem[]>([]);
   const [workerContext, setWorkerContext] = useState({ role: "support_worker" as UserRole, email: "", name: "" });
   const [workerShifts, setWorkerShifts] = useState<ShiftRecord[]>([]);
@@ -3293,7 +3293,7 @@ function SimpleModuleContent({ kind }: { kind: Exclude<ModuleKind, "invoices"> }
   const refresh = useCallback(async () => {
     const rows = await loadModuleItems(kind);
     setItems(rows);
-    setNotice(rows.length ? "Showing records from the database." : `No ${content.title.toLowerCase()} records yet.`);
+    setNotice(rows.length ? "" : `No ${content.title.toLowerCase()} records yet.`);
   }, [kind, content.title]);
 
   useEffect(() => {

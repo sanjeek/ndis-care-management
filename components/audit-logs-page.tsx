@@ -18,7 +18,7 @@ type AuditLog = {
 
 export function AuditLogsPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [message, setMessage] = useState("Loading audit trail from Supabase.");
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     if (!supabase) {

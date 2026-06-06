@@ -22,7 +22,7 @@ type ParticipantOption = {
 export function DocumentsPage() {
   const [documents, setDocuments] = useState<CareDocument[]>([]);
   const [participants, setParticipants] = useState<ParticipantOption[]>([]);
-  const [message, setMessage] = useState("Loading secure documents.");
+  const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
 
   const load = useCallback(async () => {

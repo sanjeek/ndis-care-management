@@ -25,7 +25,7 @@ type AttachmentRecord = {
 };
 
 export function ShiftAttachmentsPage() {
-  const [notice, setNotice] = useState("Loading shift attachments.");
+  const [notice, setNotice] = useState("");
   const [shifts, setShifts] = useState<ShiftOption[]>([]);
   const [attachments, setAttachments] = useState<AttachmentRecord[]>([]);
 
@@ -47,7 +47,7 @@ export function ShiftAttachmentsPage() {
     }
     setShifts(result.shifts ?? []);
     setAttachments(result.attachments ?? []);
-    setNotice(result.attachments?.length ? "Shift attachments loaded from secure storage." : "No shift attachments uploaded yet.");
+    setNotice(result.attachments?.length ? "" : "No shift attachments uploaded yet.");
   }, []);
 
   useEffect(() => {

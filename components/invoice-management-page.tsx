@@ -50,7 +50,7 @@ export function InvoiceManagementPage() {
   const [role, setRole] = useState<UserRole>("support_worker");
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
   const [items, setItems] = useState<InvoiceItem[]>([]);
-  const [notice, setNotice] = useState("Loading invoices.");
+  const [notice, setNotice] = useState("");
 
   const canManage = isAdminRole(role);
   const totals = useMemo(() => ({
@@ -77,7 +77,7 @@ export function InvoiceManagementPage() {
     setRole(resolvedRole);
     setInvoices((invoiceRows.data ?? []).map(mapInvoice));
     setItems((itemRows.data ?? []).map(mapInvoiceItem));
-    setNotice(invoiceRows.data?.length ? "Showing generated invoices from Supabase." : "No generated invoices yet.");
+    setNotice(invoiceRows.data?.length ? "" : "No generated invoices yet.");
   }, []);
 
   useEffect(() => {

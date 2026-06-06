@@ -38,7 +38,7 @@ export function PayrollExportPage() {
   const [role, setRole] = useState<UserRole>("support_worker");
   const [exports, setExports] = useState<PayrollExport[]>([]);
   const [readyShifts, setReadyShifts] = useState<PayrollReadyShift[]>([]);
-  const [notice, setNotice] = useState("Loading payroll exports.");
+  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
 
   const canGenerate = role === "admin";
@@ -74,7 +74,7 @@ export function PayrollExportPage() {
     setRole(resolvedRole);
     setExports((exportRows.data ?? []) as PayrollExport[]);
     setReadyShifts((shiftRows.data ?? []) as PayrollReadyShift[]);
-    setNotice(exportRows.data?.length ? "Payroll exports loaded from Supabase." : "No payroll exports generated yet.");
+    setNotice(exportRows.data?.length ? "" : "No payroll exports generated yet.");
   }, []);
 
   useEffect(() => {

@@ -33,7 +33,7 @@ const expiryFields = [
 export function ReminderMonitoringPage() {
   const [alerts, setAlerts] = useState<ExpiryAlert[]>([]);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
-  const [notice, setNotice] = useState("Loading reminder monitoring.");
+  const [notice, setNotice] = useState("");
 
   const refresh = useCallback(async () => {
     if (!isSupabaseConfigured || !supabase) {

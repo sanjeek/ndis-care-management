@@ -52,7 +52,7 @@ export function ContractorInvoicesPage() {
   const [userEmail, setUserEmail] = useState("");
   const [invoices, setInvoices] = useState<ContractorInvoice[]>([]);
   const [items, setItems] = useState<ContractorInvoiceItem[]>([]);
-  const [notice, setNotice] = useState("Loading contractor invoices.");
+  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
 
   const canGenerate = isAdminRole(role);
@@ -89,7 +89,7 @@ export function ContractorInvoicesPage() {
     const records = result as ApiRecords;
     setInvoices((records.invoices ?? []).map(mapInvoice));
     setItems((records.items ?? []).map(mapItem));
-    setNotice(records.invoices?.length ? "Showing contractor invoices from Supabase." : "No contractor invoices generated yet.");
+    setNotice(records.invoices?.length ? "" : "No contractor invoices generated yet.");
   }, []);
 
   useEffect(() => {

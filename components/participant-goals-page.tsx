@@ -23,7 +23,7 @@ type GoalRecord = {
 const statuses = ["active", "paused", "achieved", "archived"];
 
 export function ParticipantGoalsPage() {
-  const [notice, setNotice] = useState("Loading participant goals.");
+  const [notice, setNotice] = useState("");
   const [participants, setParticipants] = useState<ParticipantOption[]>([]);
   const [goals, setGoals] = useState<GoalRecord[]>([]);
   const [canManage, setCanManage] = useState(false);
@@ -55,7 +55,7 @@ export function ParticipantGoalsPage() {
     setParticipants(result.participants ?? []);
     setGoals(result.goals ?? []);
     setCanManage(Boolean(result.canManage));
-    setNotice(result.goals?.length ? "Participant goals loaded from Supabase." : "No participant goals recorded yet.");
+    setNotice(result.goals?.length ? "" : "No participant goals recorded yet.");
   }, []);
 
   useEffect(() => {

@@ -33,7 +33,7 @@ type SearchResult = {
   href: string;
 };
 
-export function AppShell({ title, eyebrow, children, hidePdf }: { title: string; eyebrow: string; children: React.ReactNode; hidePdf?: boolean }) {
+export function AppShell({ title, eyebrow, children, hidePdf }: { title: string; eyebrow?: string; children: React.ReactNode; hidePdf?: boolean }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -489,7 +489,7 @@ export function AppShell({ title, eyebrow, children, hidePdf }: { title: string;
           <header className="sticky top-[65px] z-10 border-b border-indigo-100/80 bg-[#fbfdff]/95 px-4 py-4 backdrop-blur lg:top-0 lg:px-8">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-gumleaf">{eyebrow}</p>
+                {eyebrow ? <p className="truncate text-sm font-medium text-gumleaf">{eyebrow}</p> : null}
                 <h1 className="text-2xl font-semibold text-ink sm:text-3xl">{title}</h1>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -819,7 +819,7 @@ function buildCareOsReportPdf(report: PagePdfReport) {
     drawText(commands, "CareOS NDIS", margin + 10, 780, 13, "F2", colors.gumleaf);
     drawText(commands, "Professional provider report", margin + 10, 764, 8.5, "F3", colors.slate);
     drawWrappedText(commands, report.title || "CareOS report", margin + 10, 742, 290, 21, "F2", colors.ink, 21);
-    drawWrappedText(commands, report.eyebrow || "Showing records from Supabase.", margin + 10, 718, 300, 8.5, "F1", colors.slate, 11);
+    drawWrappedText(commands, report.eyebrow || "", margin + 10, 718, 300, 8.5, "F1", colors.slate, 11);
     drawText(commands, "Generated", margin + 326, 758, 7.5, "F2", colors.indigo);
     drawWrappedText(commands, report.generatedAt, margin + 326, 746, 78, 7.5, "F1", colors.ink, 9);
     drawText(commands, "Role", margin + 428, 758, 7.5, "F2", colors.gumleaf);
