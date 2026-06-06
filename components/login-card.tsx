@@ -63,27 +63,15 @@ export function LoginCard() {
         return;
       }
 
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-      const { error } = await client.auth.resetPasswordForEmail(email, {
-        redirectTo: `${siteUrl.replace(/\/$/, "")}/reset-password`
-      });
-      setLoading(false);
-      if (error) {
-        if (error.message.toLowerCase().includes("rate")) {
-          setResetLockedUntil(Date.now() + 60000);
-          setMessage("Supabase has temporarily rate-limited reset emails. Please wait 60 seconds, then try again.");
-          return;
-        }
-        setMessage(error.message);
-        return;
-      }
-      setResetLockedUntil(Date.now() + 60000);
-      void fetch("/api/notifications/password-reset", {
+      const res = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email })
       });
-      setMessage("Password reset email sent. Check your inbox.");
+      const result = await res.json();
+      setLoading(false);
+      setResetLockedUntil(Date.now() + 60000);
+      setMessage(result.message ?? "If that email has an account, a reset link has been sent.");
       return;
     }
 
