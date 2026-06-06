@@ -8,10 +8,16 @@ export async function POST(request: Request) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+  // Diagnose missing env vars upfront with specific messages
+  const missing: string[] = [];
+  if (!serviceRole) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  if (!process.env.RESEND_API_KEY || !process.env.RESEND_API_KEY.startsWith("re_")) missing.push("RESEND_API_KEY");
+  if (!process.env.EMAIL_FROM && !process.env.RESEND_FROM_EMAIL) missing.push("EMAIL_FROM");
+
   if (!url || !serviceRole) {
     return NextResponse.json({
       sent: false,
-      message: `Worker record saved. Add SUPABASE_SERVICE_ROLE_KEY to send invite emails automatically.`
+      message: `Worker record saved. Invite email not sent — missing Vercel environment variable${missing.length === 1 ? "" : "s"}: ${missing.join(", ")}. Add these in your Vercel project settings → Environment Variables.`
     });
   }
 
@@ -59,5 +65,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ sent: true, message: `Invite email sent to ${email}. Worker can set up their login from the link in the email.` });
   }
 
-  return NextResponse.json({ sent: false, message: `Worker record saved. Invite email could not be sent — check email configuration in settings.` });
+  if (missing.length) {
+    return NextResponse.json({ sent: false, message: `Worker record saved. Invite email not sent — missing Vercel environment variable${missing.length === 1 ? "" : "s"}: ${missing.join(", ")}. Add these in your Vercel project settings → Environment Variables.` });
+  }
+  return NextResponse.json({ sent: false, message: `Worker record saved. Invite email could not be delivered — Resend returned an error. Check that your RESEND_API_KEY is valid and the EMAIL_FROM domain is verified in Resend.` });
 }
