@@ -65,8 +65,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ sent: true, message: `Invite email sent to ${email}. Worker can set up their login from the link in the email.` });
   }
 
-  if (missing.length) {
-    return NextResponse.json({ sent: false, message: `Worker record saved. Invite email not sent — missing Vercel environment variable${missing.length === 1 ? "" : "s"}: ${missing.join(", ")}. Add these in your Vercel project settings → Environment Variables.` });
-  }
-  return NextResponse.json({ sent: false, message: `Worker record saved. Invite email could not be delivered — Resend returned an error. Check that your RESEND_API_KEY is valid and the EMAIL_FROM domain is verified in Resend.` });
+  const resendError = result.errors?.[0] ?? "Unknown error from Resend.";
+  return NextResponse.json({ sent: false, message: `Worker record saved. Invite email failed — Resend said: "${resendError}". Check that your EMAIL_FROM domain is verified in Resend (resend.com → Domains).` });
 }

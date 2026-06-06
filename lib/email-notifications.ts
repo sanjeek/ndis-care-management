@@ -77,6 +77,7 @@ export async function sendCareNotification(client: SupabaseClient, input: EmailI
 
   let sent = 0;
   let failed = 0;
+  const errors: string[] = [];
 
   for (const recipient of recipients) {
     try {
@@ -98,18 +99,22 @@ export async function sendCareNotification(client: SupabaseClient, input: EmailI
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
         failed += 1;
-        await logNotification(client, input, recipient, "failed", String(result.message || result.error || response.statusText));
+        const errMsg = String(result.message || result.error || response.statusText);
+        errors.push(errMsg);
+        await logNotification(client, input, recipient, "failed", errMsg);
       } else {
         sent += 1;
         await logNotification(client, input, recipient, "sent", null, String(result.id ?? ""));
       }
     } catch (error) {
       failed += 1;
-      await logNotification(client, input, recipient, "failed", error instanceof Error ? error.message : "Email send failed.");
+      const errMsg = error instanceof Error ? error.message : "Email send failed.";
+      errors.push(errMsg);
+      await logNotification(client, input, recipient, "failed", errMsg);
     }
   }
 
-  return { sent, failed };
+  return { sent, failed, errors };
 }
 
 async function logNotification(
