@@ -134,7 +134,7 @@ export function BackupStatusPage() {
             <p className="font-semibold text-ink text-sm">Storage bucket setup</p>
             <p className="mt-0.5 text-xs text-slate-500">Backups require a <code>database-backups</code> bucket in Supabase Storage. Click to create it if backups are failing.</p>
             {setupMsg ? <p className="mt-1 text-xs font-medium text-gumleaf">{setupMsg}</p> : null}
-            <button onClick={() => void setupStorage()} disabled={setupLoading} className="mt-2 inline-flex items-center gap-1.5 rounded bg-gumleaf px-3 py-1.5 text-xs font-semibold text-white hover:bg-gumleaf/90 disabled:opacity-60">
+            <button onClick={() => void setupStorage()} disabled={setupLoading} className="mt-2 inline-flex items-center gap-1.5 rounded bg-gumleaf/10 border border-gumleaf/20 px-3 py-1.5 text-xs font-semibold text-gumleaf hover:bg-gumleaf/20 disabled:opacity-60">
               {setupLoading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <HardDrive className="h-3.5 w-3.5" />}
               {setupLoading ? "Creating…" : "Create storage bucket"}
             </button>
@@ -160,7 +160,7 @@ export function BackupStatusPage() {
               <RefreshCw className="h-4 w-4" />
               Refresh
             </button>
-            <button onClick={runBackup} disabled={loading} className="inline-flex items-center gap-2 rounded bg-gumleaf px-3 py-2 text-sm font-semibold text-white hover:bg-gumleaf/90 disabled:opacity-60">
+            <button onClick={runBackup} disabled={loading} className="inline-flex items-center gap-2 rounded bg-gumleaf/10 border border-gumleaf/20 px-3 py-2 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20 disabled:opacity-60">
               <PlayCircle className="h-4 w-4" />
               Run backup now
             </button>

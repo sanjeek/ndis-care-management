@@ -128,7 +128,7 @@ export function ParticipantGoalsPage() {
                 <Select name="status" label="Status" options={statuses} defaultValue={editing?.status ?? "active"} />
               </div>
               <div className="flex flex-col gap-3 sm:flex-row">
-                <button className="min-h-12 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90">{editing ? "Update goal" : "Save goal"}</button>
+                <button className="min-h-12 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20">{editing ? "Update goal" : "Save goal"}</button>
                 {editing ? <button type="button" onClick={() => setEditingId("")} className="min-h-12 rounded border border-slate-200 px-4 py-3 text-sm font-semibold text-ink hover:bg-slate-50">Cancel edit</button> : null}
               </div>
             </form>

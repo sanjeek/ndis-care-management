@@ -194,7 +194,7 @@ export function SettingsConsolePage() {
                 Sensitive setting
               </label>
             </div>
-            <button disabled={!canManage} className="inline-flex min-h-12 items-center justify-center rounded-lg bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90 disabled:cursor-not-allowed disabled:opacity-50">
+            <button disabled={!canManage} className="inline-flex min-h-12 items-center justify-center rounded-lg bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20 disabled:cursor-not-allowed disabled:opacity-50">
               Save setting
             </button>
             {!canManage ? <p className="text-sm text-slate-500">Team leaders can review settings. Admin access is required to update them.</p> : null}

@@ -143,7 +143,7 @@ export function RiskAssessmentsPage() {
             <Area name="manualHandlingRisks" label="Manual handling risks" defaultValue={editing?.manual_handling_risks ?? ""} placeholder="Transfers, mobility aids, hoists, lifting restrictions, two-person support needs." />
             <Area name="controlMeasures" label="Controls and mitigation" defaultValue={editing?.control_measures ?? ""} placeholder="Controls, instructions, PPE, escalation process, review actions, staff training." />
             <div className="flex flex-col gap-3 sm:flex-row">
-              <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90">
+              <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20">
                 <FileCheck2 className="h-4 w-4" />
                 {editing ? "Update assessment" : "Save assessment"}
               </button>

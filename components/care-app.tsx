@@ -154,7 +154,7 @@ export function CareApp() {
       <aside className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:h-screen lg:w-72 lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
         <div className="flex items-center justify-between gap-4">
           <a href="#dashboard" className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded bg-ink text-sm font-bold text-white">CO</span>
+            <span className="flex h-10 w-10 items-center justify-center rounded bg-ink text-sm font-bold text-gumleaf">CO</span>
             <span>
               <span className="block text-base font-semibold text-ink">CareOS</span>
               <span className="block text-xs text-slate-500">NDIS operations</span>
@@ -422,7 +422,7 @@ function Rostering({
             <TextField name="end" label="End time" type="datetime-local" defaultValue={emptyShift.end} />
           </div>
           <SelectField name="status" label="Shift status" options={rosterStatuses} defaultValue={emptyShift.status} />
-          <button className="inline-flex items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90">
+          <button className="inline-flex items-center justify-center gap-2 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20">
             <CalendarPlus className="h-4 w-4" />
             Save shift
           </button>
@@ -556,7 +556,7 @@ function RecordModal({
           <button type="button" onClick={onClose} className="rounded border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
             Cancel
           </button>
-          <button className="rounded bg-gumleaf px-4 py-2 text-sm font-semibold text-white hover:bg-gumleaf/90">{submitLabel}</button>
+          <button className="rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-2 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20">{submitLabel}</button>
         </div>
       </form>
     </div>

@@ -141,7 +141,7 @@ export function InternalMessagingPage() {
                 <span className="mt-1 block text-xs text-slate-500">Hold Ctrl to select multiple recipients. Messages stay inside the app.</span>
               </label>
               <Area name="body" label="Message" placeholder="Write the internal message." />
-              <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90">
+              <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20">
                 <Send className="h-4 w-4" />
                 Start conversation
               </button>
@@ -201,7 +201,7 @@ export function InternalMessagingPage() {
             <form onSubmit={sendMessage} className="border-t border-slate-200 p-4">
               <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
                 <textarea name="body" required rows={2} placeholder="Reply inside the app" className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
-                <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90">
+                <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20">
                   <Send className="h-4 w-4" />
                   Send
                 </button>

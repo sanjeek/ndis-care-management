@@ -142,7 +142,7 @@ export function BranchesPage() {
                   <Field name="managerName" label="Manager name" required={false} />
                   <Field name="managerEmail" label="Manager email" type="email" required={false} />
                 </div>
-                <button disabled={saving} className="min-h-12 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90 disabled:cursor-not-allowed disabled:opacity-60">
+                <button disabled={saving} className="min-h-12 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20 disabled:cursor-not-allowed disabled:opacity-60">
                   Save branch
                 </button>
               </form>

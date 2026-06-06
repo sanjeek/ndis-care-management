@@ -150,7 +150,7 @@ export function ParticipantTasksPage() {
                 <Field name="dueDate" label="Due date" type="date" required={false} />
                 <Select name="priority" label="Priority" options={["low", "medium", "high", "critical"]} />
               </div>
-              <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90">
+              <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20">
                 <Plus className="h-4 w-4" />
                 Assign task
               </button>

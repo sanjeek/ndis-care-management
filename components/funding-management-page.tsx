@@ -185,7 +185,7 @@ export function FundingManagementPage() {
               </div>
               <Select name="status" label="Status" options={["active", "exhausted", "closed"]} />
               <Area name="notes" label="Funding notes" placeholder="Plan manager notes, budget alerts, service booking conditions, or review actions." required={false} />
-              <button className="min-h-12 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90">Save funding record</button>
+              <button className="min-h-12 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20">Save funding record</button>
             </form>
           </Panel>
         ) : (

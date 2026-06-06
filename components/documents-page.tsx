@@ -129,7 +129,7 @@ export function DocumentsPage() {
             <input name="file" type="file" required className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none file:mr-4 file:rounded file:border-0 file:bg-gumleaf file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white" />
           </label>
         </div>
-        <button disabled={uploading || participants.length === 0} className="mt-4 inline-flex items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90 disabled:cursor-not-allowed disabled:opacity-60">
+        <button disabled={uploading || participants.length === 0} className="mt-4 inline-flex items-center justify-center gap-2 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20 disabled:cursor-not-allowed disabled:opacity-60">
           <FileUp className="h-4 w-4" />
           {uploading ? "Uploading..." : "Upload securely"}
         </button>

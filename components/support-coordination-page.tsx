@@ -134,7 +134,7 @@ export function SupportCoordinationPage() {
                   </div>
                   <Area name="address" label="Address" required={false} rows={2} />
                   <Area name="notes" label="Notes" required={false} rows={3} />
-                  <button className="min-h-12 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white">Save provider contact</button>
+                  <button className="min-h-12 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf">Save provider contact</button>
                 </form>
               </Panel>
 
@@ -155,7 +155,7 @@ export function SupportCoordinationPage() {
                     <Field name="budget_amount" label="Budget amount" type="number" min="0" step="0.01" defaultValue="0" />
                     <Field name="used_amount" label="Used amount" type="number" min="0" step="0.01" defaultValue="0" />
                   </div>
-                  <button className="min-h-12 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white">Save booking</button>
+                  <button className="min-h-12 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf">Save booking</button>
                 </form>
               </Panel>
 
@@ -168,7 +168,7 @@ export function SupportCoordinationPage() {
                   <Area name="summary" label="Summary" required={false} rows={3} />
                   <Area name="decisions" label="Decisions" required={false} rows={3} />
                   <Area name="next_steps" label="Next steps" required={false} rows={3} />
-                  <button className="min-h-12 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white">Save meeting</button>
+                  <button className="min-h-12 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf">Save meeting</button>
                 </form>
                 <form onSubmit={(event) => submit(event, "coordination_action")} className="mt-6 grid gap-4 border-t border-slate-200 pt-5">
                   <Select name="participant_name" label="Participant" options={participants.map((item) => item.name)} />
@@ -181,7 +181,7 @@ export function SupportCoordinationPage() {
                     <Field name="due_date" label="Due date" type="date" required={false} />
                     <Select name="priority" label="Priority" options={["low", "medium", "high", "critical"]} defaultValue="medium" />
                   </div>
-                  <button className="min-h-12 rounded bg-ink px-4 py-3 text-sm font-semibold text-white">Save action</button>
+                  <button className="min-h-12 rounded bg-ink px-4 py-3 text-sm font-semibold text-gumleaf">Save action</button>
                 </form>
               </Panel>
             </>
@@ -232,7 +232,7 @@ export function SupportCoordinationPage() {
                 <Card key={action.id} title={action.title} subtitle={`${action.participant_name} | Due ${dateOnly(action.due_date)}`} badge={action.status}>
                   <p className="mt-2 text-sm text-slate-600">{action.description || "No action notes."}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {action.status !== "completed" ? <button type="button" onClick={() => void updateAction(action.id, "completed")} className="rounded bg-gumleaf px-3 py-2 text-xs font-semibold text-white">Mark complete</button> : null}
+                    {action.status !== "completed" ? <button type="button" onClick={() => void updateAction(action.id, "completed")} className="rounded bg-gumleaf/10 border border-gumleaf/20 px-3 py-2 text-xs font-semibold text-gumleaf">Mark complete</button> : null}
                     {action.status === "open" ? <button type="button" onClick={() => void updateAction(action.id, "in_progress")} className="rounded border border-slate-200 px-3 py-2 text-xs font-semibold text-ink">In progress</button> : null}
                   </div>
                 </Card>

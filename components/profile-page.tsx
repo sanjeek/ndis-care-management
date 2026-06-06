@@ -49,7 +49,7 @@ export function ProfilePage() {
       <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
         <section className="rounded border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-4">
-            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-gumleaf text-xl font-bold text-white">
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-gumleaf text-xl font-bold text-gumleaf">
               {profile.name
                 .split(" ")
                 .map((part) => part[0])

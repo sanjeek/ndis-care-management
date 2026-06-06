@@ -895,7 +895,7 @@ export function ParticipantsPage() {
               <button
                 type="button"
                 onClick={() => setCreateOpen(true)}
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-gumleaf px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-harbour sm:w-auto"
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-gumleaf/10 border border-gumleaf/20 px-4 py-2.5 text-sm font-semibold text-gumleaf shadow-sm transition hover:bg-gumleaf/20 sm:w-auto"
               >
                 <Plus className="h-4 w-4" />
                 New participant
@@ -2313,7 +2313,7 @@ export function MyShiftsPage() {
               type="button"
               disabled={!canSubmitShift(shift)}
               onClick={() => setSigningShift(shift)}
-              className="rounded bg-gumleaf px-3 py-2 text-xs font-semibold text-white hover:bg-gumleaf/90 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+              className="rounded bg-gumleaf/10 border border-gumleaf/20 px-3 py-2 text-xs font-semibold text-gumleaf hover:bg-gumleaf/20 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
             >
               {shift.approvalStatus === "approved" ? "Approved" : shift.approvalStatus === "submitted" ? "Submitted" : "Sign and submit"}
             </button>
@@ -2379,7 +2379,7 @@ export function TimesheetsApprovalPage() {
             renderActions={(shift) =>
               shift.approvalStatus === "submitted" ? (
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => void approveShift(shift.id)} className="rounded bg-gumleaf px-3 py-2 text-xs font-semibold text-white hover:bg-gumleaf/90">Approve</button>
+                  <button type="button" onClick={() => void approveShift(shift.id)} className="rounded bg-gumleaf/10 border border-gumleaf/20 px-3 py-2 text-xs font-semibold text-gumleaf hover:bg-gumleaf/20">Approve</button>
                   <button type="button" onClick={() => void rejectShift(shift.id)} className="rounded border border-coral/30 bg-coral/5 px-3 py-2 text-xs font-semibold text-coral hover:bg-coral/10">Reject</button>
                 </div>
               ) : (
@@ -2920,7 +2920,7 @@ function ProgressNoteAssistPanel({ participants, setNotice }: { participants: Pa
             </select>
           </label>
           <textarea value={rawNote} onChange={(event) => setRawNote(event.target.value)} rows={7} placeholder="Type or dictate rough notes here. Review for accuracy before using in a formal progress note." className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
-          <button type="button" onClick={() => void generateDraft()} className="rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90">
+          <button type="button" onClick={() => void generateDraft()} className="rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20">
             Generate structured draft
           </button>
         </div>
@@ -3680,7 +3680,7 @@ function WorkerShiftMobilePanel({
               type="button"
               disabled={!focusShift.clockInAt || Boolean(focusShift.clockOutAt)}
               onClick={() => void onClock(focusShift.id, "out")}
-              className="min-h-16 rounded bg-gumleaf px-4 py-3 text-base font-semibold text-white shadow-sm hover:bg-gumleaf/90 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+              className="min-h-16 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-base font-semibold text-gumleaf shadow-sm hover:bg-gumleaf/20 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
             >
               {focusShift.clockOutAt ? `Out ${timeOnly(focusShift.clockOutAt)}` : "Clock out"}
             </button>
@@ -4339,7 +4339,7 @@ function VacantShiftRow({ shifts }: { shifts: ShiftRecord[] }) {
 
   return (
     <div className="flex min-h-[102px] items-center gap-3 border-b border-slate-200 px-3 py-4">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-coral text-sm font-semibold text-white">VS</span>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-coral text-sm font-semibold text-gumleaf">VS</span>
       <div className="min-w-0">
         <p className="font-semibold text-coral">Vacant Shift</p>
         <p className="text-xs text-slate-500">{vacant ? `${vacant} vacant shift records` : "No vacant shift records"}</p>
@@ -4464,7 +4464,7 @@ function RecurringSeriesPanel({ shifts, setNotice, onSaved }: { shifts: ShiftRec
 function StaffScheduleRow({ worker, hours }: { worker: WorkerRecord; hours: number }) {
   return (
     <div className="flex min-h-[102px] items-center gap-3 border-b border-slate-200 px-3 py-4">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-harbour text-sm font-semibold text-white">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-harbour text-sm font-semibold text-gumleaf">
         {initials(worker.name)}
       </span>
       <div className="min-w-0 flex-1">
@@ -4683,7 +4683,7 @@ function RecordForm({ children, submitLabel, onSubmit }: { children: React.React
   return (
     <form onSubmit={handleSubmit} className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
       <div className="grid gap-4">{children}</div>
-      <button className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-gumleaf px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-harbour sm:w-auto">
+      <button className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf shadow-sm transition hover:bg-gumleaf/20 sm:w-auto">
         <Plus className="h-4 w-4" />
         {submitLabel}
       </button>

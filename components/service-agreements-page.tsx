@@ -210,7 +210,7 @@ export function ServiceAgreementsPage() {
               <MultiSelectText name="supportCategories" label="Support categories" options={supportCategories} />
               <Area name="fundingSummary" label="Funding summary" placeholder="Budget categories, service booking references, plan manager, and claim conditions." required={false} />
               <Area name="terms" label="Agreement terms" placeholder="Services, responsibilities, cancellation notice, feedback, complaints, privacy, fees, and exit arrangements." />
-              <button className="min-h-12 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90">Save agreement</button>
+              <button className="min-h-12 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20">Save agreement</button>
             </form>
           </Panel>
         ) : (
@@ -263,7 +263,7 @@ export function ServiceAgreementsPage() {
                       </button>
                       {canManage ? (
                         <>
-                          <button type="button" onClick={() => setSigningAgreement(agreement)} className="inline-flex items-center gap-2 rounded bg-gumleaf px-3 py-2 text-xs font-semibold text-white hover:bg-gumleaf/90">
+                          <button type="button" onClick={() => setSigningAgreement(agreement)} className="inline-flex items-center gap-2 rounded bg-gumleaf/10 border border-gumleaf/20 px-3 py-2 text-xs font-semibold text-gumleaf hover:bg-gumleaf/20">
                             <FileSignature className="h-3.5 w-3.5" />
                             Capture signature
                           </button>
@@ -299,7 +299,7 @@ export function ServiceAgreementsPage() {
               <Field name="signedByName" label="Signer full name" defaultValue={signingAgreement.signedByName || signingAgreement.participantName} />
               <Field name="participantSignature" label="Participant or representative signature" defaultValue={signingAgreement.participantSignature} placeholder="Type full name as signature" />
               <p className="rounded border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-600">The signature is stored on the protected agreement record with timestamp and version details.</p>
-              <button className="min-h-12 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90">Save signature</button>
+              <button className="min-h-12 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20">Save signature</button>
             </form>
           </div>
         </div>

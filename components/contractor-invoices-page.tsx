@@ -165,7 +165,7 @@ export function ContractorInvoicesPage() {
               <p className="rounded border border-slate-200 bg-white p-3 text-sm leading-6 text-slate-600">
                 Contractor invoices use assigned scheduled shift hours for the selected week. Cancelled shifts and shifts already linked to a contractor invoice are skipped.
               </p>
-              <button disabled={busy} className="min-h-12 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90 disabled:cursor-not-allowed disabled:opacity-70">
+              <button disabled={busy} className="min-h-12 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20 disabled:cursor-not-allowed disabled:opacity-70">
                 {busy ? "Generating..." : "Generate and email invoices"}
               </button>
             </form>
