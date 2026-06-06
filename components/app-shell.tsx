@@ -361,7 +361,7 @@ export function AppShell({ title, eyebrow, children, hidePdf }: { title: string;
     const exportRoot = document.querySelector<HTMLElement>("[data-careos-export]");
     const report = buildPagePdfReport({
       title,
-      eyebrow,
+      eyebrow: eyebrow ?? "",
       root: exportRoot,
       userName,
       userEmail,
