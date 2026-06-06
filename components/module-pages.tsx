@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   BarChart3,
   Bell,
+  BriefcaseMedical,
   CalendarDays,
   CalendarPlus,
   CheckCircle2,
@@ -15,18 +16,27 @@ import {
   Download,
   Eye,
   EyeOff,
+  FileText,
   FilePlus2,
   Filter,
+  Home,
   KeyRound,
+  ListChecks,
   LockKeyhole,
+  Mail,
+  MapPin,
+  MessageSquare,
   MoreVertical,
   Phone,
   Pencil,
   Plus,
   Search,
   ShieldCheck,
+  Smartphone,
+  Target,
   TrendingUp,
   Upload,
+  UserRound,
   Users,
   X,
   type LucideIcon
@@ -44,15 +54,53 @@ type ParticipantRecord = {
   ndis: string;
   plan: string;
   dateOfBirth: string;
+  medicareNumber: string;
+  displayName: string;
+  preferredName: string;
+  personAlias: string;
+  otherIdentifier: string;
+  gender: string;
+  sex: string;
+  primaryAddress: string;
+  postalAddress: string;
+  mobileNumber: string;
+  phoneNumber: string;
+  email: string;
+  secondaryEmail: string;
+  preferredContactMethod: string;
+  languages: string;
+  culturalIdentity: string;
+  religion: string;
+  maritalStatus: string;
+  nationality: string;
+  ethnicity: string;
+  aboriginalTorresStraitIslander: string;
+  placeOfBirth: string;
+  joinedDate: string;
+  nextReviewDate: string;
+  clientStatus: string;
   emergency: string;
   emergencyContacts: string;
   needs: string;
   supportPlans: string;
   goals: string;
   riskInformation: string;
+  requirements: string;
+  preferences: string;
+  needToKnowInformation: string;
+  usefulInformation: string;
+  environmentalDetails: string;
+  psychologicalDetails: string;
+  sensoryDetails: string;
+  bmi: string;
   medicalNotes: string;
   allergies: string;
   communicationPreferences: string;
+  clientType: string;
+  shareProgressNotes: boolean;
+  enableSmsReminders: boolean;
+  invoiceTravel: boolean;
+  privateInfo: string;
   docs: number;
   notes: number;
 };
@@ -86,6 +134,76 @@ type ParticipantTimelineItem = {
   title: string;
   detail: string;
   occurredAt: string;
+};
+
+type ParticipantProfileShift = {
+  id: string;
+  worker: string;
+  location: string;
+  status: string;
+  approvalStatus: string;
+  startsAt: string;
+  endsAt: string;
+};
+
+type ParticipantProfileCarePlan = {
+  id: string;
+  title: string;
+  status: string;
+  reviewDate: string;
+};
+
+type ParticipantProfileGoal = {
+  id: string;
+  title: string;
+  progress: number;
+  status: string;
+  targetDate: string;
+};
+
+type ParticipantProfileFunding = {
+  id: string;
+  category: string;
+  totalBudget: number;
+  spentAmount: number;
+  status: string;
+  planEnd: string;
+};
+
+type ParticipantProfileInvoice = {
+  id: string;
+  invoiceNumber: string;
+  issueDate: string;
+  dueDate: string;
+  totalAmount: number;
+  status: string;
+};
+
+type ParticipantProfileRisk = {
+  id: string;
+  level: string;
+  status: string;
+  reviewDate: string;
+  assessmentDate: string;
+};
+
+type ParticipantProfileTask = {
+  id: string;
+  title: string;
+  assignedWorker: string;
+  dueDate: string;
+  status: string;
+  priority: string;
+};
+
+type ParticipantRelatedRecords = {
+  shifts: ParticipantProfileShift[];
+  carePlans: ParticipantProfileCarePlan[];
+  goals: ParticipantProfileGoal[];
+  funding: ParticipantProfileFunding[];
+  invoices: ParticipantProfileInvoice[];
+  risks: ParticipantProfileRisk[];
+  tasks: ParticipantProfileTask[];
 };
 
 type CarePlanRecord = {
@@ -707,6 +825,31 @@ export function ParticipantsPage() {
       ndis_number: get(form, "ndis"),
       plan_type: get(form, "plan"),
       date_of_birth: get(form, "dateOfBirth"),
+      medicare_number: get(form, "medicareNumber"),
+      display_name: get(form, "displayName"),
+      preferred_name: get(form, "preferredName"),
+      person_alias: get(form, "personAlias"),
+      other_identifier: get(form, "otherIdentifier"),
+      gender: get(form, "gender"),
+      sex: get(form, "sex"),
+      primary_address: get(form, "primaryAddress"),
+      postal_address: get(form, "postalAddress"),
+      mobile_number: get(form, "mobileNumber"),
+      phone_number: get(form, "phoneNumber"),
+      email: get(form, "email"),
+      secondary_email: get(form, "secondaryEmail"),
+      preferred_contact_method: get(form, "preferredContactMethod"),
+      languages: get(form, "languages"),
+      cultural_identity: get(form, "culturalIdentity"),
+      religion: get(form, "religion"),
+      marital_status: get(form, "maritalStatus"),
+      nationality: get(form, "nationality"),
+      ethnicity: get(form, "ethnicity"),
+      aboriginal_torres_strait_islander: get(form, "aboriginalTorresStraitIslander"),
+      place_of_birth: get(form, "placeOfBirth"),
+      joined_date: get(form, "joinedDate"),
+      next_review_date: get(form, "nextReviewDate"),
+      client_status: get(form, "clientStatus"),
       emergency_contact: get(form, "emergency"),
       emergency_contacts: get(form, "emergencyContacts"),
       support_needs: get(form, "needs")
@@ -714,9 +857,22 @@ export function ParticipantsPage() {
       support_plans: get(form, "supportPlans"),
       goals: get(form, "goals"),
       risk_information: get(form, "riskInformation"),
+      requirements: get(form, "requirements"),
+      preferences: get(form, "preferences"),
+      need_to_know_information: get(form, "needToKnowInformation"),
+      useful_information: get(form, "usefulInformation"),
+      environmental_details: get(form, "environmentalDetails"),
+      psychological_details: get(form, "psychologicalDetails"),
+      sensory_details: get(form, "sensoryDetails"),
+      bmi: get(form, "bmi"),
       medical_notes: get(form, "medicalNotes"),
       allergies: get(form, "allergies"),
-      communication_preferences: get(form, "communicationPreferences")
+      communication_preferences: get(form, "communicationPreferences"),
+      client_type: get(form, "clientType"),
+      share_progress_notes: form.get("shareProgressNotes") === "on",
+      enable_sms_reminders: form.get("enableSmsReminders") === "on",
+      invoice_travel: form.get("invoiceTravel") === "on",
+      private_info: get(form, "privateInfo")
     };
     const ok = await postJson("/api/participants", payload, setNotice);
     if (ok) {
@@ -848,16 +1004,62 @@ function ParticipantCreateModal({
             <Field name="name" label="Participant profile" placeholder="Full name" />
             <Field name="ndis" label="NDIS number" placeholder="NDIS participant number" />
             <Field name="plan" label="Plan type" placeholder="NDIS managed, plan managed, or self managed" />
-            <Field name="dateOfBirth" label="Date of birth" type="date" />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field name="dateOfBirth" label="Date of birth" type="date" required={false} />
+              <Field name="medicareNumber" label="Medicare number" placeholder="Medicare reference" required={false} />
+              <Field name="displayName" label="Display name" placeholder="Preferred display name" required={false} />
+              <Field name="preferredName" label="Preferred name" placeholder="Name used in daily support" required={false} />
+              <Field name="personAlias" label="Person alias" placeholder="Alias or known as" required={false} />
+              <Field name="otherIdentifier" label="Other identifier" placeholder="Provider or internal reference" required={false} />
+              <Select name="gender" label="Gender" options={["", "Female", "Male", "Non-binary", "Prefer not to say", "Other"]} required={false} />
+              <Select name="sex" label="Sex" options={["", "Female", "Male", "Intersex", "Prefer not to say"]} required={false} />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field name="mobileNumber" label="Mobile number" placeholder="Participant mobile" required={false} />
+              <Field name="phoneNumber" label="Phone number" placeholder="Home or alternate number" required={false} />
+              <Field name="email" label="Email" type="email" placeholder="participant@example.com" required={false} />
+              <Field name="secondaryEmail" label="Secondary email" type="email" placeholder="second@example.com" required={false} />
+              <Select name="preferredContactMethod" label="Preferred contact method" options={["", "Phone", "SMS", "Email", "Family/nominee", "Support coordinator"]} required={false} />
+              <Field name="languages" label="Languages" placeholder="English, Tamil, Auslan..." required={false} />
+            </div>
+            <OptionalArea name="primaryAddress" label="Primary address" placeholder="Street, suburb, state, postcode" />
+            <OptionalArea name="postalAddress" label="Postal address" placeholder="Postal address if different from primary address" />
             <Field name="emergency" label="Emergency contact" placeholder="Name and phone number" />
             <Area name="emergencyContacts" label="Emergency contacts" placeholder="Primary and secondary contacts, relationship, phone, and email" />
             <Area name="needs" label="Support needs" placeholder="Support needs, routines, risks, and goals" />
+            <OptionalArea name="requirements" label="Requirements" placeholder="Transport, access, staffing, equipment, and service requirements" />
+            <OptionalArea name="preferences" label="Preferences" placeholder="Participant likes, dislikes, routines, communication style, and support preferences" />
+            <OptionalArea name="needToKnowInformation" label="Need to know information" placeholder="Important information staff must review before support" />
+            <OptionalArea name="usefulInformation" label="Useful information" placeholder="Helpful context for daily support" />
             <Area name="supportPlans" label="Support plans" placeholder="Current support plan details, routines, funded supports, and review dates" />
             <Area name="goals" label="Participant goals" placeholder="NDIS goals, short-term goals, and progress measures" />
             <Area name="riskInformation" label="Risk information" placeholder="Known risks, triggers, behaviour support, safeguarding, and mitigation actions" />
+            <OptionalArea name="environmentalDetails" label="Environmental details" placeholder="Home access, pets, smoke alarms, hazards, parking, and entry instructions" />
+            <OptionalArea name="psychologicalDetails" label="Psychological details" placeholder="Known triggers, calming strategies, mental health considerations, and supports" />
+            <OptionalArea name="sensoryDetails" label="Sensory details" placeholder="Sensory preferences, overload triggers, noise/light needs, and routines" />
+            <Field name="bmi" label="BMI" placeholder="BMI or mobility/body handling note" required={false} />
             <Area name="medicalNotes" label="Medical notes" placeholder="Medical conditions, medication notes, mobility, swallowing, seizures, or care alerts" />
             <Area name="allergies" label="Allergies" placeholder="Food, medication, environmental allergies, and response plan" />
             <Area name="communicationPreferences" label="Communication preferences" placeholder="Preferred language, communication method, interpreter needs, and decision supports" />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field name="culturalIdentity" label="Cultural identity" placeholder="Cultural identity or community connection" required={false} />
+              <Field name="religion" label="Religion" placeholder="Religion or spiritual preference" required={false} />
+              <Field name="maritalStatus" label="Marital status" placeholder="Marital status" required={false} />
+              <Field name="nationality" label="Nationality" placeholder="Nationality" required={false} />
+              <Field name="ethnicity" label="Ethnicity" placeholder="Ethnicity" required={false} />
+              <Field name="aboriginalTorresStraitIslander" label="Aboriginal or Torres Strait Islander origin" placeholder="Yes, No, Unknown, or preferred wording" required={false} />
+              <Field name="placeOfBirth" label="Place of birth" placeholder="Place of birth" required={false} />
+              <Field name="joinedDate" label="Joined date" type="date" required={false} />
+              <Field name="nextReviewDate" label="Next review date" type="date" required={false} />
+              <Select name="clientStatus" label="Participant status" options={["active", "inactive", "archived"]} defaultValue="active" />
+              <Field name="clientType" label="Client type" placeholder="Self managed, plan managed, agency managed" required={false} />
+            </div>
+            <div className="grid gap-3 rounded border border-slate-200 bg-slate-50 p-3 sm:grid-cols-3">
+              <CheckboxField name="shareProgressNotes" label="Share progress notes" />
+              <CheckboxField name="enableSmsReminders" label="Enable SMS reminders" />
+              <CheckboxField name="invoiceTravel" label="Invoice travel" />
+            </div>
+            <OptionalArea name="privateInfo" label="Private information" placeholder="Admin-only sensitive context or internal notes" />
           </RecordForm>
         </div>
       </div>
@@ -898,16 +1100,62 @@ function ParticipantEditModal({
             <Field name="name" label="Participant profile" defaultValue={participant.name} placeholder="Full name" />
             <Field name="ndis" label="NDIS number" defaultValue={participant.ndis} placeholder="NDIS participant number" />
             <Field name="plan" label="Plan type" defaultValue={participant.plan} placeholder="NDIS managed, plan managed, or self managed" />
-            <Field name="dateOfBirth" label="Date of birth" type="date" defaultValue={participant.dateOfBirth} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field name="dateOfBirth" label="Date of birth" type="date" defaultValue={participant.dateOfBirth} required={false} />
+              <Field name="medicareNumber" label="Medicare number" defaultValue={participant.medicareNumber} placeholder="Medicare reference" required={false} />
+              <Field name="displayName" label="Display name" defaultValue={participant.displayName} placeholder="Preferred display name" required={false} />
+              <Field name="preferredName" label="Preferred name" defaultValue={participant.preferredName} placeholder="Name used in daily support" required={false} />
+              <Field name="personAlias" label="Person alias" defaultValue={participant.personAlias} placeholder="Alias or known as" required={false} />
+              <Field name="otherIdentifier" label="Other identifier" defaultValue={participant.otherIdentifier} placeholder="Provider or internal reference" required={false} />
+              <Select name="gender" label="Gender" options={["", "Female", "Male", "Non-binary", "Prefer not to say", "Other"]} defaultValue={participant.gender} required={false} />
+              <Select name="sex" label="Sex" options={["", "Female", "Male", "Intersex", "Prefer not to say"]} defaultValue={participant.sex} required={false} />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field name="mobileNumber" label="Mobile number" defaultValue={participant.mobileNumber} placeholder="Participant mobile" required={false} />
+              <Field name="phoneNumber" label="Phone number" defaultValue={participant.phoneNumber} placeholder="Home or alternate number" required={false} />
+              <Field name="email" label="Email" type="email" defaultValue={participant.email} placeholder="participant@example.com" required={false} />
+              <Field name="secondaryEmail" label="Secondary email" type="email" defaultValue={participant.secondaryEmail} placeholder="second@example.com" required={false} />
+              <Select name="preferredContactMethod" label="Preferred contact method" options={["", "Phone", "SMS", "Email", "Family/nominee", "Support coordinator"]} defaultValue={participant.preferredContactMethod} required={false} />
+              <Field name="languages" label="Languages" defaultValue={participant.languages} placeholder="English, Tamil, Auslan..." required={false} />
+            </div>
+            <OptionalArea name="primaryAddress" label="Primary address" defaultValue={participant.primaryAddress} placeholder="Street, suburb, state, postcode" />
+            <OptionalArea name="postalAddress" label="Postal address" defaultValue={participant.postalAddress} placeholder="Postal address if different from primary address" />
             <Field name="emergency" label="Primary emergency contact summary" defaultValue={participant.emergency} placeholder="Name and phone number" />
             <Area name="emergencyContacts" label="Emergency contact notes" defaultValue={participant.emergencyContacts} placeholder="Primary and secondary contacts, relationship, phone, and email" />
             <Area name="needs" label="Support needs" defaultValue={participant.needs} placeholder="Support needs, routines, risks, and goals" />
+            <OptionalArea name="requirements" label="Requirements" defaultValue={participant.requirements} placeholder="Transport, access, staffing, equipment, and service requirements" />
+            <OptionalArea name="preferences" label="Preferences" defaultValue={participant.preferences} placeholder="Participant likes, dislikes, routines, communication style, and support preferences" />
+            <OptionalArea name="needToKnowInformation" label="Need to know information" defaultValue={participant.needToKnowInformation} placeholder="Important information staff must review before support" />
+            <OptionalArea name="usefulInformation" label="Useful information" defaultValue={participant.usefulInformation} placeholder="Helpful context for daily support" />
             <Area name="supportPlans" label="Support plans" defaultValue={participant.supportPlans} placeholder="Current support plan details, routines, funded supports, and review dates" />
             <Area name="goals" label="Participant goals" defaultValue={participant.goals} placeholder="NDIS goals, short-term goals, and progress measures" />
             <Area name="riskInformation" label="Risk information" defaultValue={participant.riskInformation} placeholder="Known risks, triggers, behaviour support, safeguarding, and mitigation actions" />
+            <OptionalArea name="environmentalDetails" label="Environmental details" defaultValue={participant.environmentalDetails} placeholder="Home access, pets, smoke alarms, hazards, parking, and entry instructions" />
+            <OptionalArea name="psychologicalDetails" label="Psychological details" defaultValue={participant.psychologicalDetails} placeholder="Known triggers, calming strategies, mental health considerations, and supports" />
+            <OptionalArea name="sensoryDetails" label="Sensory details" defaultValue={participant.sensoryDetails} placeholder="Sensory preferences, overload triggers, noise/light needs, and routines" />
+            <Field name="bmi" label="BMI" defaultValue={participant.bmi} placeholder="BMI or mobility/body handling note" required={false} />
             <Area name="medicalNotes" label="Medical notes" defaultValue={participant.medicalNotes} placeholder="Medical conditions, medication notes, mobility, swallowing, seizures, or care alerts" />
             <Area name="allergies" label="Allergies" defaultValue={participant.allergies} placeholder="Food, medication, environmental allergies, and response plan" />
             <Area name="communicationPreferences" label="Communication preferences" defaultValue={participant.communicationPreferences} placeholder="Preferred language, communication method, interpreter needs, and decision supports" />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field name="culturalIdentity" label="Cultural identity" defaultValue={participant.culturalIdentity} placeholder="Cultural identity or community connection" required={false} />
+              <Field name="religion" label="Religion" defaultValue={participant.religion} placeholder="Religion or spiritual preference" required={false} />
+              <Field name="maritalStatus" label="Marital status" defaultValue={participant.maritalStatus} placeholder="Marital status" required={false} />
+              <Field name="nationality" label="Nationality" defaultValue={participant.nationality} placeholder="Nationality" required={false} />
+              <Field name="ethnicity" label="Ethnicity" defaultValue={participant.ethnicity} placeholder="Ethnicity" required={false} />
+              <Field name="aboriginalTorresStraitIslander" label="Aboriginal or Torres Strait Islander origin" defaultValue={participant.aboriginalTorresStraitIslander} placeholder="Yes, No, Unknown, or preferred wording" required={false} />
+              <Field name="placeOfBirth" label="Place of birth" defaultValue={participant.placeOfBirth} placeholder="Place of birth" required={false} />
+              <Field name="joinedDate" label="Joined date" type="date" defaultValue={participant.joinedDate} required={false} />
+              <Field name="nextReviewDate" label="Next review date" type="date" defaultValue={participant.nextReviewDate} required={false} />
+              <Select name="clientStatus" label="Participant status" options={["active", "inactive", "archived"]} defaultValue={participant.clientStatus || "active"} />
+              <Field name="clientType" label="Client type" defaultValue={participant.clientType} placeholder="Self managed, plan managed, agency managed" required={false} />
+            </div>
+            <div className="grid gap-3 rounded border border-slate-200 bg-slate-50 p-3 sm:grid-cols-3">
+              <CheckboxField name="shareProgressNotes" label="Share progress notes" defaultChecked={participant.shareProgressNotes} />
+              <CheckboxField name="enableSmsReminders" label="Enable SMS reminders" defaultChecked={participant.enableSmsReminders} />
+              <CheckboxField name="invoiceTravel" label="Invoice travel" defaultChecked={participant.invoiceTravel} />
+            </div>
+            <OptionalArea name="privateInfo" label="Private information" defaultValue={participant.privateInfo} placeholder="Admin-only sensitive context or internal notes" />
           </RecordForm>
         </div>
       </div>
@@ -1082,6 +1330,7 @@ export function ParticipantProfilePage({ participantId }: { participantId: strin
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContactRecord[]>([]);
   const [documents, setDocuments] = useState<ParticipantDocument[]>([]);
   const [timeline, setTimeline] = useState<ParticipantTimelineItem[]>([]);
+  const [relatedRecords, setRelatedRecords] = useState<ParticipantRelatedRecords>(emptyParticipantRelatedRecords());
   const [canManageProfile, setCanManageProfile] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [contactCreateOpen, setContactCreateOpen] = useState(false);
@@ -1096,17 +1345,20 @@ export function ParticipantProfilePage({ participantId }: { participantId: strin
       setEmergencyContacts([]);
       setDocuments([]);
       setTimeline([]);
+      setRelatedRecords(emptyParticipantRelatedRecords());
       setNotice("Participant not found or you do not have permission to view this profile.");
       return;
     }
-    const [contacts, docs, events] = await Promise.all([
+    const [contacts, docs, events, related] = await Promise.all([
       loadEmergencyContacts(context.role, [row.name]),
       loadParticipantDocuments(row.name),
-      loadParticipantTimeline(row.name)
+      loadParticipantTimeline(row.name),
+      loadParticipantRelatedRecords(row.name)
     ]);
     setEmergencyContacts(contacts);
     setDocuments(docs);
     setTimeline(events);
+    setRelatedRecords(related);
     setNotice("Showing participant profile from Supabase.");
   }, [participantId]);
 
@@ -1121,15 +1373,53 @@ export function ParticipantProfilePage({ participantId }: { participantId: strin
       ndis_number: get(form, "ndis"),
       plan_type: get(form, "plan"),
       date_of_birth: get(form, "dateOfBirth"),
+      medicare_number: get(form, "medicareNumber"),
+      display_name: get(form, "displayName"),
+      preferred_name: get(form, "preferredName"),
+      person_alias: get(form, "personAlias"),
+      other_identifier: get(form, "otherIdentifier"),
+      gender: get(form, "gender"),
+      sex: get(form, "sex"),
+      primary_address: get(form, "primaryAddress"),
+      postal_address: get(form, "postalAddress"),
+      mobile_number: get(form, "mobileNumber"),
+      phone_number: get(form, "phoneNumber"),
+      email: get(form, "email"),
+      secondary_email: get(form, "secondaryEmail"),
+      preferred_contact_method: get(form, "preferredContactMethod"),
+      languages: get(form, "languages"),
+      cultural_identity: get(form, "culturalIdentity"),
+      religion: get(form, "religion"),
+      marital_status: get(form, "maritalStatus"),
+      nationality: get(form, "nationality"),
+      ethnicity: get(form, "ethnicity"),
+      aboriginal_torres_strait_islander: get(form, "aboriginalTorresStraitIslander"),
+      place_of_birth: get(form, "placeOfBirth"),
+      joined_date: get(form, "joinedDate"),
+      next_review_date: get(form, "nextReviewDate"),
+      client_status: get(form, "clientStatus"),
       emergency_contact: get(form, "emergency"),
       emergency_contacts: get(form, "emergencyContacts"),
       support_needs: get(form, "needs"),
       support_plans: get(form, "supportPlans"),
       goals: get(form, "goals"),
       risk_information: get(form, "riskInformation"),
+      requirements: get(form, "requirements"),
+      preferences: get(form, "preferences"),
+      need_to_know_information: get(form, "needToKnowInformation"),
+      useful_information: get(form, "usefulInformation"),
+      environmental_details: get(form, "environmentalDetails"),
+      psychological_details: get(form, "psychologicalDetails"),
+      sensory_details: get(form, "sensoryDetails"),
+      bmi: get(form, "bmi"),
       medical_notes: get(form, "medicalNotes"),
       allergies: get(form, "allergies"),
-      communication_preferences: get(form, "communicationPreferences")
+      communication_preferences: get(form, "communicationPreferences"),
+      client_type: get(form, "clientType"),
+      share_progress_notes: form.get("shareProgressNotes") === "on",
+      enable_sms_reminders: form.get("enableSmsReminders") === "on",
+      invoice_travel: form.get("invoiceTravel") === "on",
+      private_info: get(form, "privateInfo")
     };
     const ok = await patchJson("/api/participants", payload, setNotice);
     if (ok) {
@@ -1193,77 +1483,387 @@ export function ParticipantProfilePage({ participantId }: { participantId: strin
       ) : null}
       {participant ? (
         <div className="space-y-6">
-          <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
-            <section className="space-y-4">
-              <article className="rounded border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-semibold text-gumleaf">Participant profile</p>
-                    <h2 className="mt-1 text-2xl font-semibold text-ink">{participant.name}</h2>
-                    <p className="mt-1 text-sm text-slate-500">NDIS {participant.ndis || "not recorded"}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <span className="rounded bg-harbour/10 px-3 py-1 text-sm font-semibold text-harbour">{participant.plan || "Plan not recorded"}</span>
-                    {canManageProfile ? (
-                      <button
-                        type="button"
-                        onClick={() => setEditOpen(true)}
-                        className="inline-flex items-center gap-2 rounded border border-[#cfe9e4] bg-[#eef7f5] px-3 py-2 text-xs font-semibold text-[#2f766f] transition hover:bg-[#dff0ec]"
-                      >
-                        <Pencil className="h-4 w-4" />
-                        Edit profile
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-                <Info label="Date of birth" value={participant.dateOfBirth ? dateOnly(participant.dateOfBirth) : "Not recorded"} />
-                <Info label="Communication preferences" value={participant.communicationPreferences || "Not recorded"} />
-                <Info label="Primary emergency summary" value={participant.emergency || "Not recorded"} />
-                <Info label="Emergency contact notes" value={participant.emergencyContacts || "Not recorded"} />
-              </article>
-
-              <article className="rounded border border-slate-200 bg-white p-5 shadow-sm">
-                <h2 className="font-semibold text-ink">Uploaded documents</h2>
-                <p className="mt-1 text-sm text-slate-500">Documents are stored privately and opened through permission-checked signed links.</p>
-                {documents.length ? (
-                  <div className="mt-4 grid gap-3">
-                    {documents.map((document) => (
-                      <div key={document.id} className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div>
-                            <p className="font-semibold text-ink">{document.title}</p>
-                            <p className="mt-1 text-xs text-slate-500">{document.fileName} | {formatBytes(document.sizeBytes)} | {dateTimeOrFallback(document.createdAt)}</p>
-                          </div>
-                          <button type="button" onClick={() => openDocument(document.id)} className="inline-flex items-center justify-center gap-2 rounded bg-ink px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800">
-                            <Download className="h-4 w-4" />
-                            Open
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyWorkerState title="No uploaded documents" message="Documents linked to this participant will appear here after upload." />
-                )}
-              </article>
+          <ParticipantProfileHeader
+            participant={participant}
+            contacts={emergencyContacts}
+            documents={documents}
+            related={relatedRecords}
+            canManage={canManageProfile}
+            onEdit={() => setEditOpen(true)}
+          />
+          <ParticipantProfileActions canManage={canManageProfile} />
+          <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+            <section className="space-y-6">
+              <ParticipantDemographicsPanel participant={participant} />
+              <EmergencyContactsTable contacts={emergencyContacts} canManage={canManageProfile} onAdd={() => setContactCreateOpen(true)} participantName={participant.name} />
+              <ParticipantDocumentsPanel documents={documents} onOpen={openDocument} />
             </section>
 
-            <section className="grid gap-4">
-              <ProfileSection title="Support plans" value={participant.supportPlans} />
-              <ProfileSection title="Participant goals" value={participant.goals} />
-              <ProfileSection title="Support needs" value={participant.needs} />
-              <ProfileSection title="Risk information" value={participant.riskInformation} tone="risk" />
-              <ProfileSection title="Medical notes" value={participant.medicalNotes} />
-              <ProfileSection title="Allergies" value={participant.allergies} tone="risk" />
+            <section className="space-y-6">
+              <ParticipantCareSnapshot participant={participant} related={relatedRecords} />
+              <ParticipantRelatedRecordsPanel related={relatedRecords} />
               <ParticipantTimeline timeline={timeline} />
             </section>
           </div>
-          <EmergencyContactsTable contacts={emergencyContacts} canManage={canManageProfile} onAdd={() => setContactCreateOpen(true)} participantName={participant.name} />
         </div>
       ) : (
         <EmptyState title="Participant profile unavailable" message="This participant could not be found, or your login does not have permission to view it." />
       )}
     </AppShell>
+  );
+}
+
+function ParticipantProfileHeader({
+  participant,
+  contacts,
+  documents,
+  related,
+  canManage,
+  onEdit
+}: {
+  participant: ParticipantRecord;
+  contacts: EmergencyContactRecord[];
+  documents: ParticipantDocument[];
+  related: ParticipantRelatedRecords;
+  canManage: boolean;
+  onEdit: () => void;
+}) {
+  const displayName = participant.displayName || participant.preferredName || participant.name;
+  const upcomingShifts = related.shifts.filter((shift) => new Date(shift.startsAt).getTime() >= startOfToday().getTime()).length;
+  const openTasks = related.tasks.filter((task) => ["open", "in_progress"].includes(task.status)).length;
+  const activeGoals = related.goals.filter((goal) => goal.status === "active").length;
+  const riskLevel = highestRiskLevel(related.risks.map((risk) => risk.level));
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-panel">
+      <div className="bg-gradient-to-r from-[#f8fbff] via-white to-[#f7fffc] p-5 sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex gap-4">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-indigo-100 bg-indigo-50 text-xl font-bold text-indigo-600 shadow-sm">
+              {initials(displayName)}
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-2xl font-semibold text-ink">{displayName}</h2>
+                <span className={statusPillClass(participant.clientStatus)}>{participant.clientStatus || "active"}</span>
+                {riskLevel ? <span className={riskPillClass(riskLevel)}>{riskLevel} risk</span> : null}
+              </div>
+              <p className="mt-1 text-sm text-slate-500">{participant.name !== displayName ? participant.name : participant.preferredName ? `Preferred name: ${participant.preferredName}` : "Participant profile"}</p>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
+                <span className="rounded-full border border-indigo-100 bg-white px-3 py-1">NDIS {participant.ndis || "not recorded"}</span>
+                <span className="rounded-full border border-indigo-100 bg-white px-3 py-1">{participant.plan || "Plan not recorded"}</span>
+                <span className="rounded-full border border-indigo-100 bg-white px-3 py-1">{participant.clientType || "Client type not recorded"}</span>
+              </div>
+            </div>
+          </div>
+          {canManage ? (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#cfe9e4] bg-[#eef7f5] px-4 py-2.5 text-sm font-semibold text-[#2f766f] transition hover:bg-[#dff0ec]"
+            >
+              <Pencil className="h-4 w-4" />
+              Edit profile
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="grid border-t border-indigo-100 bg-white sm:grid-cols-2 xl:grid-cols-6">
+        <ParticipantMetric icon={CalendarDays} label="Upcoming shifts" value={String(upcomingShifts)} detail="Scheduled" />
+        <ParticipantMetric icon={Phone} label="Contacts" value={String(contacts.length)} detail="Emergency contacts" />
+        <ParticipantMetric icon={FileText} label="Documents" value={String(documents.length)} detail="Private files" />
+        <ParticipantMetric icon={Target} label="Active goals" value={String(activeGoals)} detail="Tracked goals" />
+        <ParticipantMetric icon={ListChecks} label="Open tasks" value={String(openTasks)} detail="Action items" />
+        <ParticipantMetric icon={Bell} label="Next review" value={participant.nextReviewDate ? dateOnly(participant.nextReviewDate) : "-"} detail="Care review" />
+      </div>
+    </section>
+  );
+}
+
+function ParticipantMetric({ icon: Icon, label, value, detail }: { icon: LucideIcon; label: string; value: string; detail: string }) {
+  return (
+    <div className="border-b border-r border-indigo-100 p-4 last:border-r-0 sm:last:border-r xl:border-b-0">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+          <p className="mt-2 text-2xl font-semibold text-ink">{value}</p>
+          <p className="mt-1 text-xs text-slate-500">{detail}</p>
+        </div>
+        <span className="rounded-xl bg-indigo-50 p-2 text-indigo-500">
+          <Icon className="h-4 w-4" />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ParticipantProfileActions({ canManage }: { canManage: boolean }) {
+  const actions = [
+    { label: "Create shift", href: "/rostering", icon: CalendarPlus, adminOnly: true },
+    { label: "Progress note", href: "/progress-notes", icon: FilePlus2, adminOnly: false },
+    { label: "Log incident", href: "/incident-reports", icon: AlertTriangle, adminOnly: false },
+    { label: "Upload document", href: "/documents", icon: Upload, adminOnly: true },
+    { label: "Care plan", href: "/care-plans", icon: BriefcaseMedical, adminOnly: true },
+    { label: "Funding", href: "/funding", icon: BarChart3, adminOnly: true },
+    { label: "Invoice", href: "/invoices", icon: ClipboardPlus, adminOnly: true }
+  ].filter((action) => canManage || !action.adminOnly);
+
+  return (
+    <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+      {actions.map((action) => (
+        <Link
+          key={action.label}
+          href={action.href}
+          className="inline-flex min-h-12 items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-white px-4 py-3 text-sm font-semibold text-ink shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50/40"
+        >
+          <span className="inline-flex items-center gap-2">
+            <action.icon className="h-4 w-4 text-indigo-500" />
+            {action.label}
+          </span>
+          <ChevronRight className="h-4 w-4 text-slate-300" />
+        </Link>
+      ))}
+    </section>
+  );
+}
+
+function ParticipantDemographicsPanel({ participant }: { participant: ParticipantRecord }) {
+  return (
+    <article className="rounded border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="font-semibold text-ink">Demographic and contact details</h2>
+          <p className="mt-1 text-sm text-slate-500">Participant identity, address, contact, and review information.</p>
+        </div>
+        <UserRound className="h-5 w-5 text-indigo-400" />
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <DetailTile icon={UserRound} label="Legal name" value={participant.name} />
+        <DetailTile icon={UserRound} label="Preferred / display name" value={participant.preferredName || participant.displayName || "Not recorded"} />
+        <DetailTile icon={CalendarDays} label="Date of birth" value={participant.dateOfBirth ? dateOnly(participant.dateOfBirth) : "Not recorded"} />
+        <DetailTile icon={ShieldCheck} label="Medicare number" value={participant.medicareNumber || "Not recorded"} />
+        <DetailTile icon={Users} label="Gender / sex" value={[participant.gender, participant.sex].filter(Boolean).join(" / ") || "Not recorded"} />
+        <DetailTile icon={KeyRound} label="Other identifier" value={participant.otherIdentifier || participant.personAlias || "Not recorded"} />
+        <DetailTile icon={Smartphone} label="Mobile / phone" value={[participant.mobileNumber, participant.phoneNumber].filter(Boolean).join(" / ") || "Not recorded"} />
+        <DetailTile icon={Mail} label="Email" value={participant.email || participant.secondaryEmail || "Not recorded"} />
+        <DetailTile icon={MessageSquare} label="Preferred contact" value={participant.preferredContactMethod || participant.communicationPreferences || "Not recorded"} />
+        <DetailTile icon={MapPin} label="Primary address" value={participant.primaryAddress || "Not recorded"} />
+        <DetailTile icon={Home} label="Postal address" value={participant.postalAddress || "Same as primary or not recorded"} />
+        <DetailTile icon={Bell} label="Joined / review" value={[participant.joinedDate ? dateOnly(participant.joinedDate) : "", participant.nextReviewDate ? `Review ${dateOnly(participant.nextReviewDate)}` : ""].filter(Boolean).join(" | ") || "Not recorded"} />
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <Info label="Languages" value={participant.languages || "Not recorded"} />
+        <Info label="Cultural identity" value={participant.culturalIdentity || "Not recorded"} />
+        <Info label="Religion / nationality / ethnicity" value={[participant.religion, participant.nationality, participant.ethnicity].filter(Boolean).join(" | ") || "Not recorded"} />
+        <Info label="Aboriginal or Torres Strait Islander origin" value={participant.aboriginalTorresStraitIslander || "Not recorded"} />
+      </div>
+
+      <div className="mt-4 grid gap-2 rounded border border-indigo-100 bg-indigo-50/35 p-3 text-sm sm:grid-cols-3">
+        <BooleanPill label="Share progress notes" active={participant.shareProgressNotes} />
+        <BooleanPill label="SMS reminders" active={participant.enableSmsReminders} />
+        <BooleanPill label="Invoice travel" active={participant.invoiceTravel} />
+      </div>
+    </article>
+  );
+}
+
+function DetailTile({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
+  return (
+    <div className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
+      <div className="flex items-start gap-3">
+        <Icon className="mt-0.5 h-4 w-4 shrink-0 text-indigo-400" />
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+          <p className="mt-1 whitespace-pre-wrap leading-6 text-slate-700">{value}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BooleanPill({ label, active }: { label: string; active: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded bg-white px-3 py-2">
+      <span className="font-medium text-slate-700">{label}</span>
+      <span className={active ? "rounded bg-gumleaf/10 px-2 py-1 text-xs font-semibold text-gumleaf" : "rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-500"}>
+        {active ? "Enabled" : "Off"}
+      </span>
+    </div>
+  );
+}
+
+function ParticipantDocumentsPanel({ documents, onOpen }: { documents: ParticipantDocument[]; onOpen: (documentId: string) => void }) {
+  return (
+    <article className="rounded border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="font-semibold text-ink">Documents</h2>
+          <p className="mt-1 text-sm text-slate-500">Private files open through permission-checked signed links.</p>
+        </div>
+        <Link href="/documents" className="inline-flex items-center gap-2 rounded border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-600 hover:bg-indigo-100">
+          Upload
+          <ChevronRight className="h-4 w-4" />
+        </Link>
+      </div>
+      {documents.length ? (
+        <div className="mt-4 grid gap-3">
+          {documents.map((document) => (
+            <div key={document.id} className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-semibold text-ink">{document.title}</p>
+                  <p className="mt-1 text-xs text-slate-500">{document.fileName} | {formatBytes(document.sizeBytes)} | {dateTimeOrFallback(document.createdAt)}</p>
+                </div>
+                <button type="button" onClick={() => onOpen(document.id)} className="inline-flex items-center justify-center gap-2 rounded bg-ink px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800">
+                  <Download className="h-4 w-4" />
+                  Open
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyWorkerState title="No uploaded documents" message="Documents linked to this participant will appear here after upload." />
+      )}
+    </article>
+  );
+}
+
+function ParticipantCareSnapshot({ participant, related }: { participant: ParticipantRecord; related: ParticipantRelatedRecords }) {
+  const fundingTotal = related.funding.reduce((total, record) => total + record.totalBudget, 0);
+  const fundingSpent = related.funding.reduce((total, record) => total + record.spentAmount, 0);
+
+  return (
+    <article className="rounded border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="font-semibold text-ink">Care and support profile</h2>
+          <p className="mt-1 text-sm text-slate-500">Support needs, requirements, preferences, risks, and clinical context.</p>
+        </div>
+        <BriefcaseMedical className="h-5 w-5 text-indigo-400" />
+      </div>
+      <div className="mt-4 grid gap-4">
+        <CareSnapshotBlock title="Disability / support need" value={participant.needs} />
+        <CareSnapshotBlock title="Requirements" value={participant.requirements} />
+        <CareSnapshotBlock title="Preferences" value={participant.preferences} />
+        <CareSnapshotBlock title="Need to know information" value={participant.needToKnowInformation} tone="notice" />
+        <CareSnapshotBlock title="Useful information" value={participant.usefulInformation} />
+        <CareSnapshotBlock title="Support plans" value={participant.supportPlans} />
+        <CareSnapshotBlock title="Participant goals summary" value={participant.goals} />
+        <CareSnapshotBlock title="Risks and issues" value={participant.riskInformation} tone="risk" />
+        <CareSnapshotBlock title="Environmental details" value={participant.environmentalDetails} />
+        <CareSnapshotBlock title="Psychological details" value={participant.psychologicalDetails} />
+        <CareSnapshotBlock title="Sensory details" value={participant.sensoryDetails} />
+        <CareSnapshotBlock title="Medical notes" value={participant.medicalNotes} tone="notice" />
+        <CareSnapshotBlock title="Allergies" value={participant.allergies} tone="risk" />
+        <CareSnapshotBlock title="BMI / manual handling note" value={participant.bmi} />
+        {participant.privateInfo ? <CareSnapshotBlock title="Private information" value={participant.privateInfo} tone="private" /> : null}
+      </div>
+      <div className="mt-4 rounded border border-indigo-100 bg-indigo-50/30 p-3 text-sm">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Funding snapshot</p>
+        <p className="mt-1 font-semibold text-ink">{related.funding.length ? `${formatMoney(fundingSpent)} used of ${formatMoney(fundingTotal)}` : "No funding records linked yet"}</p>
+      </div>
+    </article>
+  );
+}
+
+function CareSnapshotBlock({ title, value, tone = "default" }: { title: string; value: string; tone?: "default" | "risk" | "notice" | "private" }) {
+  const toneClass = {
+    default: "border-slate-200 bg-slate-50",
+    risk: "border-coral/25 bg-coral/5",
+    notice: "border-banksia/35 bg-banksia/10",
+    private: "border-indigo-200 bg-indigo-50/50"
+  }[tone];
+  return (
+    <div className={`rounded border p-3 ${toneClass}`}>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</p>
+      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{value || "Not recorded"}</p>
+    </div>
+  );
+}
+
+function ParticipantRelatedRecordsPanel({ related }: { related: ParticipantRelatedRecords }) {
+  return (
+    <div className="grid gap-4">
+      <RelatedPanel title="Upcoming and recent shifts" href="/rostering" icon={CalendarDays}>
+        {related.shifts.length ? related.shifts.map((shift) => (
+          <RelatedRow key={shift.id} title={`${timeOnly(shift.startsAt)} - ${timeOnly(shift.endsAt)}`} detail={[dateOnly(shift.startsAt), shift.worker || "Open shift", shift.location].filter(Boolean).join(" | ")} badge={shift.status || "scheduled"} />
+        )) : <EmptyWorkerState title="No shifts linked" message="Assigned shifts will appear here after rostering." />}
+      </RelatedPanel>
+
+      <RelatedPanel title="Goals and care plans" href="/care-plans" icon={Target}>
+        {related.goals.length || related.carePlans.length ? (
+          <div className="grid gap-3">
+            {related.goals.map((goal) => (
+              <div key={goal.id} className="rounded border border-slate-200 bg-slate-50 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-semibold text-ink">{goal.title}</p>
+                  <span className={statusPillClass(goal.status)}>{goal.status}</span>
+                </div>
+                <div className="mt-2 h-2 rounded-full bg-white">
+                  <div className="h-2 rounded-full bg-gumleaf" style={{ width: `${Math.min(100, Math.max(0, goal.progress))}%` }} />
+                </div>
+                <p className="mt-1 text-xs text-slate-500">{goal.progress}% progress{goal.targetDate ? ` | target ${dateOnly(goal.targetDate)}` : ""}</p>
+              </div>
+            ))}
+            {related.carePlans.map((plan) => <RelatedRow key={plan.id} title={plan.title} detail={plan.reviewDate ? `Review ${dateOnly(plan.reviewDate)}` : "Review date not recorded"} badge={plan.status} />)}
+          </div>
+        ) : <EmptyWorkerState title="No goals or care plans" message="Care plans and participant goals will appear after they are created." />}
+      </RelatedPanel>
+
+      <RelatedPanel title="Funding and invoices" href="/invoices" icon={BarChart3}>
+        {related.funding.length || related.invoices.length ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {related.funding.map((fund) => <RelatedRow key={fund.id} title={fund.category} detail={`${formatMoney(fund.spentAmount)} used of ${formatMoney(fund.totalBudget)}${fund.planEnd ? ` | ends ${dateOnly(fund.planEnd)}` : ""}`} badge={fund.status} />)}
+            {related.invoices.map((invoice) => <RelatedRow key={invoice.id} title={invoice.invoiceNumber} detail={`${formatMoney(invoice.totalAmount)}${invoice.dueDate ? ` | due ${dateOnly(invoice.dueDate)}` : ""}`} badge={invoice.status} />)}
+          </div>
+        ) : <EmptyWorkerState title="No funding or invoices" message="Funding utilisation and invoices will appear after records are linked." />}
+      </RelatedPanel>
+
+      <RelatedPanel title="Risks and tasks" href="/risk-assessments" icon={AlertTriangle}>
+        {related.risks.length || related.tasks.length ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {related.risks.map((risk) => <RelatedRow key={risk.id} title={`${risk.level} risk`} detail={risk.reviewDate ? `Review ${dateOnly(risk.reviewDate)}` : dateOnly(risk.assessmentDate)} badge={risk.status} tone="risk" />)}
+            {related.tasks.map((task) => <RelatedRow key={task.id} title={task.title} detail={[task.assignedWorker, task.dueDate ? `Due ${dateOnly(task.dueDate)}` : ""].filter(Boolean).join(" | ")} badge={task.status} />)}
+          </div>
+        ) : <EmptyWorkerState title="No risks or tasks" message="Risk assessments and assigned tasks will appear here." />}
+      </RelatedPanel>
+    </div>
+  );
+}
+
+function RelatedPanel({ title, href, icon: Icon, children }: { title: string; href: string; icon: LucideIcon; children: React.ReactNode }) {
+  return (
+    <article className="rounded border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Icon className="h-5 w-5 text-indigo-400" />
+          <h2 className="font-semibold text-ink">{title}</h2>
+        </div>
+        <Link href={href} className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700">
+          Open
+          <ChevronRight className="h-4 w-4" />
+        </Link>
+      </div>
+      <div className="mt-4">{children}</div>
+    </article>
+  );
+}
+
+function RelatedRow({ title, detail, badge, tone = "default" }: { title: string; detail: string; badge: string; tone?: "default" | "risk" }) {
+  return (
+    <div className={`rounded border p-3 text-sm ${tone === "risk" ? "border-coral/20 bg-coral/5" : "border-slate-200 bg-slate-50"}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold text-ink">{title || "Untitled"}</p>
+          <p className="mt-1 text-slate-600">{detail || "No details recorded"}</p>
+        </div>
+        <span className={tone === "risk" ? riskPillClass(badge) : statusPillClass(badge)}>{badge || "active"}</span>
+      </div>
+    </div>
   );
 }
 
@@ -4109,6 +4709,15 @@ function RecordForm({ children, submitLabel, onSubmit }: { children: React.React
   );
 }
 
+function FieldLabel({ label, required }: { label: string; required: boolean }) {
+  return (
+    <span className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
+      <span>{label}{required ? <span className="ml-1 text-coral">*</span> : null}</span>
+      {!required ? <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Optional</span> : null}
+    </span>
+  );
+}
+
 function Field({
   name,
   label,
@@ -4132,7 +4741,7 @@ function Field({
 }) {
   return (
     <label>
-      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+      <FieldLabel label={label} required={required} />
       <input name={name} type={type} required={required} defaultValue={defaultValue} placeholder={placeholder} step={step} min={min} max={max} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
     </label>
   );
@@ -4153,7 +4762,7 @@ function PasswordField({
 }) {
   return (
     <label>
-      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+      <FieldLabel label={label} required />
       <span className="flex items-center gap-3 rounded border border-slate-200 bg-white px-3 py-2.5 shadow-sm focus-within:border-gumleaf focus-within:ring-2 focus-within:ring-gumleaf/15">
         <LockKeyhole className="h-5 w-5 text-slate-400" />
         <input name={name} type={show ? "text" : "password"} required minLength={6} placeholder={placeholder} className="w-full border-0 bg-transparent text-sm text-ink outline-none" />
@@ -4165,10 +4774,19 @@ function PasswordField({
   );
 }
 
+function CheckboxField({ name, label, defaultChecked = false }: { name: string; label: string; defaultChecked?: boolean }) {
+  return (
+    <label className="flex items-center gap-3 rounded border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">
+      <input name={name} type="checkbox" defaultChecked={defaultChecked} className="h-4 w-4 rounded border-slate-300 text-gumleaf focus:ring-gumleaf/20" />
+      <span>{label}</span>
+    </label>
+  );
+}
+
 function Area({ name, label, defaultValue = "", placeholder = "" }: { name: string; label: string; defaultValue?: string; placeholder?: string }) {
   return (
     <label>
-      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+      <FieldLabel label={label} required />
       <textarea name={name} required rows={3} defaultValue={defaultValue} placeholder={placeholder} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
     </label>
   );
@@ -4177,7 +4795,7 @@ function Area({ name, label, defaultValue = "", placeholder = "" }: { name: stri
 function OptionalArea({ name, label, defaultValue = "", placeholder = "" }: { name: string; label: string; defaultValue?: string; placeholder?: string }) {
   return (
     <label>
-      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+      <FieldLabel label={label} required={false} />
       <textarea name={name} rows={3} defaultValue={defaultValue} placeholder={placeholder} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
     </label>
   );
@@ -4200,7 +4818,7 @@ function Select({
 }) {
   return (
     <label>
-      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+      <FieldLabel label={label} required={required} />
       <select name={name} required={required} defaultValue={defaultValue} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15">
         {options.map((option) => (
           <option key={option || "empty"} value={option}>{renderLabel ? renderLabel(option) : option || "Leave unchanged"}</option>
@@ -4213,7 +4831,7 @@ function Select({
 function FileField({ name, label }: { name: string; label: string }) {
   return (
     <label>
-      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+      <FieldLabel label={label} required={false} />
       <input
         name={name}
         type="file"
@@ -4240,15 +4858,6 @@ function Info({ label, value }: { label: string; value: string }) {
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
       <p className="mt-1 leading-6 text-slate-700">{value}</p>
     </div>
-  );
-}
-
-function ProfileSection({ title, value, tone = "default" }: { title: string; value: string; tone?: "default" | "risk" }) {
-  return (
-    <article className={`rounded border p-5 shadow-sm ${tone === "risk" ? "border-coral/20 bg-coral/5" : "border-slate-200 bg-white"}`}>
-      <h2 className="font-semibold text-ink">{title}</h2>
-      <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">{value || "Not recorded"}</p>
-    </article>
   );
 }
 
@@ -4439,6 +5048,122 @@ async function loadParticipantTimeline(participantName: string): Promise<Partici
     .slice(0, 20);
 }
 
+function emptyParticipantRelatedRecords(): ParticipantRelatedRecords {
+  return {
+    shifts: [],
+    carePlans: [],
+    goals: [],
+    funding: [],
+    invoices: [],
+    risks: [],
+    tasks: []
+  };
+}
+
+async function loadParticipantRelatedRecords(participantName: string): Promise<ParticipantRelatedRecords> {
+  if (!isSupabaseConfigured || !supabase || !participantName) return emptyParticipantRelatedRecords();
+  const [shifts, carePlans, goals, funding, invoices, risks, tasks] = await Promise.all([
+    supabase
+      .from("shifts")
+      .select("id, support_worker_name, starts_at, ends_at, status, location, approval_status")
+      .eq("participant_name", participantName)
+      .order("starts_at", { ascending: false })
+      .limit(8),
+    supabase
+      .from("care_plans")
+      .select("id, title, status, review_date")
+      .eq("participant_name", participantName)
+      .order("created_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("participant_goals")
+      .select("id, title, current_progress_percent, status, target_date")
+      .eq("participant_name", participantName)
+      .order("created_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("ndis_funding_records")
+      .select("id, support_category, plan_total_budget, spent_amount, status, plan_end")
+      .eq("participant_name", participantName)
+      .order("created_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("invoices")
+      .select("id, invoice_number, issue_date, due_date, total_amount, status")
+      .eq("participant_name", participantName)
+      .order("created_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("participant_risk_assessments")
+      .select("id, overall_risk_level, status, review_date, assessment_date")
+      .eq("participant_name", participantName)
+      .order("created_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("participant_tasks")
+      .select("id, title, assigned_worker_name, due_date, status, priority")
+      .eq("participant_name", participantName)
+      .order("created_at", { ascending: false })
+      .limit(5)
+  ]);
+
+  return {
+    shifts: (shifts.data ?? []).map((row) => ({
+      id: String(row.id ?? ""),
+      worker: String(row.support_worker_name ?? ""),
+      location: String(row.location ?? ""),
+      status: String(row.status ?? ""),
+      approvalStatus: String(row.approval_status ?? ""),
+      startsAt: String(row.starts_at ?? ""),
+      endsAt: String(row.ends_at ?? "")
+    })),
+    carePlans: (carePlans.data ?? []).map((row) => ({
+      id: String(row.id ?? ""),
+      title: String(row.title ?? ""),
+      status: String(row.status ?? ""),
+      reviewDate: String(row.review_date ?? "")
+    })),
+    goals: (goals.data ?? []).map((row) => ({
+      id: String(row.id ?? ""),
+      title: String(row.title ?? ""),
+      progress: Number(row.current_progress_percent ?? 0),
+      status: String(row.status ?? ""),
+      targetDate: String(row.target_date ?? "")
+    })),
+    funding: (funding.data ?? []).map((row) => ({
+      id: String(row.id ?? ""),
+      category: String(row.support_category ?? ""),
+      totalBudget: Number(row.plan_total_budget ?? 0),
+      spentAmount: Number(row.spent_amount ?? 0),
+      status: String(row.status ?? ""),
+      planEnd: String(row.plan_end ?? "")
+    })),
+    invoices: (invoices.data ?? []).map((row) => ({
+      id: String(row.id ?? ""),
+      invoiceNumber: String(row.invoice_number ?? ""),
+      issueDate: String(row.issue_date ?? ""),
+      dueDate: String(row.due_date ?? ""),
+      totalAmount: Number(row.total_amount ?? 0),
+      status: String(row.status ?? "")
+    })),
+    risks: (risks.data ?? []).map((row) => ({
+      id: String(row.id ?? ""),
+      level: String(row.overall_risk_level ?? ""),
+      status: String(row.status ?? ""),
+      reviewDate: String(row.review_date ?? ""),
+      assessmentDate: String(row.assessment_date ?? "")
+    })),
+    tasks: (tasks.data ?? []).map((row) => ({
+      id: String(row.id ?? ""),
+      title: String(row.title ?? ""),
+      assignedWorker: String(row.assigned_worker_name ?? ""),
+      dueDate: String(row.due_date ?? ""),
+      status: String(row.status ?? ""),
+      priority: String(row.priority ?? "")
+    }))
+  };
+}
+
 async function loadCarePlans(): Promise<CarePlanRecord[]> {
   if (!isSupabaseConfigured || !supabase) return [];
   const { data, error } = await supabase.from("care_plans").select("*").order("created_at", { ascending: false });
@@ -4465,15 +5190,53 @@ function mapParticipantRow(row: Record<string, unknown>): ParticipantRecord {
     ndis: String(row.ndis_number ?? ""),
     plan: String(row.plan_type ?? ""),
     dateOfBirth: String(row.date_of_birth ?? ""),
+    medicareNumber: String(row.medicare_number ?? ""),
+    displayName: String(row.display_name ?? ""),
+    preferredName: String(row.preferred_name ?? ""),
+    personAlias: String(row.person_alias ?? ""),
+    otherIdentifier: String(row.other_identifier ?? ""),
+    gender: String(row.gender ?? ""),
+    sex: String(row.sex ?? ""),
+    primaryAddress: String(row.primary_address ?? ""),
+    postalAddress: String(row.postal_address ?? ""),
+    mobileNumber: String(row.mobile_number ?? ""),
+    phoneNumber: String(row.phone_number ?? ""),
+    email: String(row.email ?? ""),
+    secondaryEmail: String(row.secondary_email ?? ""),
+    preferredContactMethod: String(row.preferred_contact_method ?? ""),
+    languages: String(row.languages ?? ""),
+    culturalIdentity: String(row.cultural_identity ?? ""),
+    religion: String(row.religion ?? ""),
+    maritalStatus: String(row.marital_status ?? ""),
+    nationality: String(row.nationality ?? ""),
+    ethnicity: String(row.ethnicity ?? ""),
+    aboriginalTorresStraitIslander: String(row.aboriginal_torres_strait_islander ?? ""),
+    placeOfBirth: String(row.place_of_birth ?? ""),
+    joinedDate: String(row.joined_date ?? ""),
+    nextReviewDate: String(row.next_review_date ?? ""),
+    clientStatus: String(row.client_status ?? "active"),
     emergency: String(row.emergency_contact ?? ""),
     emergencyContacts: String(row.emergency_contacts ?? ""),
     needs: String(row.support_needs ?? ""),
     supportPlans: String(row.support_plans ?? ""),
     goals: String(row.goals ?? ""),
     riskInformation: String(row.risk_information ?? ""),
+    requirements: String(row.requirements ?? ""),
+    preferences: String(row.preferences ?? ""),
+    needToKnowInformation: String(row.need_to_know_information ?? ""),
+    usefulInformation: String(row.useful_information ?? ""),
+    environmentalDetails: String(row.environmental_details ?? ""),
+    psychologicalDetails: String(row.psychological_details ?? ""),
+    sensoryDetails: String(row.sensory_details ?? ""),
+    bmi: String(row.bmi ?? ""),
     medicalNotes: String(row.medical_notes ?? ""),
     allergies: String(row.allergies ?? ""),
     communicationPreferences: String(row.communication_preferences ?? ""),
+    clientType: String(row.client_type ?? ""),
+    shareProgressNotes: Boolean(row.share_progress_notes),
+    enableSmsReminders: Boolean(row.enable_sms_reminders),
+    invoiceTravel: Boolean(row.invoice_travel),
+    privateInfo: String(row.private_info ?? ""),
     docs: Number(row.document_count ?? 0),
     notes: Number(row.note_count ?? 0)
   };
@@ -5285,6 +6048,38 @@ function dateTimeOrFallback(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short" });
+}
+
+function startOfToday() {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function formatMoney(value: number) {
+  return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" }).format(Number.isFinite(value) ? value : 0);
+}
+
+function statusPillClass(status: string) {
+  const normalised = status.toLowerCase().replace(/\s+/g, "_");
+  if (["active", "approved", "paid", "completed", "achieved"].includes(normalised)) return "rounded bg-gumleaf/10 px-2.5 py-1 text-xs font-semibold text-gumleaf";
+  if (["critical", "high", "overdue", "rejected", "void", "archived", "cancelled"].includes(normalised)) return "rounded bg-coral/10 px-2.5 py-1 text-xs font-semibold text-coral";
+  if (["medium", "submitted", "issued", "in_progress", "review_required"].includes(normalised)) return "rounded bg-banksia/20 px-2.5 py-1 text-xs font-semibold text-slate-700";
+  return "rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600";
+}
+
+function riskPillClass(level: string) {
+  const normalised = level.toLowerCase();
+  if (normalised === "critical" || normalised === "high") return "rounded bg-coral/10 px-2.5 py-1 text-xs font-semibold text-coral";
+  if (normalised === "medium") return "rounded bg-banksia/20 px-2.5 py-1 text-xs font-semibold text-slate-700";
+  if (normalised === "low") return "rounded bg-gumleaf/10 px-2.5 py-1 text-xs font-semibold text-gumleaf";
+  return statusPillClass(level);
+}
+
+function highestRiskLevel(levels: string[]) {
+  const priority = ["critical", "high", "medium", "low"];
+  const normalised = levels.map((level) => level.toLowerCase()).filter(Boolean);
+  return priority.find((level) => normalised.includes(level)) || "";
 }
 
 function friendlyEscalationStatus(value: string) {

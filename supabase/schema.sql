@@ -56,6 +56,123 @@ add column if not exists allergies text;
 alter table public.participants
 add column if not exists communication_preferences text;
 
+alter table public.participants
+add column if not exists medicare_number text;
+
+alter table public.participants
+add column if not exists display_name text;
+
+alter table public.participants
+add column if not exists preferred_name text;
+
+alter table public.participants
+add column if not exists person_alias text;
+
+alter table public.participants
+add column if not exists other_identifier text;
+
+alter table public.participants
+add column if not exists gender text;
+
+alter table public.participants
+add column if not exists sex text;
+
+alter table public.participants
+add column if not exists primary_address text;
+
+alter table public.participants
+add column if not exists postal_address text;
+
+alter table public.participants
+add column if not exists mobile_number text;
+
+alter table public.participants
+add column if not exists phone_number text;
+
+alter table public.participants
+add column if not exists email text;
+
+alter table public.participants
+add column if not exists secondary_email text;
+
+alter table public.participants
+add column if not exists preferred_contact_method text;
+
+alter table public.participants
+add column if not exists languages text;
+
+alter table public.participants
+add column if not exists cultural_identity text;
+
+alter table public.participants
+add column if not exists religion text;
+
+alter table public.participants
+add column if not exists marital_status text;
+
+alter table public.participants
+add column if not exists nationality text;
+
+alter table public.participants
+add column if not exists ethnicity text;
+
+alter table public.participants
+add column if not exists aboriginal_torres_strait_islander text;
+
+alter table public.participants
+add column if not exists place_of_birth text;
+
+alter table public.participants
+add column if not exists joined_date date;
+
+alter table public.participants
+add column if not exists next_review_date date;
+
+alter table public.participants
+add column if not exists client_status text not null default 'active';
+
+alter table public.participants
+add column if not exists requirements text;
+
+alter table public.participants
+add column if not exists preferences text;
+
+alter table public.participants
+add column if not exists need_to_know_information text;
+
+alter table public.participants
+add column if not exists useful_information text;
+
+alter table public.participants
+add column if not exists environmental_details text;
+
+alter table public.participants
+add column if not exists psychological_details text;
+
+alter table public.participants
+add column if not exists sensory_details text;
+
+alter table public.participants
+add column if not exists bmi text;
+
+alter table public.participants
+add column if not exists client_type text;
+
+alter table public.participants
+add column if not exists share_progress_notes boolean not null default false;
+
+alter table public.participants
+add column if not exists enable_sms_reminders boolean not null default false;
+
+alter table public.participants
+add column if not exists invoice_travel boolean not null default false;
+
+alter table public.participants
+add column if not exists private_info text;
+
+alter table public.participants
+add column if not exists updated_at timestamptz not null default now();
+
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text not null,
