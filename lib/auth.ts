@@ -6,7 +6,7 @@ const teamLeaderRoutes = ["/dashboard", "/branches", "/rostering", "/participant
 const teamLeaderNavOrder = ["/dashboard", "/branches", "/rostering", "/participant-matching", "/timesheets", "/payroll", "/travel", "/training-records", "/visitors", "/vehicles", "/shift-attachments", "/checklists", "/messages", "/tasks", "/participant-goals", "/medications", "/incident-reports", "/risk-assessments", "/support-coordination", "/service-agreements", "/reports", "/profile"];
 const familyRoutes = ["/family-portal", "/participant-goals", "/profile", "/unauthorised"];
 const familyNavOrder = ["/family-portal", "/participant-goals", "/profile"];
-const superAdminEmails = ["sanjee@live.com"];
+const superAdminEmails = ["sanjee@live.com", "sanjeevan.nadarasa@minnovation.com.au"];
 
 export function normalizeRole(role: unknown): UserRole {
   if (role === "super_admin") return "super_admin";
