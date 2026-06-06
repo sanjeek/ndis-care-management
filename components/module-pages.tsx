@@ -4712,7 +4712,7 @@ function RecordForm({ children, submitLabel, onSubmit }: { children: React.React
 function FieldLabel({ label, required }: { label: string; required: boolean }) {
   return (
     <span className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
-      <span>{label}{required ? <span className="ml-1 text-coral">*</span> : null}</span>
+      <span>{label}</span>
       {!required ? <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Optional</span> : null}
     </span>
   );
