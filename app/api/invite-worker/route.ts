@@ -59,5 +59,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ sent: true, message: `Invite email sent to ${email}. Worker can set up their login from the link in the email.` });
   }
 
-  return NextResponse.json({ sent: false, message: `Worker record saved. Invite email could not be sent (check email configuration). Share this link manually: ${loginUrl}`, inviteUrl: loginUrl });
+  return NextResponse.json({ sent: false, message: `Worker record saved. Invite email could not be sent — check email configuration in settings.` });
 }
