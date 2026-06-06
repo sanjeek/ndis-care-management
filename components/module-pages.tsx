@@ -2188,7 +2188,7 @@ export function WorkersPage() {
             <button
               type="button"
               onClick={() => setShowAddWorker(true)}
-              className="inline-flex items-center gap-2 rounded border border-gumleaf/30 bg-gumleaf px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gumleaf/90"
+              className="inline-flex items-center gap-2 rounded border border-gumleaf/20 bg-gumleaf/10 px-3.5 py-2 text-sm font-semibold text-gumleaf shadow-sm hover:bg-gumleaf/20"
             >
               <Plus className="h-4 w-4" />
               Add support worker
