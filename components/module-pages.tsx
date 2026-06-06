@@ -2018,7 +2018,8 @@ export function WorkersPage() {
       recordLabel: next.email,
       metadata: { recordType: "support_worker", name: next.name }
     });
-    const portalUrl = `/worker-portal/create-login?invite=${token}`;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const portalUrl = `${origin}/worker-portal/create-login?invite=${token}&email=${encodeURIComponent(next.email)}&wname=${encodeURIComponent(next.name)}`;
     setInviteLink(portalUrl);
     if (workerSaved) await refresh();
     await persist(
@@ -2075,15 +2076,19 @@ export function WorkersPage() {
       ) : null}
       {inviteLink ? (
         <div className="mb-6 rounded border border-gumleaf/25 bg-gumleaf/5 p-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h2 className="font-semibold text-ink">Latest invite link</h2>
-              <p className="mt-1 text-sm text-slate-600">This link was created from the database invitation workflow.</p>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <h2 className="font-semibold text-ink">Invite sent</h2>
+              <p className="mt-1 text-sm text-slate-600">An email was sent to the worker with a link to create their login. If email is not configured, share the link below manually.</p>
+              <p className="mt-2 break-all rounded border border-slate-200 bg-white px-2 py-1.5 font-mono text-xs text-slate-700">{inviteLink}</p>
             </div>
-            <Link href={inviteLink} className="inline-flex items-center justify-center gap-2 rounded bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+            <button
+              type="button"
+              onClick={() => { void navigator.clipboard?.writeText(inviteLink); }}
+              className="inline-flex shrink-0 items-center gap-2 rounded border border-gumleaf/20 bg-white px-3 py-2 text-sm font-semibold text-gumleaf hover:bg-gumleaf/5">
               <KeyRound className="h-4 w-4" />
-              Open invite link
-            </Link>
+              Copy link
+            </button>
           </div>
         </div>
       ) : null}
@@ -2128,27 +2133,58 @@ export function WorkersPage() {
         <Area name="trainingCertificates" label="Training certificates" placeholder="List training certificates, completion dates, renewal due dates, and evidence location" />
       </RecordForm>
       {workers.length ? (
-        <div className="mt-6 grid gap-4 xl:grid-cols-3">
-          {workers.map((worker) => (
-            <article key={`${worker.email}-${worker.name}`} className="rounded border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="font-semibold text-ink">{worker.name}</h2>
-                  <p className="text-sm text-slate-500">{worker.role || "Role not recorded"}</p>
-                </div>
-                <button type="button" onClick={() => setEditingWorker(worker)} className="inline-flex items-center gap-1.5 rounded border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-                  <Pencil className="h-3.5 w-3.5" />
-                  Edit
-                </button>
-              </div>
-              <Info label="Invite email" value={worker.email || "Not recorded"} />
-              <Info label="Availability" value={worker.availability || "Not recorded"} />
-              <Info label="Qualifications" value={worker.qualifications || "Not recorded"} />
-              <Info label="Compliance" value={worker.compliance || "Not recorded"} />
-              <ComplianceGrid worker={worker} />
-              <Info label="Assigned shifts" value={`${worker.assigned} assigned shifts`} />
-            </article>
-          ))}
+        <div className="mt-6 overflow-x-auto rounded border border-slate-200 bg-white shadow-sm">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-left">
+                <th className="px-4 py-3 font-semibold text-slate-600">Name</th>
+                <th className="px-4 py-3 font-semibold text-slate-600">Email</th>
+                <th className="px-4 py-3 font-semibold text-slate-600">Role</th>
+                <th className="px-4 py-3 font-semibold text-slate-600">Compliance</th>
+                <th className="px-4 py-3 font-semibold text-slate-600 text-center">Shifts</th>
+                <th className="px-4 py-3 font-semibold text-slate-600 text-center">Docs</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {workers.map((worker) => {
+                const alerts = workerComplianceAlerts(worker);
+                const expiredCount = alerts.filter((a) => a.status === "expired").length;
+                const warningCount = alerts.filter((a) => a.status !== "expired").length;
+                return (
+                  <tr key={worker.id || worker.email} className="hover:bg-slate-50/60">
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-ink">{worker.name}</p>
+                      <p className="text-xs text-slate-500">{worker.availability || "Availability not set"}</p>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">{worker.email || "—"}</td>
+                    <td className="px-4 py-3 text-slate-600">{worker.role || "—"}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex rounded px-2 py-0.5 text-xs font-semibold ${
+                        expiredCount ? "bg-coral/10 text-coral" :
+                        warningCount ? "bg-banksia/20 text-banksia" :
+                        "bg-gumleaf/10 text-gumleaf"
+                      }`}>
+                        {expiredCount ? `${expiredCount} expired` : warningCount ? `${warningCount} expiring` : "Clear"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center font-semibold text-ink">{worker.assigned}</td>
+                    <td className="px-4 py-3 text-center">
+                      {[worker.policeCheckExpiry, worker.ndisWorkerScreeningExpiry, worker.firstAidExpiry, worker.cprExpiry, worker.driversLicenceExpiry].filter(Boolean).length}
+                      <span className="text-xs text-slate-400">/5</span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button type="button" onClick={() => setEditingWorker(worker)}
+                        className="inline-flex items-center gap-1.5 rounded border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100">
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       ) : (
         <EmptyState title="No support workers yet" message="Support worker records will appear here after they are added to the database." />
@@ -2462,41 +2498,101 @@ export function TimesheetsApprovalPage() {
 }
 
 export function WorkerCreateLoginPage() {
-  const [notice, setNotice] = useState("Create login details from your invite email.");
+  const [params, setParams] = useState({ invite: "", email: "", name: "" });
+  const [notice, setNotice] = useState("");
+  const [done, setDone] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  async function submit(form: FormData) {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search);
+    setParams({
+      invite: p.get("invite") ?? "",
+      email: p.get("email") ?? "",
+      name: p.get("wname") ?? ""
+    });
+  }, []);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
+    setSaving(true);
     const response = await fetch("/api/register-provider", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        email: get(form, "email"),
+        email: params.email || get(form, "email"),
         password: get(form, "password"),
         name: get(form, "name"),
         organisation: "Worker portal",
         role: "support_worker",
-        invite: get(form, "invite")
+        invite: params.invite || get(form, "invite")
       })
     });
     const result = await response.json();
-    setNotice(result.message ?? (response.ok ? "Login created. You can now sign in." : "Could not create login."));
+    setSaving(false);
+    if (response.ok) {
+      setDone(true);
+      setNotice(result.message ?? "Login created. You can now sign in to the worker portal.");
+    } else {
+      setNotice(result.message ?? "Could not create login.");
+    }
+  }
+
+  if (done) {
+    return (
+      <main className="min-h-screen bg-slate-50 px-4 py-8">
+        <div className="mx-auto max-w-xl rounded border border-gumleaf/25 bg-white p-8 shadow-panel text-center">
+          <CheckCircle2 className="mx-auto h-12 w-12 text-gumleaf" />
+          <h1 className="mt-4 text-2xl font-semibold text-ink">Login created</h1>
+          <p className="mt-3 text-sm text-slate-600">{notice}</p>
+          <Link href="/login" className="mt-6 inline-flex items-center gap-2 rounded bg-gumleaf px-5 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90">
+            Sign in to CareOS
+          </Link>
+        </div>
+      </main>
+    );
   }
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8">
-      <div className="mx-auto max-w-xl rounded border border-slate-200 bg-white p-5 shadow-panel">
-        <p className="text-sm font-semibold text-gumleaf">CareOS worker invite</p>
-        <h1 className="mt-2 text-3xl font-semibold text-ink">Create login details</h1>
-        <p className="mt-3 text-sm text-slate-600">{notice}</p>
-        <RecordForm submitLabel="Create worker login" onSubmit={submit}>
-          <Field name="invite" label="Invite code" placeholder="Invite code from email" />
-          <Field name="name" label="Full name" placeholder="Full name" />
-          <Field name="email" label="Email address" type="email" placeholder="worker@example.com" />
-          <PasswordField name="password" label="Password" placeholder="Create a password" show={showPassword} setShow={setShowPassword} />
-        </RecordForm>
-        <Link href="/worker-portal" className="mt-5 inline-flex font-semibold text-gumleaf hover:text-ink">
-          Open worker portal
-        </Link>
+      <div className="mx-auto max-w-xl rounded border border-slate-200 bg-white p-6 shadow-panel">
+        <p className="text-sm font-semibold text-gumleaf">CareOS Worker Invite</p>
+        <h1 className="mt-2 text-2xl font-semibold text-ink">Create your login</h1>
+        {params.email ? (
+          <p className="mt-3 text-sm text-slate-600">
+            Your email address <strong>{params.email}</strong> has been pre-filled from your invite link. Just choose a password to get started.
+          </p>
+        ) : (
+          <p className="mt-3 text-sm text-slate-600">Enter your invite code, email, and choose a password to create your worker login.</p>
+        )}
+        {notice ? <p className="mt-3 rounded border border-coral/20 bg-coral/5 p-3 text-sm text-coral">{notice}</p> : null}
+        <form onSubmit={submit} className="mt-5 grid gap-4">
+          {params.invite ? <input type="hidden" name="invite" value={params.invite} /> : (
+            <Field name="invite" label="Invite code" placeholder="Invite code from your email" />
+          )}
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">Full name</label>
+            <input name="name" type="text" required defaultValue={params.name}
+              placeholder="Your full name"
+              className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
+          </div>
+          {params.email ? (
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">Email address</label>
+              <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600">{params.email}</div>
+            </div>
+          ) : (
+            <Field name="email" label="Email address" type="email" placeholder="worker@example.com" />
+          )}
+          <PasswordField name="password" label="Create a password" placeholder="Choose a strong password" show={showPassword} setShow={setShowPassword} />
+          <button disabled={saving} className="min-h-12 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90 disabled:opacity-60">
+            {saving ? "Creating login…" : "Create login"}
+          </button>
+        </form>
+        <p className="mt-4 text-xs text-slate-500">Already have an account? <Link href="/login" className="font-semibold text-gumleaf hover:text-ink">Sign in</Link></p>
       </div>
     </main>
   );
