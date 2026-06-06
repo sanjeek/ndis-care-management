@@ -2269,54 +2269,48 @@ export function WorkerPortalPage() {
           onSubmit={(shift) => setSigningShift(shift)}
           onAcceptOpenShift={acceptOpenShift}
         />
-        <WorkerPortalQuickActions />
-        <div className="space-y-6">
-          <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="font-semibold text-ink">Client information</h2>
-                <p className="mt-1 text-sm text-slate-500">Only participants linked to your assigned shifts are shown.</p>
-              </div>
-              <ShieldCheck className="h-5 w-5 text-gumleaf" />
+        <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-ink">Client information</h2>
+              <p className="mt-1 text-sm text-slate-500">Only participants linked to your assigned shifts are shown.</p>
             </div>
-            {visibleParticipants.length ? (
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {visibleParticipants.map((participant) => (
-                  <article key={`${participant.ndis}-${participant.name}`} className="rounded border border-slate-200 bg-slate-50 p-4 text-sm">
-                    <p className="font-semibold text-ink">{participant.name}</p>
-                    <Info label="NDIS" value={participant.ndis || "Not recorded"} />
-                    <Info label="Support needs" value={participant.needs || "Not recorded"} />
-                    <Info label="Emergency contact" value={participant.emergency || "Not recorded"} />
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <EmptyWorkerState title="No linked participant information" message="Participant details only appear when you are assigned to that participant's shift." />
-            )}
-          </section>
-        </div>
+            <ShieldCheck className="h-5 w-5 text-gumleaf" />
+          </div>
+          {visibleParticipants.length ? (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {visibleParticipants.map((participant) => (
+                <article key={`${participant.ndis}-${participant.name}`} className="rounded border border-slate-200 bg-slate-50 p-4 text-sm">
+                  <p className="font-semibold text-ink">{participant.name}</p>
+                  <Info label="NDIS" value={participant.ndis || "Not recorded"} />
+                  <Info label="Support needs" value={participant.needs || "Not recorded"} />
+                  <Info label="Emergency contact" value={participant.emergency || "Not recorded"} />
+                </article>
+              ))}
+            </div>
+          ) : (
+            <EmptyWorkerState title="No linked participant information" message="Participant details only appear when you are assigned to that participant's shift." />
+          )}
+        </section>
 
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           <WorkerProgressNoteForm workerName={workerName} workerEmail={workerEmail} participants={visibleParticipants} />
           <WorkerIncidentForm workerName={workerName} workerEmail={workerEmail} participants={visibleParticipants} />
-        </div>
-        <div className="grid gap-6 xl:grid-cols-2">
           <WorkerLeaveForm workerName={workerName} workerEmail={workerEmail} leaveRequests={leaveRequests} onSaved={refresh} setNotice={setNotice} />
           <WorkerAvailabilityForm workerName={workerName} workerEmail={workerEmail} availability={availability} onSaved={refresh} setNotice={setNotice} />
         </div>
-        <div>
-          <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="font-semibold text-ink">Important worker reminders</h2>
-            <div className="mt-4 grid gap-3">
-              {["Complete progress notes before shift end", "Call coordinator for medication or behaviour changes", "Submit incidents immediately for review"].map((item) => (
-                <div key={item} className="flex gap-3 rounded border border-slate-200 p-3 text-sm text-slate-700">
-                  <ShieldCheck className="mt-0.5 h-4 w-4 text-gumleaf" />
-                  {item}
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
+
+        <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="font-semibold text-ink">Important worker reminders</h2>
+          <div className="mt-4 grid gap-3">
+            {["Complete progress notes before shift end", "Call coordinator for medication or behaviour changes", "Submit incidents immediately for review"].map((item) => (
+              <div key={item} className="flex gap-3 rounded border border-slate-200 p-3 text-sm text-slate-700">
+                <ShieldCheck className="mt-0.5 h-4 w-4 text-gumleaf" />
+                {item}
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
       {signingShift ? <ShiftSignatureModal shift={signingShift} onClose={() => setSigningShift(null)} onSubmit={submitSignedShift} /> : null}
     </AppShell>
@@ -3519,11 +3513,17 @@ function SimpleModuleContent({ kind }: { kind: Exclude<ModuleKind, "invoices"> }
 }
 
 function WorkerProgressNoteForm({ workerName, workerEmail, participants }: { workerName: string; workerEmail: string; participants: ParticipantRecord[] }) {
+  const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState<string[]>([]);
-  const [notice, setNotice] = useState("Add an important progress note.");
+  const [notice, setNotice] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  async function submit(form: FormData) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
     const note = get(form, "note");
+    setSaving(true);
     const ok = await persist(
       "progress_notes",
       {
@@ -3538,49 +3538,74 @@ function WorkerProgressNoteForm({ workerName, workerEmail, participants }: { wor
         is_important: get(form, "important") === "Important"
       },
       setNotice,
-      {
-        action: "progress_note",
-        recordLabel: get(form, "participant"),
-        metadata: { category: get(form, "category"), operation: "create" }
-      }
+      { action: "progress_note", recordLabel: get(form, "participant"), metadata: { category: get(form, "category"), operation: "create" } }
     );
-    if (ok) setNotes([note, ...notes]);
+    setSaving(false);
+    if (ok) { formEl.reset(); setNotes([note, ...notes]); setOpen(false); }
   }
 
   return (
-    <section id="worker-progress-note" className="scroll-mt-24 rounded border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="font-semibold text-ink">Quick progress note</h2>
-      {participants.length === 0 ? (
-        <EmptyWorkerState title="No assigned participant" message="You can add progress notes only for participants linked to your assigned shifts." />
-      ) : (
-        <RecordForm submitLabel="Add progress note" onSubmit={submit}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Select name="participant" label="Client" options={participants.map((participant) => participant.name)} />
-            <Select name="category" label="Support category" options={["Self care", "Community access", "Medication prompt", "Meal preparation", "Behaviour support", "Transport assistance"]} />
+    <section className="rounded border border-slate-200 bg-white shadow-sm">
+      <button type="button" onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-3 p-4 text-left">
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-gumleaf/10 text-gumleaf"><FilePlus2 className="h-4 w-4" /></span>
+          <div>
+            <p className="font-semibold text-ink">Progress note</p>
+            <p className="text-xs text-slate-500">{notes.length ? `${notes.length} added this session` : "Record support provided"}</p>
           </div>
-          <ReadOnlyField label="Worker" value={workerName || "Current worker"} />
-          <Select name="important" label="Priority" options={["Important", "Standard"]} />
-          <Area name="note" label="Progress note details" placeholder="Write the support provided, outcomes, changes, and follow-up required." />
-          <Area name="outcomes" label="Outcomes" placeholder="Record achieved goals, progress, risks, and follow-up actions." />
-          <Field name="signature" label="Digital signature" placeholder="Type full name as signature" />
-        </RecordForm>
-      )}
-      <p className="mt-3 text-sm text-slate-500">{notice}</p>
-      <div className="mt-3 grid gap-2">
-        {notes.map((note) => (
-          <p key={note} className="rounded bg-gumleaf/5 p-3 text-sm text-slate-700">{note}</p>
-        ))}
-      </div>
+        </div>
+        <span className={`rounded border px-3 py-1.5 text-xs font-semibold transition ${open ? "border-slate-200 text-slate-500" : "border-gumleaf/20 bg-gumleaf/10 text-gumleaf"}`}>
+          {open ? "Close" : "Add note"}
+        </span>
+      </button>
+      {open ? (
+        <div className="border-t border-slate-200 p-4">
+          {participants.length === 0 ? (
+            <EmptyWorkerState title="No assigned participant" message="Progress notes can only be added for participants linked to your assigned shifts." />
+          ) : (
+            <form onSubmit={submit} className="grid gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Select name="participant" label="Client" options={participants.map((p) => p.name)} />
+                <Select name="category" label="Support category" options={["Self care", "Community access", "Medication prompt", "Meal preparation", "Behaviour support", "Transport assistance"]} />
+              </div>
+              <ReadOnlyField label="Worker" value={workerName || "Current worker"} />
+              <Select name="important" label="Priority" options={["Standard", "Important"]} />
+              <Area name="note" label="Progress note details" placeholder="Write the support provided, outcomes, changes, and follow-up required." />
+              <Area name="outcomes" label="Outcomes" placeholder="Record achieved goals, progress, risks, and follow-up actions." />
+              <Field name="signature" label="Digital signature" placeholder="Type full name as signature" />
+              <div className="flex gap-3">
+                <button disabled={saving} className="min-h-11 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-2.5 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20 disabled:opacity-60">{saving ? "Saving…" : "Add progress note"}</button>
+                <button type="button" onClick={() => setOpen(false)} className="min-h-11 rounded border border-slate-200 px-4 py-2.5 text-sm font-semibold text-ink hover:bg-slate-50">Cancel</button>
+              </div>
+              {notice ? <p className="text-sm text-slate-600">{notice}</p> : null}
+            </form>
+          )}
+          {notes.length ? (
+            <div className="mt-4 grid gap-2">
+              {notes.map((note) => (
+                <p key={note} className="rounded bg-gumleaf/5 p-3 text-sm text-slate-700">{note}</p>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }
 
 function WorkerIncidentForm({ workerName, workerEmail, participants }: { workerName: string; workerEmail: string; participants: ParticipantRecord[] }) {
+  const [open, setOpen] = useState(false);
   const [reports, setReports] = useState<string[]>([]);
-  const [notice, setNotice] = useState("Submit incidents for immediate review.");
+  const [notice, setNotice] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  async function submit(form: FormData) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
     const summary = get(form, "summary");
+    setSaving(true);
     const ok = await persist(
       "incident_reports",
       {
@@ -3591,36 +3616,55 @@ function WorkerIncidentForm({ workerName, workerEmail, participants }: { workerN
         summary
       },
       setNotice,
-      {
-        action: "incident_report",
-        recordLabel: get(form, "participant"),
-        metadata: { priority: get(form, "priority"), operation: "create" }
-      }
+      { action: "incident_report", recordLabel: get(form, "participant"), metadata: { priority: get(form, "priority"), operation: "create" } }
     );
-    if (ok) setReports([summary, ...reports]);
+    setSaving(false);
+    if (ok) { formEl.reset(); setReports([summary, ...reports]); setOpen(false); }
   }
 
   return (
-    <section id="worker-incident-report" className="scroll-mt-24 rounded border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="font-semibold text-ink">Report incident</h2>
-      {participants.length === 0 ? (
-        <EmptyWorkerState title="No assigned participant" message="You can submit incidents only for participants linked to your assigned shifts." />
-      ) : (
-        <RecordForm submitLabel="Submit incident" onSubmit={submit}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Select name="participant" label="Client" options={participants.map((participant) => participant.name)} />
-            <Select name="priority" label="Priority" options={["High", "Medium", "Low"]} />
+    <section className="rounded border border-coral/20 bg-white shadow-sm">
+      <button type="button" onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-3 p-4 text-left">
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-coral/10 text-coral"><AlertTriangle className="h-4 w-4" /></span>
+          <div>
+            <p className="font-semibold text-ink">Report incident</p>
+            <p className="text-xs text-slate-500">{reports.length ? `${reports.length} reported this session` : "Escalate immediately"}</p>
           </div>
-          <ReadOnlyField label="Worker" value={workerName || "Current worker"} />
-          <Area name="summary" label="Incident details" placeholder="Describe what happened, actions taken, people notified, and follow-up required." />
-        </RecordForm>
-      )}
-      <p className="mt-3 text-sm text-slate-500">{notice}</p>
-      <div className="mt-3 grid gap-2">
-        {reports.map((report) => (
-          <p key={report} className="rounded bg-coral/5 p-3 text-sm text-slate-700">{report}</p>
-        ))}
-      </div>
+        </div>
+        <span className={`rounded border px-3 py-1.5 text-xs font-semibold transition ${open ? "border-slate-200 text-slate-500" : "border-coral/20 bg-coral/10 text-coral"}`}>
+          {open ? "Close" : "Report"}
+        </span>
+      </button>
+      {open ? (
+        <div className="border-t border-slate-200 p-4">
+          {participants.length === 0 ? (
+            <EmptyWorkerState title="No assigned participant" message="Incidents can only be submitted for participants linked to your assigned shifts." />
+          ) : (
+            <form onSubmit={submit} className="grid gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Select name="participant" label="Client" options={participants.map((p) => p.name)} />
+                <Select name="priority" label="Priority" options={["High", "Medium", "Low"]} />
+              </div>
+              <ReadOnlyField label="Worker" value={workerName || "Current worker"} />
+              <Area name="summary" label="Incident details" placeholder="Describe what happened, actions taken, people notified, and follow-up required." />
+              <div className="flex gap-3">
+                <button disabled={saving} className="min-h-11 rounded bg-coral/10 border border-coral/20 px-4 py-2.5 text-sm font-semibold text-coral hover:bg-coral/20 disabled:opacity-60">{saving ? "Submitting…" : "Submit incident"}</button>
+                <button type="button" onClick={() => setOpen(false)} className="min-h-11 rounded border border-slate-200 px-4 py-2.5 text-sm font-semibold text-ink hover:bg-slate-50">Cancel</button>
+              </div>
+              {notice ? <p className="text-sm text-slate-600">{notice}</p> : null}
+            </form>
+          )}
+          {reports.length ? (
+            <div className="mt-4 grid gap-2">
+              {reports.map((report) => (
+                <p key={report} className="rounded bg-coral/5 p-3 text-sm text-slate-700">{report}</p>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -3638,56 +3682,68 @@ function WorkerLeaveForm({
   onSaved: () => Promise<void>;
   setNotice: (message: string) => void;
 }) {
-  async function submit(form: FormData) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
+    setSaving(true);
     const ok = await postJson(
       "/api/leave",
-      {
-        worker_name: workerName,
-        worker_email: workerEmail,
-        leave_type: get(form, "leaveType"),
-        starts_at: get(form, "startsAt"),
-        ends_at: get(form, "endsAt"),
-        reason: get(form, "reason")
-      },
+      { worker_name: workerName, worker_email: workerEmail, leave_type: get(form, "leaveType"), starts_at: get(form, "startsAt"), ends_at: get(form, "endsAt"), reason: get(form, "reason") },
       setNotice
     );
-    if (ok) await onSaved();
+    setSaving(false);
+    if (ok) { formEl.reset(); setOpen(false); await onSaved(); }
   }
 
   return (
-    <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <h2 className="font-semibold text-ink">Leave management</h2>
-          <p className="mt-1 text-sm text-slate-500">Request annual leave, sick leave, or unavailable periods. Approved leave blocks scheduling.</p>
+    <section className="rounded border border-slate-200 bg-white shadow-sm">
+      <button type="button" onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-3 p-4 text-left">
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-harbour/10 text-harbour"><CalendarPlus className="h-4 w-4" /></span>
+          <div>
+            <p className="font-semibold text-ink">Leave request</p>
+            <p className="text-xs text-slate-500">{leaveRequests.length ? `${leaveRequests.length} request${leaveRequests.length === 1 ? "" : "s"} on file` : "Annual leave, sick leave, unavailability"}</p>
+          </div>
         </div>
-        <CalendarPlus className="h-5 w-5 text-gumleaf" />
-      </div>
-      <RecordForm submitLabel="Submit leave request" onSubmit={submit}>
-        <Select name="leaveType" label="Leave type" options={leaveTypes} />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field name="startsAt" label="Start" type="datetime-local" />
-          <Field name="endsAt" label="End" type="datetime-local" />
-        </div>
-        <OptionalArea name="reason" label="Reason / notes" placeholder="Annual leave, sick leave, appointment, training, or unavailable period details" />
-      </RecordForm>
-      {leaveRequests.length ? (
-        <div className="grid gap-2">
-          {leaveRequests.slice(0, 4).map((leave) => (
-            <div key={leave.id} className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
-              <div className="flex items-center justify-between gap-3">
-                <p className="font-semibold text-ink">{friendlyLeaveType(leave.leaveType)}</p>
-                <span className={`rounded px-2 py-1 text-xs font-semibold ${leaveStatusBadge(leave.status)}`}>{friendlyLeaveStatus(leave.status)}</span>
-              </div>
-              <p className="mt-1 text-slate-600">{dateTimeOrFallback(leave.startsAt)} to {dateTimeOrFallback(leave.endsAt)}</p>
-              {leave.reason ? <p className="mt-1 text-xs text-slate-500">{leave.reason}</p> : null}
-              {leave.reviewNotes ? <p className="mt-1 text-xs text-slate-500">Review: {leave.reviewNotes}</p> : null}
+        <span className={`rounded border px-3 py-1.5 text-xs font-semibold transition ${open ? "border-slate-200 text-slate-500" : "border-harbour/20 bg-harbour/10 text-harbour"}`}>
+          {open ? "Close" : "Request"}
+        </span>
+      </button>
+      {open ? (
+        <div className="border-t border-slate-200 p-4 grid gap-4">
+          <form onSubmit={submit} className="grid gap-4">
+            <Select name="leaveType" label="Leave type" options={leaveTypes} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field name="startsAt" label="Start" type="datetime-local" />
+              <Field name="endsAt" label="End" type="datetime-local" />
             </div>
-          ))}
+            <OptionalArea name="reason" label="Reason / notes" placeholder="Annual leave, sick leave, appointment, training, or unavailable period details" />
+            <div className="flex gap-3">
+              <button disabled={saving} className="min-h-11 rounded bg-harbour/10 border border-harbour/20 px-4 py-2.5 text-sm font-semibold text-harbour hover:bg-harbour/20 disabled:opacity-60">{saving ? "Submitting…" : "Submit leave request"}</button>
+              <button type="button" onClick={() => setOpen(false)} className="min-h-11 rounded border border-slate-200 px-4 py-2.5 text-sm font-semibold text-ink hover:bg-slate-50">Cancel</button>
+            </div>
+          </form>
+          {leaveRequests.length ? (
+            <div className="grid gap-2">
+              {leaveRequests.slice(0, 4).map((leave) => (
+                <div key={leave.id} className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold text-ink">{friendlyLeaveType(leave.leaveType)}</p>
+                    <span className={`rounded px-2 py-1 text-xs font-semibold ${leaveStatusBadge(leave.status)}`}>{friendlyLeaveStatus(leave.status)}</span>
+                  </div>
+                  <p className="mt-1 text-slate-600">{dateTimeOrFallback(leave.startsAt)} to {dateTimeOrFallback(leave.endsAt)}</p>
+                  {leave.reason ? <p className="mt-1 text-xs text-slate-500">{leave.reason}</p> : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
-      ) : (
-        <EmptyWorkerState title="No leave requests" message="Your annual leave, sick leave, and unavailable period requests will appear here." />
-      )}
+      ) : null}
     </section>
   );
 }
@@ -3705,57 +3761,69 @@ function WorkerAvailabilityForm({
   onSaved: () => Promise<void>;
   setNotice: (message: string) => void;
 }) {
-  async function submit(form: FormData) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
+    setSaving(true);
     const ok = await postJson(
       "/api/availability",
-      {
-        worker_name: workerName,
-        worker_email: workerEmail,
-        available_date: get(form, "availableDate"),
-        start_time: get(form, "startTime"),
-        end_time: get(form, "endTime"),
-        availability_status: get(form, "status"),
-        notes: get(form, "notes")
-      },
+      { worker_name: workerName, worker_email: workerEmail, available_date: get(form, "availableDate"), start_time: get(form, "startTime"), end_time: get(form, "endTime"), availability_status: get(form, "status"), notes: get(form, "notes") },
       setNotice
     );
-    if (ok) await onSaved();
+    setSaving(false);
+    if (ok) { formEl.reset(); setOpen(false); await onSaved(); }
   }
 
   return (
-    <section className="rounded border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <h2 className="font-semibold text-ink">My availability</h2>
-          <p className="mt-1 text-sm text-slate-500">Submit available days and unavailable periods. The scheduler blocks shifts that overlap unavailable time.</p>
+    <section className="rounded border border-slate-200 bg-white shadow-sm">
+      <button type="button" onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-3 p-4 text-left">
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-banksia/20 text-banksia"><CalendarDays className="h-4 w-4" /></span>
+          <div>
+            <p className="font-semibold text-ink">My availability</p>
+            <p className="text-xs text-slate-500">{availability.length ? `${availability.length} slot${availability.length === 1 ? "" : "s"} on file` : "Set available days and unavailable periods"}</p>
+          </div>
         </div>
-        <CalendarDays className="h-5 w-5 text-gumleaf" />
-      </div>
-      <RecordForm submitLabel="Submit availability" onSubmit={submit}>
-        <Field name="availableDate" label="Date" type="date" />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field name="startTime" label="Start time" type="time" />
-          <Field name="endTime" label="End time" type="time" />
-        </div>
-        <Select name="status" label="Availability type" options={availabilityStatuses} />
-        <OptionalArea name="notes" label="Notes" placeholder="Available day, unavailable appointment, preferred locations, transport limits, or leave details" />
-      </RecordForm>
-      {availability.length ? (
-        <div className="grid gap-2">
-          {availability.slice(0, 4).map((slot) => (
-            <div key={slot.id} className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
-              <div className="flex items-center justify-between gap-3">
-                <p className="font-semibold text-ink">{formatDateLabel(slot.date)}</p>
-                <span className={`rounded px-2 py-1 text-xs font-semibold ${availabilityBadge(slot.status)}`}>{friendlyAvailability(slot.status)}</span>
-              </div>
-              <p className="mt-1 text-slate-600">{formatTimeRange(slot.startTime, slot.endTime)}</p>
-              {slot.notes ? <p className="mt-1 text-xs text-slate-500">{slot.notes}</p> : null}
+        <span className={`rounded border px-3 py-1.5 text-xs font-semibold transition ${open ? "border-slate-200 text-slate-500" : "border-banksia/30 bg-banksia/10 text-banksia"}`}>
+          {open ? "Close" : "Update"}
+        </span>
+      </button>
+      {open ? (
+        <div className="border-t border-slate-200 p-4 grid gap-4">
+          <form onSubmit={submit} className="grid gap-4">
+            <Field name="availableDate" label="Date" type="date" />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field name="startTime" label="Start time" type="time" />
+              <Field name="endTime" label="End time" type="time" />
             </div>
-          ))}
+            <Select name="status" label="Availability type" options={availabilityStatuses} />
+            <OptionalArea name="notes" label="Notes" placeholder="Available day, unavailable appointment, preferred locations, transport limits, or leave details" />
+            <div className="flex gap-3">
+              <button disabled={saving} className="min-h-11 rounded bg-banksia/10 border border-banksia/30 px-4 py-2.5 text-sm font-semibold text-banksia hover:bg-banksia/20 disabled:opacity-60">{saving ? "Saving…" : "Submit availability"}</button>
+              <button type="button" onClick={() => setOpen(false)} className="min-h-11 rounded border border-slate-200 px-4 py-2.5 text-sm font-semibold text-ink hover:bg-slate-50">Cancel</button>
+            </div>
+          </form>
+          {availability.length ? (
+            <div className="grid gap-2">
+              {availability.slice(0, 4).map((slot) => (
+                <div key={slot.id} className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold text-ink">{formatDateLabel(slot.date)}</p>
+                    <span className={`rounded px-2 py-1 text-xs font-semibold ${availabilityBadge(slot.status)}`}>{friendlyAvailability(slot.status)}</span>
+                  </div>
+                  <p className="mt-1 text-slate-600">{formatTimeRange(slot.startTime, slot.endTime)}</p>
+                  {slot.notes ? <p className="mt-1 text-xs text-slate-500">{slot.notes}</p> : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
-      ) : (
-        <EmptyWorkerState title="No availability submitted" message="Your submitted availability will appear here." />
-      )}
+      ) : null}
     </section>
   );
 }
@@ -3935,29 +4003,6 @@ function WorkerShiftMobilePanel({
   );
 }
 
-function WorkerPortalQuickActions() {
-  const actions = [
-    { label: "Progress note", detail: "Record service notes", href: "#worker-progress-note", icon: FilePlus2 },
-    { label: "Report incident", detail: "Escalate immediately", href: "#worker-incident-report", icon: AlertTriangle },
-    { label: "My shifts", detail: "Full schedule", href: "/my-shifts", icon: CalendarDays }
-  ];
-
-  return (
-    <section className="grid gap-3 sm:grid-cols-3">
-      {actions.map((action) => (
-        <Link key={action.label} href={action.href} className="flex min-h-20 items-center gap-3 rounded border border-slate-200 bg-white p-4 shadow-sm hover:border-gumleaf/40 hover:bg-gumleaf/5">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-gumleaf/10 text-gumleaf">
-            <action.icon className="h-5 w-5" />
-          </span>
-          <span>
-            <span className="block font-semibold text-ink">{action.label}</span>
-            <span className="mt-1 block text-xs text-slate-500">{action.detail}</span>
-          </span>
-        </Link>
-      ))}
-    </section>
-  );
-}
 
 const WORKER_COMPLIANCE_DOCS = [
   { key: "policeCheck", name: "policeCheckExpiry", label: "Police check expiry", title: "Police Check" },
