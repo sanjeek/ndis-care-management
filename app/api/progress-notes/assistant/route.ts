@@ -13,7 +13,72 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Add at least 10 characters of note text before using the assistant." }, { status: 400 });
   }
 
-  const draft = [
+  let draft: string;
+  let engine: "claude" | "keyword";
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (apiKey && apiKey.startsWith("sk-ant-")) {
+    try {
+      draft = await generateWithClaude(apiKey, rawNote, participantName, category);
+      engine = "claude";
+    } catch (err) {
+      console.error("[assistant] Claude API failed, using keyword fallback:", err);
+      draft = generateWithKeywords(rawNote, participantName, category);
+      engine = "keyword";
+    }
+  } else {
+    draft = generateWithKeywords(rawNote, participantName, category);
+    engine = "keyword";
+  }
+
+  await recordServerAudit(auth.client, {
+    userId: auth.user.id,
+    userEmail: auth.user.email,
+    userName: auth.user.name,
+    userRole: auth.user.role,
+    action: "ai_note_assistant",
+    tableName: "progress_notes",
+    recordLabel: participantName || "Draft note",
+    metadata: { category, sourceLength: rawNote.length, generatedLength: draft.length, engine }
+  });
+
+  return NextResponse.json({ message: "Draft generated. Review before saving to the participant record.", draft, engine });
+}
+
+async function generateWithClaude(apiKey: string, rawNote: string, participantName: string, category: string): Promise<string> {
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 600,
+      system: "You are a professional NDIS support worker progress note writer. Write clear, factual, person-centred progress notes. Use respectful, strength-based language. Focus only on what was observed and supported — never invent details.",
+      messages: [
+        {
+          role: "user",
+          content: `Write a professional NDIS progress note using these sections: "Support provided", "Observed response and outcomes", "Risks, follow-up, and handover".\n\nParticipant: ${participantName || "Not specified"}\nSupport category: ${category}\nRaw worker note: ${rawNote}\n\nKeep it factual and suitable for an NDIS audit. Do not invent details not present in the raw note.`
+        }
+      ]
+    })
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Anthropic API ${response.status}: ${text.slice(0, 200)}`);
+  }
+
+  const data = (await response.json()) as { content?: Array<{ text?: string }> };
+  const text = data.content?.[0]?.text ?? "";
+  if (!text) throw new Error("Empty response from Claude");
+  return text;
+}
+
+function generateWithKeywords(rawNote: string, participantName: string, category: string): string {
+  return [
     `Participant: ${participantName || "Not selected"}`,
     `Support category: ${category}`,
     "",
@@ -26,19 +91,6 @@ export async function POST(request: Request) {
     "Risks, follow-up, and handover:",
     inferFollowUp(rawNote)
   ].join("\n");
-
-  await recordServerAudit(auth.client, {
-    userId: auth.user.id,
-    userEmail: auth.user.email,
-    userName: auth.user.name,
-    userRole: auth.user.role,
-    action: "ai_note_assistant",
-    tableName: "progress_notes",
-    recordLabel: participantName || "Draft note",
-    metadata: { category, sourceLength: rawNote.length, generatedLength: draft.length }
-  });
-
-  return NextResponse.json({ message: "Draft generated. Review before saving to the participant record.", draft });
 }
 
 function sentence(value: string) {

@@ -68,7 +68,7 @@ export async function sendCareNotification(client: SupabaseClient, input: EmailI
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM || process.env.RESEND_FROM_EMAIL;
 
-  if (!apiKey || !from) {
+  if (!apiKey || !apiKey.startsWith("re_") || !from) {
     await Promise.all(recipients.map((recipient) => logNotification(client, input, recipient, "skipped", "Email provider is not configured.")));
     return { sent: 0, skipped: recipients.length };
   }

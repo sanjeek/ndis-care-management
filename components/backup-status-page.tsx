@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Download, PlayCircle, RefreshCw, RotateCcw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, HardDrive, Mail, PlayCircle, RefreshCw, RotateCcw } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { supabase } from "@/lib/supabase";
 
@@ -31,6 +31,8 @@ export function BackupStatusPage() {
   const [message, setMessage] = useState("Loading backup status.");
   const [loading, setLoading] = useState(false);
   const [restorePlan, setRestorePlan] = useState<RestorePlan | null>(null);
+  const [setupMsg, setSetupMsg] = useState<string | null>(null);
+  const [setupLoading, setSetupLoading] = useState(false);
 
   const authHeaders = useCallback(async () => {
     const token = (await supabase?.auth.getSession())?.data.session?.access_token;
@@ -62,6 +64,19 @@ export function BackupStatusPage() {
   useEffect(() => {
     void loadBackups();
   }, [loadBackups]);
+
+  async function setupStorage() {
+    setSetupLoading(true);
+    setSetupMsg(null);
+    const response = await fetch("/api/admin/setup-storage", {
+      method: "POST",
+      headers: await authHeaders()
+    });
+    const result = await response.json().catch(() => ({ message: "Setup failed." }));
+    setSetupLoading(false);
+    setSetupMsg(result.message);
+    if (response.ok) await loadBackups();
+  }
 
   async function runBackup() {
     setLoading(true);
@@ -110,6 +125,28 @@ export function BackupStatusPage() {
         <StatusCard label="Latest status" value={latest?.status ?? "No backup"} detail={latest?.completed_at ? formatDate(latest.completed_at) : "No completed backup yet"} good={latest?.status === "completed"} />
         <StatusCard label="Latest size" value={latest?.size_bytes ? formatBytes(latest.size_bytes) : "0 KB"} detail={latest?.file_name ?? "No backup file"} good={Boolean(latest?.size_bytes)} />
         <StatusCard label="Automation" value="Daily" detail="Vercel cron calls the backup endpoint once per day." good />
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <HardDrive className="mt-0.5 h-5 w-5 shrink-0 text-gumleaf" />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-ink text-sm">Storage bucket setup</p>
+            <p className="mt-0.5 text-xs text-slate-500">Backups require a <code>database-backups</code> bucket in Supabase Storage. Click to create it if backups are failing.</p>
+            {setupMsg ? <p className="mt-1 text-xs font-medium text-gumleaf">{setupMsg}</p> : null}
+            <button onClick={() => void setupStorage()} disabled={setupLoading} className="mt-2 inline-flex items-center gap-1.5 rounded bg-gumleaf px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1d625d] disabled:opacity-60">
+              {setupLoading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <HardDrive className="h-3.5 w-3.5" />}
+              {setupLoading ? "Creating…" : "Create storage bucket"}
+            </button>
+          </div>
+        </div>
+        <div className="flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <Mail className="mt-0.5 h-5 w-5 shrink-0 text-banksia" />
+          <div>
+            <p className="font-semibold text-ink text-sm">Email notifications</p>
+            <p className="mt-0.5 text-xs text-slate-500">Backup failure alerts are sent via Resend. Add <code>RESEND_API_KEY</code> and <code>EMAIL_FROM</code> to Vercel environment variables to enable them.</p>
+          </div>
+        </div>
       </div>
 
       <section className="mt-6 rounded border border-slate-200 bg-white shadow-sm">
