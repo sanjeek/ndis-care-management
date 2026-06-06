@@ -535,7 +535,7 @@ export function DashboardPage() {
   ];
 
   return (
-    <AppShell title="Dashboard" eyebrow={`${formatToday()} | ${notice}`}>
+    <AppShell title="Dashboard" eyebrow={notice}>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         {metricCards.map((metric) => (
           <StatCard key={metric.label} {...metric} />
@@ -2186,7 +2186,7 @@ export function WorkerPortalPage() {
   }
 
   return (
-    <AppShell title="Worker Portal" eyebrow={`${workerName || "Worker"} | ${notice}`}>
+    <AppShell title="Worker Portal" eyebrow={`${workerName || "Worker"} | ${notice}`} hidePdf>
       <div className="mx-auto grid max-w-6xl gap-5">
         <WorkerShiftMobilePanel
           shifts={visibleShifts}

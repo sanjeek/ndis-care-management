@@ -42,7 +42,7 @@ export function ProfilePage() {
   }, []);
 
   return (
-    <AppShell title="Profile" eyebrow="Account, role, and portal access">
+    <AppShell title="Profile" eyebrow="Account, role, and portal access" hidePdf>
       {!profile ? (
         <section className="rounded border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">Loading profile...</section>
       ) : (

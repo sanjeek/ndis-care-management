@@ -125,7 +125,7 @@ export function InternalMessagingPage() {
   }
 
   return (
-    <AppShell title="Internal Messages" eyebrow={notice}>
+    <AppShell title="Internal Messages" eyebrow={notice} hidePdf>
       <div className="grid gap-6 xl:grid-cols-[0.78fr_1.22fr]">
         <section className="space-y-6">
           <Panel title="New internal message">

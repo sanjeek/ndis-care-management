@@ -6,7 +6,7 @@ import { AppShell } from "@/components/app-shell";
 
 export function UnauthorisedPage() {
   return (
-    <AppShell title="Unauthorised" eyebrow="Access restricted">
+    <AppShell title="Unauthorised" eyebrow="Access restricted" hidePdf>
       <section className="mx-auto max-w-2xl rounded border border-slate-200 bg-white p-6 text-center shadow-sm">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded bg-coral/10 text-coral">
           <ShieldAlert className="h-6 w-6" />

@@ -104,7 +104,7 @@ export function SettingsConsolePage() {
   }
 
   return (
-    <AppShell title="Settings" eyebrow={notice}>
+    <AppShell title="Settings" eyebrow={notice} hidePdf>
       <div className="grid gap-4 md:grid-cols-4">
         {stats.map((stat) => (
           <section key={stat.label} className="rounded-lg border border-indigo-100 bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">

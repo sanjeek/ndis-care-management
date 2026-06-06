@@ -33,7 +33,7 @@ type SearchResult = {
   href: string;
 };
 
-export function AppShell({ title, eyebrow, children }: { title: string; eyebrow: string; children: React.ReactNode }) {
+export function AppShell({ title, eyebrow, children, hidePdf }: { title: string; eyebrow: string; children: React.ReactNode; hidePdf?: boolean }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -488,8 +488,8 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
         <div className="flex min-h-screen flex-1 flex-col">
           <header className="sticky top-[65px] z-10 border-b border-indigo-100/80 bg-[#fbfdff]/95 px-4 py-4 backdrop-blur lg:top-0 lg:px-8">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-              <div>
-                <p className="text-sm font-medium text-gumleaf">{eyebrow}</p>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-gumleaf">{eyebrow}</p>
                 <h1 className="text-2xl font-semibold text-ink sm:text-3xl">{title}</h1>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -550,15 +550,17 @@ export function AppShell({ title, eyebrow, children }: { title: string; eyebrow:
                     <MessageSquare className="h-4 w-4" />
                   </Link>
                 ) : null}
-                <button
-                  type="button"
-                  onClick={downloadCurrentPagePdf}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-100 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.035)] hover:bg-indigo-50/60"
-                  aria-label="Download this page as PDF"
-                >
-                  <Download className="h-4 w-4" />
-                  <span className="hidden lg:inline">PDF</span>
-                </button>
+                {!hidePdf ? (
+                  <button
+                    type="button"
+                    onClick={downloadCurrentPagePdf}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-100 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.035)] hover:bg-indigo-50/60"
+                    aria-label="Download this page as PDF"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span className="hidden lg:inline">PDF</span>
+                  </button>
+                ) : null}
                 <label className="hidden items-center gap-2 rounded-lg border border-indigo-100 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.035)] md:flex">
                   <CalendarDays className="h-4 w-4 text-gumleaf" />
                   <span className="sr-only">Selected date</span>
