@@ -21,6 +21,7 @@ import {
   LockKeyhole,
   MoreVertical,
   Phone,
+  Pencil,
   Plus,
   Search,
   ShieldCheck,
@@ -673,11 +674,9 @@ function AnalyticsMini({ title, value, detail }: { title: string; value: string;
 
 export function ParticipantsPage() {
   const [participants, setParticipants] = useState<ParticipantRecord[]>([]);
-  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContactRecord[]>([]);
   const [notice, setNotice] = useState("Loading participant records from Supabase.");
   const [canManageParticipants, setCanManageParticipants] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
-  const [contactCreateOpen, setContactCreateOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     const context = await getCurrentUserContext();
@@ -686,9 +685,7 @@ export function ParticipantsPage() {
     const rows = context.role === "support_worker" && context.email
       ? await loadParticipantsForShifts(await loadShifts(context.email))
       : await loadParticipants();
-    const contacts = await loadEmergencyContacts(context.role, rows.map((participant) => participant.name));
     setParticipants(rows);
-    setEmergencyContacts(contacts);
     setNotice(
       context.role === "support_worker"
         ? rows.length
@@ -729,26 +726,6 @@ export function ParticipantsPage() {
     return ok;
   }
 
-  async function submitEmergencyContact(form: FormData) {
-    const payload = {
-      participant_name: get(form, "participant"),
-      contact_name: get(form, "contactName"),
-      relationship: get(form, "relationship"),
-      phone: get(form, "phone"),
-      email: get(form, "email"),
-      priority: get(form, "priority"),
-      consent_status: get(form, "consentStatus"),
-      notes: get(form, "notes"),
-      status: get(form, "status")
-    };
-    const ok = await postJson("/api/operations/emergency-contacts", payload, setNotice);
-    if (ok) {
-      await refresh();
-      setContactCreateOpen(false);
-    }
-    return ok;
-  }
-
   return (
     <AppShell title="Participants" eyebrow={notice}>
       {canManageParticipants ? (
@@ -759,14 +736,6 @@ export function ParticipantsPage() {
               <p className="mt-1 text-sm text-slate-500">Add, review, and open participant profiles from one table.</p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => setContactCreateOpen(true)}
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-[#cfe9e4] bg-[#eef7f5] px-4 py-2.5 text-sm font-semibold text-[#2f766f] shadow-sm transition hover:bg-[#dff0ec] sm:w-auto"
-              >
-                <Phone className="h-4 w-4" />
-                New emergency contact
-              </button>
               <button
                 type="button"
                 onClick={() => setCreateOpen(true)}
@@ -784,7 +753,6 @@ export function ParticipantsPage() {
         </section>
       )}
       {createOpen ? <ParticipantCreateModal onClose={() => setCreateOpen(false)} onSubmit={submit} /> : null}
-      {contactCreateOpen ? <EmergencyContactCreateModal participants={participants} onClose={() => setContactCreateOpen(false)} onSubmit={submitEmergencyContact} /> : null}
       {participants.length ? (
         <section className="mt-6 overflow-hidden rounded border border-indigo-100 bg-white shadow-panel">
           <div className="flex items-center justify-between border-b border-indigo-100 bg-[#fbfdff] px-4 py-3">
@@ -846,7 +814,6 @@ export function ParticipantsPage() {
           message={canManageParticipants ? "Participant records will appear here after they are added to the database." : "Participant records appear here only when you are assigned to their shifts."}
         />
       )}
-      <EmergencyContactsTable contacts={emergencyContacts} canManage={canManageParticipants} onAdd={() => setContactCreateOpen(true)} />
     </AppShell>
   );
 }
@@ -898,15 +865,69 @@ function ParticipantCreateModal({
   );
 }
 
+function ParticipantEditModal({
+  participant,
+  onClose,
+  onSubmit
+}: {
+  participant: ParticipantRecord;
+  onClose: () => void;
+  onSubmit: (form: FormData) => Promise<boolean | void>;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/45 px-4 py-6 backdrop-blur-sm sm:items-center">
+      <div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-indigo-100 bg-[#fbfdff] px-5 py-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gumleaf">Participant profile</p>
+            <h2 className="mt-1 text-xl font-semibold text-ink">Edit {participant.name}</h2>
+            <p className="mt-1 text-sm text-slate-500">Update participant details, care information, risks, and communication preferences.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-indigo-100 bg-white text-slate-500 transition hover:bg-indigo-50 hover:text-ink"
+            aria-label="Close edit participant form"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="max-h-[76vh] overflow-y-auto p-5 scrollbar-subtle">
+          <RecordForm submitLabel="Save participant profile" onSubmit={onSubmit}>
+            <input type="hidden" name="id" value={participant.id} />
+            <Field name="name" label="Participant profile" defaultValue={participant.name} placeholder="Full name" />
+            <Field name="ndis" label="NDIS number" defaultValue={participant.ndis} placeholder="NDIS participant number" />
+            <Field name="plan" label="Plan type" defaultValue={participant.plan} placeholder="NDIS managed, plan managed, or self managed" />
+            <Field name="dateOfBirth" label="Date of birth" type="date" defaultValue={participant.dateOfBirth} />
+            <Field name="emergency" label="Primary emergency contact summary" defaultValue={participant.emergency} placeholder="Name and phone number" />
+            <Area name="emergencyContacts" label="Emergency contact notes" defaultValue={participant.emergencyContacts} placeholder="Primary and secondary contacts, relationship, phone, and email" />
+            <Area name="needs" label="Support needs" defaultValue={participant.needs} placeholder="Support needs, routines, risks, and goals" />
+            <Area name="supportPlans" label="Support plans" defaultValue={participant.supportPlans} placeholder="Current support plan details, routines, funded supports, and review dates" />
+            <Area name="goals" label="Participant goals" defaultValue={participant.goals} placeholder="NDIS goals, short-term goals, and progress measures" />
+            <Area name="riskInformation" label="Risk information" defaultValue={participant.riskInformation} placeholder="Known risks, triggers, behaviour support, safeguarding, and mitigation actions" />
+            <Area name="medicalNotes" label="Medical notes" defaultValue={participant.medicalNotes} placeholder="Medical conditions, medication notes, mobility, swallowing, seizures, or care alerts" />
+            <Area name="allergies" label="Allergies" defaultValue={participant.allergies} placeholder="Food, medication, environmental allergies, and response plan" />
+            <Area name="communicationPreferences" label="Communication preferences" defaultValue={participant.communicationPreferences} placeholder="Preferred language, communication method, interpreter needs, and decision supports" />
+          </RecordForm>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EmergencyContactCreateModal({
   participants,
+  fixedParticipantName,
   onClose,
   onSubmit
 }: {
   participants: ParticipantRecord[];
+  fixedParticipantName?: string;
   onClose: () => void;
   onSubmit: (form: FormData) => Promise<boolean | void>;
 }) {
+  const hasParticipant = Boolean(fixedParticipantName || participants.length);
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/45 px-4 py-6 backdrop-blur-sm sm:items-center">
       <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-2xl">
@@ -926,9 +947,17 @@ function EmergencyContactCreateModal({
           </button>
         </div>
         <div className="max-h-[76vh] overflow-y-auto p-5 scrollbar-subtle">
-          {participants.length ? (
+          {hasParticipant ? (
             <RecordForm submitLabel="Save emergency contact" onSubmit={onSubmit}>
-              <Select name="participant" label="Participant" options={participants.map((participant) => participant.name)} />
+              {fixedParticipantName ? (
+                <div className="rounded border border-indigo-100 bg-indigo-50/35 p-3 text-sm">
+                  <input type="hidden" name="participant" value={fixedParticipantName} />
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Participant</p>
+                  <p className="mt-1 font-semibold text-ink">{fixedParticipantName}</p>
+                </div>
+              ) : (
+                <Select name="participant" label="Participant" options={participants.map((participant) => participant.name)} />
+              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field name="contactName" label="Contact name" placeholder="Full name" />
                 <Select name="relationship" label="Relationship" options={["Parent", "Guardian", "Partner", "Sibling", "Support coordinator", "Plan nominee", "Other"]} />
@@ -952,18 +981,24 @@ function EmergencyContactCreateModal({
 function EmergencyContactsTable({
   contacts,
   canManage,
-  onAdd
+  onAdd,
+  participantName
 }: {
   contacts: EmergencyContactRecord[];
   canManage: boolean;
   onAdd: () => void;
+  participantName?: string;
 }) {
+  const showParticipantColumn = !participantName;
+
   return (
     <section className="mt-6 overflow-hidden rounded border border-indigo-100 bg-white shadow-panel">
       <div className="flex flex-col gap-3 border-b border-indigo-100 bg-[#fbfdff] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-semibold text-ink">Emergency contacts</h2>
-          <p className="mt-1 text-sm text-slate-500">Participant emergency contacts are managed inside the Participants page.</p>
+          <p className="mt-1 text-sm text-slate-500">
+            {participantName ? `Contacts are stored inside ${participantName}'s participant profile.` : "Participant emergency contacts are managed inside each participant profile."}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <span className="rounded bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-indigo-100">{contacts.length} records</span>
@@ -981,10 +1016,10 @@ function EmergencyContactsTable({
       </div>
       {contacts.length ? (
         <div className="overflow-x-auto scrollbar-subtle">
-          <table className="w-full min-w-[1040px] border-collapse text-left text-sm">
+          <table className={`${showParticipantColumn ? "min-w-[1040px]" : "min-w-[880px]"} w-full border-collapse text-left text-sm`}>
             <thead className="border-b border-indigo-100 bg-indigo-50/35 text-xs uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="border-r border-indigo-100 px-4 py-3">Participant</th>
+                {showParticipantColumn ? <th className="border-r border-indigo-100 px-4 py-3">Participant</th> : null}
                 <th className="border-r border-indigo-100 px-4 py-3">Contact</th>
                 <th className="border-r border-indigo-100 px-4 py-3">Relationship</th>
                 <th className="border-r border-indigo-100 px-4 py-3">Phone</th>
@@ -998,7 +1033,7 @@ function EmergencyContactsTable({
             <tbody className="divide-y divide-indigo-50">
               {contacts.map((contact) => (
                 <tr key={contact.id} className="transition hover:bg-[#fbfffe]">
-                  <td className="border-r border-indigo-50 px-4 py-4 font-semibold text-ink">{contact.participantName || "Not recorded"}</td>
+                  {showParticipantColumn ? <td className="border-r border-indigo-50 px-4 py-4 font-semibold text-ink">{contact.participantName || "Not recorded"}</td> : null}
                   <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{contact.contactName || "Not recorded"}</td>
                   <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{contact.relationship || "Not recorded"}</td>
                   <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{contact.phone || "Not recorded"}</td>
@@ -1044,31 +1079,85 @@ function emergencyPriorityClass(priority: string) {
 
 export function ParticipantProfilePage({ participantId }: { participantId: string }) {
   const [participant, setParticipant] = useState<ParticipantRecord | null>(null);
+  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContactRecord[]>([]);
   const [documents, setDocuments] = useState<ParticipantDocument[]>([]);
   const [timeline, setTimeline] = useState<ParticipantTimelineItem[]>([]);
+  const [canManageProfile, setCanManageProfile] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [contactCreateOpen, setContactCreateOpen] = useState(false);
   const [notice, setNotice] = useState("Loading participant profile.");
 
-  useEffect(() => {
-    let active = true;
-    async function load() {
-      const row = await loadParticipantById(participantId);
-      if (!active) return;
-      setParticipant(row);
-      if (!row) {
-        setNotice("Participant not found or you do not have permission to view this profile.");
-        return;
-      }
-      const [docs, events] = await Promise.all([loadParticipantDocuments(row.name), loadParticipantTimeline(row.name)]);
-      if (!active) return;
-      setDocuments(docs);
-      setTimeline(events);
-      setNotice("Showing participant profile from Supabase.");
+  const refresh = useCallback(async () => {
+    const context = await getCurrentUserContext();
+    const row = await loadParticipantById(participantId);
+    setCanManageProfile(isAdminRole(context.role));
+    setParticipant(row);
+    if (!row) {
+      setEmergencyContacts([]);
+      setDocuments([]);
+      setTimeline([]);
+      setNotice("Participant not found or you do not have permission to view this profile.");
+      return;
     }
-    void load();
-    return () => {
-      active = false;
-    };
+    const [contacts, docs, events] = await Promise.all([
+      loadEmergencyContacts(context.role, [row.name]),
+      loadParticipantDocuments(row.name),
+      loadParticipantTimeline(row.name)
+    ]);
+    setEmergencyContacts(contacts);
+    setDocuments(docs);
+    setTimeline(events);
+    setNotice("Showing participant profile from Supabase.");
   }, [participantId]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  async function submitProfileUpdate(form: FormData) {
+    const payload = {
+      id: get(form, "id"),
+      name: get(form, "name"),
+      ndis_number: get(form, "ndis"),
+      plan_type: get(form, "plan"),
+      date_of_birth: get(form, "dateOfBirth"),
+      emergency_contact: get(form, "emergency"),
+      emergency_contacts: get(form, "emergencyContacts"),
+      support_needs: get(form, "needs"),
+      support_plans: get(form, "supportPlans"),
+      goals: get(form, "goals"),
+      risk_information: get(form, "riskInformation"),
+      medical_notes: get(form, "medicalNotes"),
+      allergies: get(form, "allergies"),
+      communication_preferences: get(form, "communicationPreferences")
+    };
+    const ok = await patchJson("/api/participants", payload, setNotice);
+    if (ok) {
+      setEditOpen(false);
+      await refresh();
+    }
+    return ok;
+  }
+
+  async function submitEmergencyContact(form: FormData) {
+    const payload = {
+      participant_name: get(form, "participant"),
+      contact_name: get(form, "contactName"),
+      relationship: get(form, "relationship"),
+      phone: get(form, "phone"),
+      email: get(form, "email"),
+      priority: get(form, "priority"),
+      consent_status: get(form, "consentStatus"),
+      notes: get(form, "notes"),
+      status: get(form, "status")
+    };
+    const ok = await postJson("/api/operations/emergency-contacts", payload, setNotice);
+    if (ok) {
+      setContactCreateOpen(false);
+      await refresh();
+    }
+    return ok;
+  }
 
   async function openDocument(documentId: string) {
     if (!supabase) {
@@ -1093,59 +1182,83 @@ export function ParticipantProfilePage({ participantId }: { participantId: strin
 
   return (
     <AppShell title={participant?.name || "Participant Profile"} eyebrow={notice}>
+      {participant && editOpen ? <ParticipantEditModal participant={participant} onClose={() => setEditOpen(false)} onSubmit={submitProfileUpdate} /> : null}
+      {participant && contactCreateOpen ? (
+        <EmergencyContactCreateModal
+          participants={[participant]}
+          fixedParticipantName={participant.name}
+          onClose={() => setContactCreateOpen(false)}
+          onSubmit={submitEmergencyContact}
+        />
+      ) : null}
       {participant ? (
-        <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
-          <section className="space-y-4">
-            <article className="rounded border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-gumleaf">Participant profile</p>
-                  <h2 className="mt-1 text-2xl font-semibold text-ink">{participant.name}</h2>
-                  <p className="mt-1 text-sm text-slate-500">NDIS {participant.ndis || "not recorded"}</p>
+        <div className="space-y-6">
+          <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+            <section className="space-y-4">
+              <article className="rounded border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gumleaf">Participant profile</p>
+                    <h2 className="mt-1 text-2xl font-semibold text-ink">{participant.name}</h2>
+                    <p className="mt-1 text-sm text-slate-500">NDIS {participant.ndis || "not recorded"}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className="rounded bg-harbour/10 px-3 py-1 text-sm font-semibold text-harbour">{participant.plan || "Plan not recorded"}</span>
+                    {canManageProfile ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditOpen(true)}
+                        className="inline-flex items-center gap-2 rounded border border-[#cfe9e4] bg-[#eef7f5] px-3 py-2 text-xs font-semibold text-[#2f766f] transition hover:bg-[#dff0ec]"
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Edit profile
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-                <span className="rounded bg-harbour/10 px-3 py-1 text-sm font-semibold text-harbour">{participant.plan || "Plan not recorded"}</span>
-              </div>
-              <Info label="Date of birth" value={participant.dateOfBirth ? dateOnly(participant.dateOfBirth) : "Not recorded"} />
-              <Info label="Communication preferences" value={participant.communicationPreferences || "Not recorded"} />
-              <Info label="Emergency contact" value={participant.emergency || "Not recorded"} />
-              <Info label="Emergency contacts" value={participant.emergencyContacts || "Not recorded"} />
-            </article>
+                <Info label="Date of birth" value={participant.dateOfBirth ? dateOnly(participant.dateOfBirth) : "Not recorded"} />
+                <Info label="Communication preferences" value={participant.communicationPreferences || "Not recorded"} />
+                <Info label="Primary emergency summary" value={participant.emergency || "Not recorded"} />
+                <Info label="Emergency contact notes" value={participant.emergencyContacts || "Not recorded"} />
+              </article>
 
-            <article className="rounded border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="font-semibold text-ink">Uploaded documents</h2>
-              <p className="mt-1 text-sm text-slate-500">Documents are stored privately and opened through permission-checked signed links.</p>
-              {documents.length ? (
-                <div className="mt-4 grid gap-3">
-                  {documents.map((document) => (
-                    <div key={document.id} className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="font-semibold text-ink">{document.title}</p>
-                          <p className="mt-1 text-xs text-slate-500">{document.fileName} | {formatBytes(document.sizeBytes)} | {dateTimeOrFallback(document.createdAt)}</p>
+              <article className="rounded border border-slate-200 bg-white p-5 shadow-sm">
+                <h2 className="font-semibold text-ink">Uploaded documents</h2>
+                <p className="mt-1 text-sm text-slate-500">Documents are stored privately and opened through permission-checked signed links.</p>
+                {documents.length ? (
+                  <div className="mt-4 grid gap-3">
+                    {documents.map((document) => (
+                      <div key={document.id} className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="font-semibold text-ink">{document.title}</p>
+                            <p className="mt-1 text-xs text-slate-500">{document.fileName} | {formatBytes(document.sizeBytes)} | {dateTimeOrFallback(document.createdAt)}</p>
+                          </div>
+                          <button type="button" onClick={() => openDocument(document.id)} className="inline-flex items-center justify-center gap-2 rounded bg-ink px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800">
+                            <Download className="h-4 w-4" />
+                            Open
+                          </button>
                         </div>
-                        <button type="button" onClick={() => openDocument(document.id)} className="inline-flex items-center justify-center gap-2 rounded bg-ink px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800">
-                          <Download className="h-4 w-4" />
-                          Open
-                        </button>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyWorkerState title="No uploaded documents" message="Documents linked to this participant will appear here after upload." />
-              )}
-            </article>
-          </section>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyWorkerState title="No uploaded documents" message="Documents linked to this participant will appear here after upload." />
+                )}
+              </article>
+            </section>
 
-          <section className="grid gap-4">
-            <ProfileSection title="Support plans" value={participant.supportPlans} />
-            <ProfileSection title="Participant goals" value={participant.goals} />
-            <ProfileSection title="Support needs" value={participant.needs} />
-            <ProfileSection title="Risk information" value={participant.riskInformation} tone="risk" />
-            <ProfileSection title="Medical notes" value={participant.medicalNotes} />
-            <ProfileSection title="Allergies" value={participant.allergies} tone="risk" />
-            <ParticipantTimeline timeline={timeline} />
-          </section>
+            <section className="grid gap-4">
+              <ProfileSection title="Support plans" value={participant.supportPlans} />
+              <ProfileSection title="Participant goals" value={participant.goals} />
+              <ProfileSection title="Support needs" value={participant.needs} />
+              <ProfileSection title="Risk information" value={participant.riskInformation} tone="risk" />
+              <ProfileSection title="Medical notes" value={participant.medicalNotes} />
+              <ProfileSection title="Allergies" value={participant.allergies} tone="risk" />
+              <ParticipantTimeline timeline={timeline} />
+            </section>
+          </div>
+          <EmergencyContactsTable contacts={emergencyContacts} canManage={canManageProfile} onAdd={() => setContactCreateOpen(true)} participantName={participant.name} />
         </div>
       ) : (
         <EmptyState title="Participant profile unavailable" message="This participant could not be found, or your login does not have permission to view it." />
@@ -4214,6 +4327,8 @@ async function loadEmergencyContacts(role: UserRole, participantNames: string[])
     .limit(200);
   if (role === "support_worker") {
     if (!assignedNames.length) return [];
+    query = query.in("participant_name", assignedNames);
+  } else if (assignedNames.length) {
     query = query.in("participant_name", assignedNames);
   }
   const { data, error } = await query;
