@@ -2565,13 +2565,16 @@ export function WorkerCreateLoginPage() {
     event.preventDefault();
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
+    const password = get(form, "password");
+    if (password.length < 8) { setNotice("Password must be at least 8 characters."); return; }
     setSaving(true);
+    setNotice("");
     const response = await fetch("/api/register-provider", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email: params.email || get(form, "email"),
-        password: get(form, "password"),
+        password,
         name: get(form, "name"),
         organisation: "Worker portal",
         role: "support_worker",
@@ -2595,6 +2598,14 @@ export function WorkerCreateLoginPage() {
           <CheckCircle2 className="mx-auto h-12 w-12 text-gumleaf" />
           <h1 className="mt-4 text-2xl font-semibold text-ink">Login created</h1>
           <p className="mt-3 text-sm text-slate-600">{notice}</p>
+          <div className="mt-6 rounded border border-slate-200 bg-slate-50 p-4 text-left text-sm text-slate-600">
+            <p className="font-semibold text-ink mb-2">What happens next</p>
+            <ul className="space-y-1.5 list-disc pl-4">
+              <li>Sign in using your email and the password you just created</li>
+              <li>Your shifts will appear in the Worker Portal once assigned by your coordinator</li>
+              <li>You can submit progress notes, report incidents, and request leave from the portal</li>
+            </ul>
+          </div>
           <Link href="/login" className="mt-6 inline-flex items-center gap-2 rounded bg-gumleaf px-5 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90">
             Sign in to CareOS
           </Link>
@@ -3660,31 +3671,36 @@ function WorkerProgressNoteForm({ workerName, workerEmail, participants }: { wor
   const [notes, setNotes] = useState<string[]>([]);
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
+  const today = new Date().toISOString().slice(0, 10);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
-    const note = get(form, "note");
+    const note = get(form, "note").trim();
+    if (!note) { setNotice("Progress note details are required."); return; }
+    const sig = get(form, "signature").trim();
+    if (!sig) { setNotice("A digital signature is required."); return; }
     setSaving(true);
+    setNotice("");
     const ok = await persist(
       "progress_notes",
       {
         participant_name: get(form, "participant"),
         worker_name: workerName,
         worker_email: workerEmail,
-        service_date: new Date().toISOString().slice(0, 10),
+        service_date: get(form, "serviceDate") || today,
         category: get(form, "category"),
         note,
         outcomes: get(form, "outcomes"),
-        digital_signature: get(form, "signature"),
+        digital_signature: sig,
         is_important: get(form, "important") === "Important"
       },
       setNotice,
       { action: "progress_note", recordLabel: get(form, "participant"), metadata: { category: get(form, "category"), operation: "create" } }
     );
     setSaving(false);
-    if (ok) { formEl.reset(); setNotes([note, ...notes]); setOpen(false); }
+    if (ok) { formEl.reset(); setNotes([note, ...notes]); setNotice("Progress note saved."); setOpen(false); }
   }
 
   return (
@@ -3712,16 +3728,19 @@ function WorkerProgressNoteForm({ workerName, workerEmail, participants }: { wor
                 <Select name="participant" label="Client" options={participants.map((p) => p.name)} />
                 <Select name="category" label="Support category" options={["Self care", "Community access", "Medication prompt", "Meal preparation", "Behaviour support", "Transport assistance"]} />
               </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field name="serviceDate" label="Service date" type="date" defaultValue={today} max={today} />
+                <Select name="important" label="Priority" options={["Standard", "Important"]} />
+              </div>
               <ReadOnlyField label="Worker" value={workerName || "Current worker"} />
-              <Select name="important" label="Priority" options={["Standard", "Important"]} />
               <Area name="note" label="Progress note details" placeholder="Write the support provided, outcomes, changes, and follow-up required." />
               <Area name="outcomes" label="Outcomes" placeholder="Record achieved goals, progress, risks, and follow-up actions." />
               <Field name="signature" label="Digital signature" placeholder="Type full name as signature" />
+              {notice ? <p className={`text-sm ${notice.includes("saved") ? "text-gumleaf" : "text-coral"}`}>{notice}</p> : null}
               <div className="flex gap-3">
                 <button disabled={saving} className="min-h-11 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-2.5 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20 disabled:opacity-60">{saving ? "Saving…" : "Add progress note"}</button>
                 <button type="button" onClick={() => setOpen(false)} className="min-h-11 rounded border border-slate-200 px-4 py-2.5 text-sm font-semibold text-ink hover:bg-slate-50">Cancel</button>
               </div>
-              {notice ? <p className="text-sm text-slate-600">{notice}</p> : null}
             </form>
           )}
           {notes.length ? (
@@ -3742,27 +3761,33 @@ function WorkerIncidentForm({ workerName, workerEmail, participants }: { workerN
   const [reports, setReports] = useState<string[]>([]);
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
+  const now = new Date();
+  const todayDatetime = `${now.toISOString().slice(0, 10)}T${now.toTimeString().slice(0, 5)}`;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
-    const summary = get(form, "summary");
+    const summary = get(form, "summary").trim();
+    if (!summary) { setNotice("Incident details are required."); return; }
     setSaving(true);
+    setNotice("");
     const ok = await persist(
       "incident_reports",
       {
         participant_name: get(form, "participant"),
         worker_name: workerName,
         worker_email: workerEmail,
+        incident_type: get(form, "incidentType"),
+        incident_date: get(form, "incidentDate") || now.toISOString(),
         priority: get(form, "priority"),
         summary
       },
       setNotice,
-      { action: "incident_report", recordLabel: get(form, "participant"), metadata: { priority: get(form, "priority"), operation: "create" } }
+      { action: "incident_report", recordLabel: get(form, "participant"), metadata: { priority: get(form, "priority"), incidentType: get(form, "incidentType"), operation: "create" } }
     );
     setSaving(false);
-    if (ok) { formEl.reset(); setReports([summary, ...reports]); setOpen(false); }
+    if (ok) { formEl.reset(); setReports([summary, ...reports]); setNotice("Incident report submitted."); setOpen(false); }
   }
 
   return (
@@ -3788,15 +3813,19 @@ function WorkerIncidentForm({ workerName, workerEmail, participants }: { workerN
             <form onSubmit={submit} className="grid gap-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Select name="participant" label="Client" options={participants.map((p) => p.name)} />
-                <Select name="priority" label="Priority" options={["High", "Medium", "Low"]} />
+                <Select name="incidentType" label="Incident type" options={["Injury to participant", "Injury to worker", "Behavioural incident", "Medical emergency", "Near miss", "Property damage", "Other"]} />
               </div>
-              <ReadOnlyField label="Worker" value={workerName || "Current worker"} />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Select name="priority" label="Priority" options={["High", "Medium", "Low"]} />
+                <Field name="incidentDate" label="Date & time" type="datetime-local" defaultValue={todayDatetime} />
+              </div>
+              <ReadOnlyField label="Reported by" value={workerName || "Current worker"} />
               <Area name="summary" label="Incident details" placeholder="Describe what happened, actions taken, people notified, and follow-up required." />
+              {notice ? <p className={`text-sm ${notice.includes("submitted") ? "text-gumleaf" : "text-coral"}`}>{notice}</p> : null}
               <div className="flex gap-3">
                 <button disabled={saving} className="min-h-11 rounded bg-coral/10 border border-coral/20 px-4 py-2.5 text-sm font-semibold text-coral hover:bg-coral/20 disabled:opacity-60">{saving ? "Submitting…" : "Submit incident"}</button>
                 <button type="button" onClick={() => setOpen(false)} className="min-h-11 rounded border border-slate-200 px-4 py-2.5 text-sm font-semibold text-ink hover:bg-slate-50">Cancel</button>
               </div>
-              {notice ? <p className="text-sm text-slate-600">{notice}</p> : null}
             </form>
           )}
           {reports.length ? (
@@ -3827,15 +3856,21 @@ function WorkerLeaveForm({
 }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [localNotice, setLocalNotice] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
+    const startsAt = get(form, "startsAt");
+    const endsAt = get(form, "endsAt");
+    if (!startsAt || !endsAt) { setLocalNotice("Start and end dates are required."); return; }
+    if (endsAt < startsAt) { setLocalNotice("End date must be after the start date."); return; }
+    setLocalNotice("");
     setSaving(true);
     const ok = await postJson(
       "/api/leave",
-      { worker_name: workerName, worker_email: workerEmail, leave_type: get(form, "leaveType"), starts_at: get(form, "startsAt"), ends_at: get(form, "endsAt"), reason: get(form, "reason") },
+      { worker_name: workerName, worker_email: workerEmail, leave_type: get(form, "leaveType"), starts_at: startsAt, ends_at: endsAt, reason: get(form, "reason") },
       setNotice
     );
     setSaving(false);
@@ -3862,10 +3897,11 @@ function WorkerLeaveForm({
           <form onSubmit={submit} className="grid gap-4">
             <Select name="leaveType" label="Leave type" options={leaveTypes} />
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field name="startsAt" label="Start" type="datetime-local" />
-              <Field name="endsAt" label="End" type="datetime-local" />
+              <Field name="startsAt" label="Start date" type="date" />
+              <Field name="endsAt" label="End date" type="date" />
             </div>
             <OptionalArea name="reason" label="Reason / notes" placeholder="Annual leave, sick leave, appointment, training, or unavailable period details" />
+            {localNotice ? <p className="text-sm text-coral">{localNotice}</p> : null}
             <div className="flex gap-3">
               <button disabled={saving} className="min-h-11 rounded bg-harbour/10 border border-harbour/20 px-4 py-2.5 text-sm font-semibold text-harbour hover:bg-harbour/20 disabled:opacity-60">{saving ? "Submitting…" : "Submit leave request"}</button>
               <button type="button" onClick={() => setOpen(false)} className="min-h-11 rounded border border-slate-200 px-4 py-2.5 text-sm font-semibold text-ink hover:bg-slate-50">Cancel</button>
@@ -3906,15 +3942,21 @@ function WorkerAvailabilityForm({
 }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [localNotice, setLocalNotice] = useState("");
+  const today = new Date().toISOString().slice(0, 10);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
+    const startTime = get(form, "startTime");
+    const endTime = get(form, "endTime");
+    if (startTime && endTime && endTime <= startTime) { setLocalNotice("End time must be after start time."); return; }
+    setLocalNotice("");
     setSaving(true);
     const ok = await postJson(
       "/api/availability",
-      { worker_name: workerName, worker_email: workerEmail, available_date: get(form, "availableDate"), start_time: get(form, "startTime"), end_time: get(form, "endTime"), availability_status: get(form, "status"), notes: get(form, "notes") },
+      { worker_name: workerName, worker_email: workerEmail, available_date: get(form, "availableDate"), start_time: startTime, end_time: endTime, availability_status: get(form, "status"), notes: get(form, "notes") },
       setNotice
     );
     setSaving(false);
@@ -3939,13 +3981,14 @@ function WorkerAvailabilityForm({
       {open ? (
         <div className="border-t border-slate-200 p-4 grid gap-4">
           <form onSubmit={submit} className="grid gap-4">
-            <Field name="availableDate" label="Date" type="date" />
+            <Field name="availableDate" label="Date" type="date" min={today} />
             <div className="grid gap-4 sm:grid-cols-2">
               <Field name="startTime" label="Start time" type="time" />
               <Field name="endTime" label="End time" type="time" />
             </div>
             <Select name="status" label="Availability type" options={availabilityStatuses} />
             <OptionalArea name="notes" label="Notes" placeholder="Available day, unavailable appointment, preferred locations, transport limits, or leave details" />
+            {localNotice ? <p className="text-sm text-coral">{localNotice}</p> : null}
             <div className="flex gap-3">
               <button disabled={saving} className="min-h-11 rounded bg-banksia/10 border border-banksia/30 px-4 py-2.5 text-sm font-semibold text-banksia hover:bg-banksia/20 disabled:opacity-60">{saving ? "Saving…" : "Submit availability"}</button>
               <button type="button" onClick={() => setOpen(false)} className="min-h-11 rounded border border-slate-200 px-4 py-2.5 text-sm font-semibold text-ink hover:bg-slate-50">Cancel</button>
