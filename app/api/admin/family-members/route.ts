@@ -77,3 +77,28 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ message: "Family portal access saved.", id: data.id });
 }
+
+export async function PATCH(request: Request) {
+  const auth = await requireApiUser(request);
+  if ("response" in auth) return auth.response;
+  if (!requireRole(auth.user, ["admin"])) {
+    return NextResponse.json({ message: "Only admin users can manage family access." }, { status: 403 });
+  }
+  const body = await request.json();
+  const id = String(body.id ?? "").trim();
+  const status = String(body.status ?? "").trim().toLowerCase();
+  if (!id || !["pending", "approved", "suspended"].includes(status)) {
+    return NextResponse.json({ message: "Record ID and valid status required." }, { status: 400 });
+  }
+  const { error } = await auth.client
+    .from("family_members")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) return NextResponse.json({ message: error.message }, { status: 400 });
+  await recordServerAudit(auth.client, {
+    userId: auth.user.id, userEmail: auth.user.email, userName: auth.user.name, userRole: auth.user.role,
+    action: "family_access_status_change", tableName: "family_members", recordId: id,
+    recordLabel: `Status → ${status}`, metadata: { id, status }
+  });
+  return NextResponse.json({ message: `Family access ${status}.` });
+}

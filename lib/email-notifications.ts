@@ -17,7 +17,8 @@ export type EmailNotificationType =
   | "contractor_invoice"
   | "payroll_export"
   | "operations_update"
-  | "worker_invite";
+  | "worker_invite"
+  | "user_account_created";
 
 type EmailInput = {
   type: EmailNotificationType;

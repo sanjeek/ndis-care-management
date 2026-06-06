@@ -34,6 +34,7 @@ import {
   ShieldCheck,
   Smartphone,
   Target,
+  Trash2,
   TrendingUp,
   Upload,
   UserRound,
@@ -805,6 +806,7 @@ export function ParticipantsPage() {
   const [notice, setNotice] = useState("");
   const [canManageParticipants, setCanManageParticipants] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [deletingParticipantId, setDeletingParticipantId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const context = await getCurrentUserContext();
@@ -892,6 +894,15 @@ export function ParticipantsPage() {
     return ok;
   }
 
+  async function deleteParticipant(id: string) {
+    if (!isSupabaseConfigured || !supabase) return;
+    const { error } = await supabase.from("participants").delete().eq("id", id);
+    if (error) { setNotice(error.message); return; }
+    setDeletingParticipantId(null);
+    setNotice("Participant deleted.");
+    await refresh();
+  }
+
   return (
     <AppShell title="Participants" eyebrow={notice}>
       {canManageParticipants ? (
@@ -964,9 +975,32 @@ export function ParticipantsPage() {
                     </td>
                     <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{participant.docs} documents, {participant.notes} notes</td>
                     <td className="px-4 py-4">
-                      <Link href={`/participants/${participant.id}`} className="inline-flex rounded border border-gumleaf/20 bg-gumleaf/5 px-3 py-2 text-xs font-semibold text-gumleaf hover:bg-gumleaf/10">
-                        Open profile
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link href={`/participants/${participant.id}`} className="inline-flex rounded border border-gumleaf/20 bg-gumleaf/5 px-3 py-2 text-xs font-semibold text-gumleaf hover:bg-gumleaf/10">
+                          Open profile
+                        </Link>
+                        {canManageParticipants && (
+                          deletingParticipantId === participant.id ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-500">Delete?</span>
+                              <button type="button" onClick={() => void deleteParticipant(participant.id)}
+                                className="inline-flex items-center gap-1 rounded border border-coral/30 bg-coral/10 px-2.5 py-1.5 text-xs font-semibold text-coral hover:bg-coral/20">
+                                Yes, delete
+                              </button>
+                              <button type="button" onClick={() => setDeletingParticipantId(null)}
+                                className="inline-flex items-center px-2 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700">
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button type="button" onClick={() => setDeletingParticipantId(participant.id)}
+                              className="inline-flex items-center gap-1.5 rounded border border-coral/20 px-2.5 py-1.5 text-xs font-semibold text-coral/80 hover:bg-coral/5">
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Delete
+                            </button>
+                          )
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1982,8 +2016,8 @@ export function CarePlansPage() {
 export function WorkersPage() {
   const [workers, setWorkers] = useState<WorkerRecord[]>([]);
   const [notice, setNotice] = useState("");
-  const [inviteLink, setInviteLink] = useState("");
   const [editingWorker, setEditingWorker] = useState<WorkerRecord | null>(null);
+  const [deletingWorkerId, setDeletingWorkerId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const rows = await loadWorkers();
@@ -2018,9 +2052,8 @@ export function WorkersPage() {
       recordLabel: next.email,
       metadata: { recordType: "support_worker", name: next.name }
     });
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const portalUrl = `${origin}/worker-portal/create-login?invite=${token}&email=${encodeURIComponent(next.email)}&wname=${encodeURIComponent(next.name)}`;
-    setInviteLink(portalUrl);
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== "undefined" ? window.location.origin : "");
+    const portalUrl = `${siteUrl.replace(/\/$/, "")}/worker-portal/create-login?invite=${token}&email=${encodeURIComponent(next.email)}&wname=${encodeURIComponent(next.name)}`;
     if (workerSaved) await refresh();
     await persist(
       "worker_invitations",
@@ -2069,28 +2102,19 @@ export function WorkersPage() {
     await refresh();
   }
 
+  async function deleteWorker(id: string) {
+    if (!isSupabaseConfigured || !supabase) return;
+    const { error } = await supabase.from("support_workers").delete().eq("id", id);
+    if (error) { setNotice(error.message); return; }
+    setDeletingWorkerId(null);
+    setNotice("Worker deleted.");
+    await refresh();
+  }
+
   return (
     <AppShell title="Support Workers" eyebrow={notice}>
       {editingWorker ? (
         <WorkerEditModal worker={editingWorker} onClose={() => setEditingWorker(null)} onSubmit={updateWorker} />
-      ) : null}
-      {inviteLink ? (
-        <div className="mb-6 rounded border border-gumleaf/25 bg-gumleaf/5 p-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
-              <h2 className="font-semibold text-ink">Invite sent</h2>
-              <p className="mt-1 text-sm text-slate-600">An email was sent to the worker with a link to create their login. If email is not configured, share the link below manually.</p>
-              <p className="mt-2 break-all rounded border border-slate-200 bg-white px-2 py-1.5 font-mono text-xs text-slate-700">{inviteLink}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => { void navigator.clipboard?.writeText(inviteLink); }}
-              className="inline-flex shrink-0 items-center gap-2 rounded border border-gumleaf/20 bg-white px-3 py-2 text-sm font-semibold text-gumleaf hover:bg-gumleaf/5">
-              <KeyRound className="h-4 w-4" />
-              Copy link
-            </button>
-          </div>
-        </div>
       ) : null}
 
       <section className="mb-6 rounded border border-slate-200 bg-white p-4 shadow-sm">
@@ -2174,11 +2198,34 @@ export function WorkersPage() {
                       <span className="text-xs text-slate-400">/5</span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button type="button" onClick={() => setEditingWorker(worker)}
-                        className="inline-flex items-center gap-1.5 rounded border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100">
-                        <Pencil className="h-3.5 w-3.5" />
-                        Edit
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        {deletingWorkerId === worker.id ? (
+                          <>
+                            <span className="text-xs text-slate-500">Delete?</span>
+                            <button type="button" onClick={() => void deleteWorker(worker.id)}
+                              className="inline-flex items-center gap-1 rounded border border-coral/30 bg-coral/10 px-2.5 py-1.5 text-xs font-semibold text-coral hover:bg-coral/20">
+                              Yes, delete
+                            </button>
+                            <button type="button" onClick={() => setDeletingWorkerId(null)}
+                              className="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700">
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button type="button" onClick={() => setEditingWorker(worker)}
+                              className="inline-flex items-center gap-1.5 rounded border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100">
+                              <Pencil className="h-3.5 w-3.5" />
+                              Edit
+                            </button>
+                            <button type="button" onClick={() => setDeletingWorkerId(worker.id)}
+                              className="inline-flex items-center gap-1.5 rounded border border-coral/20 px-2.5 py-1.5 text-xs font-semibold text-coral/80 hover:bg-coral/5">
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

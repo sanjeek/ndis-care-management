@@ -109,6 +109,19 @@ export function AdminUserManagementPage() {
     if (response.ok) await loadUsers();
   }
 
+  async function updateFamilyStatus(id: string, status: string) {
+    setLoading(true);
+    const response = await fetch("/api/admin/family-members", {
+      method: "PATCH",
+      headers: await authHeaders(),
+      body: JSON.stringify({ id, status })
+    });
+    const result = await response.json();
+    setLoading(false);
+    setMessage(result.message ?? "Family access updated.");
+    if (response.ok) await loadFamilyAccess();
+  }
+
   async function approveFamilyAccess(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -225,11 +238,20 @@ export function AdminUserManagementPage() {
         {familyAccess.length ? (
           <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {familyAccess.map((access) => (
-              <article key={access.id} className="rounded border border-slate-200 bg-slate-50 p-4 text-sm">
-                <p className="font-semibold text-ink">{access.family_name}</p>
-                <p className="text-slate-500">{access.family_email}</p>
-                <p className="mt-2 text-slate-700">{access.relationship} for {access.participant_name}</p>
-                <span className="mt-3 inline-flex rounded bg-gumleaf/10 px-2.5 py-1 text-xs font-semibold text-gumleaf">{access.status}</span>
+              <article key={access.id} className="rounded border border-slate-200 bg-white p-4 text-sm shadow-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-semibold text-ink">{access.family_name}</p>
+                    <p className="text-slate-500">{access.family_email}</p>
+                    <p className="mt-2 text-slate-700">{access.relationship} for <span className="font-medium text-ink">{access.participant_name}</span></p>
+                  </div>
+                  <span className={`shrink-0 rounded px-2.5 py-1 text-xs font-semibold ${access.status === "approved" ? "bg-gumleaf/10 text-gumleaf" : access.status === "suspended" ? "bg-coral/10 text-coral" : "bg-banksia/20 text-banksia"}`}>{access.status}</span>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                  {access.status !== "approved" && <button disabled={loading} onClick={() => void updateFamilyStatus(access.id, "approved")} className="rounded border border-gumleaf/20 bg-gumleaf/5 px-3 py-1.5 text-xs font-semibold text-gumleaf hover:bg-gumleaf/10 disabled:opacity-50">Approve</button>}
+                  {access.status !== "suspended" && <button disabled={loading} onClick={() => void updateFamilyStatus(access.id, "suspended")} className="rounded border border-coral/20 bg-coral/5 px-3 py-1.5 text-xs font-semibold text-coral hover:bg-coral/10 disabled:opacity-50">Suspend</button>}
+                  {access.status !== "pending" && <button disabled={loading} onClick={() => void updateFamilyStatus(access.id, "pending")} className="rounded border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">Set pending</button>}
+                </div>
               </article>
             ))}
           </div>

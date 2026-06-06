@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { normalizeRole, roleForUser } from "@/lib/auth";
+import { normalizeRole, roleForUser, friendlyRole } from "@/lib/auth";
 import { recordServerAudit } from "@/lib/server-audit";
+import { appUrl, sendCareNotification } from "@/lib/email-notifications";
 
 type AdminAction = "create" | "status" | "password" | "role";
 
@@ -164,9 +165,47 @@ export async function POST(request: Request) {
         recordLabel: email,
         metadata: { recordType: "user_login", role }
       });
+
+      const loginUrl = appUrl("/login");
+      const roleLabel = friendlyRole(role);
+      await sendCareNotification(admin.client, {
+        type: "user_account_created",
+        to: [email],
+        subject: "Your CareOS account is ready",
+        text: [
+          `Hi ${name},`,
+          "",
+          "Your CareOS account has been created. Use the details below to sign in.",
+          "",
+          `Email:     ${email}`,
+          `Password:  ${password}`,
+          `Role:      ${roleLabel}`,
+          "",
+          `Sign in at: ${loginUrl}`,
+          "",
+          "Please change your password after your first login.",
+          "",
+          "If you did not expect this email, please contact your administrator.",
+        ].join("\n"),
+        html: `
+          <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
+            <p style="font-size:13px;font-weight:600;color:#4b5fe8;margin:0 0 8px">CareOS</p>
+            <h1 style="font-size:22px;font-weight:700;color:#172033;margin:0 0 16px">Your account is ready, ${name}</h1>
+            <p style="color:#475569;line-height:1.6;margin:0 0 20px">Your CareOS login has been created. Use the details below to sign in.</p>
+            <table style="width:100%;border-collapse:collapse;margin-bottom:24px">
+              <tr><td style="padding:8px 12px;background:#f8fafc;border:1px solid #e2e8f0;font-size:13px;color:#64748b;width:120px">Email</td><td style="padding:8px 12px;background:#f8fafc;border:1px solid #e2e8f0;font-size:13px;color:#172033;font-weight:600">${email}</td></tr>
+              <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:13px;color:#64748b">Password</td><td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:13px;color:#172033;font-weight:600">${password}</td></tr>
+              <tr><td style="padding:8px 12px;background:#f8fafc;border:1px solid #e2e8f0;font-size:13px;color:#64748b">Role</td><td style="padding:8px 12px;background:#f8fafc;border:1px solid #e2e8f0;font-size:13px;color:#172033">${roleLabel}</td></tr>
+            </table>
+            <a href="${loginUrl}" style="display:inline-block;padding:12px 24px;background:#4b5fe8;color:#fff;font-weight:600;font-size:14px;border-radius:6px;text-decoration:none">Sign in to CareOS</a>
+            <p style="color:#94a3b8;font-size:12px;margin-top:24px;border-top:1px solid #e2e8f0;padding-top:16px">Please change your password after your first login. If you did not expect this email, contact your administrator.</p>
+          </div>
+        `,
+        metadata: { userId: data.user.id, role }
+      });
     }
 
-    return NextResponse.json({ message: "User account created.", userId: data.user?.id });
+    return NextResponse.json({ message: `Account created. Login details sent to ${email}.`, userId: data.user?.id });
   }
 
   return NextResponse.json({ message: "Unsupported action." }, { status: 400 });

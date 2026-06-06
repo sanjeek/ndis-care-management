@@ -37,6 +37,7 @@ type FundingSummary = {
   spentAmount: number;
   remainingBalance: number;
   utilisation: number;
+  planEnd: string;
 };
 
 const supportCategories = [
@@ -205,12 +206,21 @@ export function FundingManagementPage() {
                         <h3 className="font-semibold text-ink">{summary.participantName}</h3>
                         <p className="mt-1 text-sm text-slate-500">{currency(summary.remainingBalance)} remaining from {currency(summary.planTotalBudget)}</p>
                       </div>
-                      <span className={`w-fit rounded px-2.5 py-1 text-xs font-semibold ${summary.utilisation >= 90 ? "bg-coral/10 text-coral" : "bg-gumleaf/10 text-gumleaf"}`}>
-                        {summary.utilisation}% used
-                      </span>
+                      <div className="flex flex-wrap justify-end gap-1.5">
+                        <span className={`rounded px-2.5 py-1 text-xs font-semibold ${summary.utilisation >= 90 ? "bg-coral/10 text-coral" : summary.utilisation >= 70 ? "bg-banksia/20 text-banksia" : "bg-gumleaf/10 text-gumleaf"}`}>
+                          {summary.utilisation}% used
+                        </span>
+                        {summary.planEnd ? (() => {
+                          const days = Math.ceil((new Date(summary.planEnd).getTime() - Date.now()) / 86400000);
+                          if (days < 0) return <span className="rounded bg-coral/10 px-2.5 py-1 text-xs font-semibold text-coral">Plan expired</span>;
+                          if (days <= 30) return <span className="rounded bg-coral/10 px-2.5 py-1 text-xs font-semibold text-coral">{days}d left in plan</span>;
+                          if (days <= 90) return <span className="rounded bg-banksia/20 px-2.5 py-1 text-xs font-semibold text-banksia">{days}d to plan end</span>;
+                          return null;
+                        })() : null}
+                      </div>
                     </div>
-                    <div className="mt-4 h-2 overflow-hidden rounded bg-slate-200">
-                      <div className={`h-full ${summary.utilisation >= 90 ? "bg-coral" : "bg-gumleaf"}`} style={{ width: `${Math.min(100, summary.utilisation)}%` }} />
+                    <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-200">
+                      <div className={`h-full rounded-full transition-all ${summary.utilisation >= 90 ? "bg-coral" : summary.utilisation >= 70 ? "bg-banksia" : "bg-gumleaf"}`} style={{ width: `${Math.min(100, summary.utilisation)}%` }} />
                     </div>
                     <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
                       <Info label="Service bookings" value={currency(summary.serviceBookings)} />
@@ -278,7 +288,8 @@ function summariseFunding(records: FundingRecord[]): FundingSummary[] {
     const spentAmount = rows.reduce((sum, row) => sum + row.spentAmount, 0);
     const remainingBalance = Math.max(0, planTotalBudget - spentAmount);
     const utilisation = planTotalBudget > 0 ? Math.round((spentAmount / planTotalBudget) * 100) : 0;
-    return { participantName, planTotalBudget, serviceBookings, spentAmount, remainingBalance, utilisation };
+    const planEnd = rows.map((r) => r.planEnd).filter(Boolean).sort().at(-1) ?? "";
+    return { participantName, planTotalBudget, serviceBookings, spentAmount, remainingBalance, utilisation, planEnd };
   });
 }
 

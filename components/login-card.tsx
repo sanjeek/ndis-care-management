@@ -63,9 +63,9 @@ export function LoginCard() {
         return;
       }
 
-      const siteUrl = window.location.origin;
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
       const { error } = await client.auth.resetPasswordForEmail(email, {
-        redirectTo: `${siteUrl}/reset-password`
+        redirectTo: `${siteUrl.replace(/\/$/, "")}/reset-password`
       });
       setLoading(false);
       if (error) {
