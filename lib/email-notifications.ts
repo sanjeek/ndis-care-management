@@ -64,15 +64,23 @@ export async function sendCareNotification(client: SupabaseClient, input: EmailI
   const recipients = uniqueEmails(input.to);
   if (!recipients.length) {
     await logNotification(client, input, "", "skipped", "No notification recipient was available.");
-    return { sent: 0, skipped: 1 };
+    return { sent: 0, failed: 0, errors: [] as string[] };
   }
 
+  // Gmail SMTP takes priority if configured
+  const gmailUser = process.env.GMAIL_USER;
+  const gmailPass = process.env.GMAIL_APP_PASSWORD;
+  if (gmailUser && gmailPass) {
+    return sendViaGmail(client, input, recipients, gmailUser, gmailPass);
+  }
+
+  // Fall back to Resend
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM || process.env.RESEND_FROM_EMAIL;
 
   if (!apiKey || !apiKey.startsWith("re_") || !from) {
     await Promise.all(recipients.map((recipient) => logNotification(client, input, recipient, "skipped", "Email provider is not configured.")));
-    return { sent: 0, skipped: recipients.length };
+    return { sent: 0, failed: 0, errors: [] as string[] };
   }
 
   let sent = 0;
@@ -109,6 +117,47 @@ export async function sendCareNotification(client: SupabaseClient, input: EmailI
     } catch (error) {
       failed += 1;
       const errMsg = error instanceof Error ? error.message : "Email send failed.";
+      errors.push(errMsg);
+      await logNotification(client, input, recipient, "failed", errMsg);
+    }
+  }
+
+  return { sent, failed, errors };
+}
+
+async function sendViaGmail(
+  client: SupabaseClient,
+  input: EmailInput,
+  recipients: string[],
+  user: string,
+  pass: string
+) {
+  const { default: nodemailer } = await import("nodemailer");
+  const transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    auth: { user, pass }
+  });
+
+  let sent = 0;
+  let failed = 0;
+  const errors: string[] = [];
+
+  for (const recipient of recipients) {
+    try {
+      await transporter.sendMail({
+        from: `CareOS <${user}>`,
+        to: recipient,
+        subject: input.subject,
+        text: input.text,
+        html: input.html || textToHtml(input.text)
+      });
+      sent += 1;
+      await logNotification(client, input, recipient, "sent", null, "gmail");
+    } catch (error) {
+      failed += 1;
+      const errMsg = error instanceof Error ? error.message : "Gmail send failed.";
       errors.push(errMsg);
       await logNotification(client, input, recipient, "failed", errMsg);
     }

@@ -226,7 +226,7 @@ export async function generateContractorInvoices(client: SupabaseClient, input: 
     if (input.sendEmails !== false) {
       const email = await sendContractorInvoiceEmail(client, draft, recipients);
       emailSent += email.sent ?? 0;
-      emailSkipped += email.skipped ?? 0;
+      emailSkipped += email.failed ?? 0;
       status = email.sent ? "emailed" : "email_pending";
       await client
         .from("contractor_invoices")
