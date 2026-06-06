@@ -91,6 +91,7 @@ function goalPayload(auth: Auth, body: Record<string, unknown>) {
     description: clean(body.description),
     target_outcome: clean(body.target_outcome),
     support_strategy: clean(body.support_strategy),
+    ndis_category: clean(body.ndis_category) || null,
     start_date: clean(body.start_date) || null,
     target_date: clean(body.target_date) || null,
     current_progress_percent: progress,
