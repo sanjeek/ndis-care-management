@@ -619,13 +619,21 @@ function UpcomingPlanReviews({ reviews }: { reviews: DashboardPlanReview[] }) {
     <DashboardPanel title="Upcoming Plan Reviews" icon={CalendarDays}>
       {reviews.length ? (
         <div className="grid gap-3">
-          {reviews.map((review) => (
-            <Link key={review.id} href="/care-plans" className="rounded-lg border border-indigo-100 bg-slate-50 p-3 text-sm hover:bg-white hover:shadow-sm">
-              <p className="font-semibold text-ink">{review.participantName}</p>
-              <p className="mt-1 text-slate-600">{review.title || "Care plan review"}</p>
-              <span className="mt-2 inline-flex rounded bg-harbour/10 px-2.5 py-1 text-xs font-semibold text-harbour">{dateOnly(review.reviewDate)}</span>
-            </Link>
-          ))}
+          {reviews.map((review) => {
+            const days = daysUntil(review.reviewDate);
+            const urgency = days < 0 ? "border-coral/30 bg-coral/5" : days <= 14 ? "border-coral/25 bg-coral/5" : days <= 30 ? "border-banksia/30 bg-amber-50/70" : "border-indigo-100 bg-slate-50";
+            const badge = days < 0 ? "bg-coral/10 text-coral" : days <= 14 ? "bg-coral/10 text-coral" : days <= 30 ? "bg-banksia/20 text-banksia" : "bg-harbour/10 text-harbour";
+            return (
+              <Link key={review.id} href="/care-plans" className={`rounded-lg border p-3 text-sm hover:shadow-sm ${urgency}`}>
+                <p className="font-semibold text-ink">{review.participantName}</p>
+                <p className="mt-1 text-slate-600">{review.title || "Care plan review"}</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className={`rounded px-2.5 py-1 text-xs font-semibold ${badge}`}>{dateOnly(review.reviewDate)}</span>
+                  {days < 0 ? <span className="text-xs font-semibold text-coral">{Math.abs(days)}d overdue</span> : days <= 30 ? <span className="text-xs text-slate-500">{days}d remaining</span> : null}
+                </div>
+              </Link>
+            );
+          })}
         </div>
       ) : (
         <EmptyWorkerState title="No plan reviews due" message="Care plan reviews with review dates will appear here." />
@@ -2185,9 +2193,34 @@ export function WorkerPortalPage() {
     }
   }
 
+  const todayShiftCount = visibleShifts.filter(isTodayShift).length;
+  const weekHours = useMemo(() => {
+    const now = new Date();
+    const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay()); weekStart.setHours(0,0,0,0);
+    return Math.round(visibleShifts.filter(s => s.startsAt && new Date(s.startsAt) >= weekStart).reduce((sum, s) => sum + shiftHours(s.startsAt ?? "", s.endsAt ?? ""), 0) * 10) / 10;
+  }, [visibleShifts]);
+  const monthNoteCount = useMemo(() => {
+    const now = new Date();
+    return workerNotes.filter(n => { const d = new Date(n.serviceDate); return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); }).length;
+  }, [workerNotes]);
+
   return (
     <AppShell title="Worker Portal" eyebrow={`${workerName || "Worker"} | ${notice}`} hidePdf>
       <div className="mx-auto grid max-w-6xl gap-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: "Today's shifts", value: String(todayShiftCount), sub: todayShiftCount ? "Scheduled today" : "No shifts today" },
+            { label: "Hours this week", value: `${weekHours}h`, sub: "From assigned shifts" },
+            { label: "Notes this month", value: String(monthNoteCount), sub: "Progress notes submitted" },
+            { label: "Open shifts", value: String(openShifts.length), sub: openShifts.length ? "Available to accept" : "None available" }
+          ].map((stat) => (
+            <div key={stat.label} className="rounded border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{stat.label}</p>
+              <p className="mt-2 text-2xl font-semibold text-ink">{stat.value}</p>
+              <p className="mt-1 text-xs text-slate-500">{stat.sub}</p>
+            </div>
+          ))}
+        </div>
         <WorkerShiftMobilePanel
           shifts={visibleShifts}
           openShifts={openShifts}
@@ -2445,6 +2478,7 @@ export function RosteringPage() {
   const [notice, setNotice] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<ShiftRecord | null>(null);
+  const [cloningFrom, setCloningFrom] = useState<ShiftRecord | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [rosterLoaded, setRosterLoaded] = useState(false);
@@ -2577,7 +2611,8 @@ export function RosteringPage() {
       />
       <RecurringSeriesPanel shifts={shifts} setNotice={setNotice} onSaved={refresh} />
       {createOpen ? <ShiftCreateModal participants={participants} workers={workers} availability={availability} leaveRequests={leaveRequests} onClose={() => setCreateOpen(false)} onSubmit={submit} /> : null}
-      {editingShift ? <ShiftCreateModal participants={participants} workers={workers} availability={availability} leaveRequests={leaveRequests} initialShift={editingShift} onClose={() => setEditingShift(null)} onSubmit={updateShift} /> : null}
+      {cloningFrom ? <ShiftCreateModal participants={participants} workers={workers} availability={availability} leaveRequests={leaveRequests} cloneSource={cloningFrom} onClose={() => setCloningFrom(null)} onSubmit={async (form) => { await submit(form); setCloningFrom(null); }} /> : null}
+      {editingShift ? <ShiftCreateModal participants={participants} workers={workers} availability={availability} leaveRequests={leaveRequests} initialShift={editingShift} onClone={() => { setCloningFrom(editingShift); setEditingShift(null); }} onClose={() => setEditingShift(null)} onSubmit={updateShift} /> : null}
     </AppShell>
   );
 }
@@ -4483,21 +4518,28 @@ function ShiftCreateModal({
   availability,
   leaveRequests,
   initialShift,
+  cloneSource,
   onClose,
-  onSubmit
+  onSubmit,
+  onClone
 }: {
   participants: ParticipantRecord[];
   workers: WorkerRecord[];
   availability: AvailabilityRecord[];
   leaveRequests: LeaveRecord[];
   initialShift?: ShiftRecord;
+  cloneSource?: ShiftRecord;
   onClose: () => void;
   onSubmit: (form: FormData) => Promise<void>;
+  onClone?: () => void;
 }) {
-  const initialWorkerEmail = initialShift?.workerEmail || workers.find((worker) => normaliseRosterText(worker.name) === normaliseRosterText(initialShift?.worker ?? ""))?.email || workers[0]?.email || "";
+  const formFill = initialShift ?? cloneSource;
+  const isEdit = Boolean(initialShift);
+  const isClone = Boolean(cloneSource && !initialShift);
+  const initialWorkerEmail = formFill?.workerEmail || workers.find((worker) => normaliseRosterText(worker.name) === normaliseRosterText(formFill?.worker ?? ""))?.email || workers[0]?.email || "";
   const [selectedWorkerEmail, setSelectedWorkerEmail] = useState(initialWorkerEmail);
-  const [startValue, setStartValue] = useState(toDateTimeLocalValue(initialShift?.startsAt ?? ""));
-  const [endValue, setEndValue] = useState(toDateTimeLocalValue(initialShift?.endsAt ?? ""));
+  const [startValue, setStartValue] = useState(toDateTimeLocalValue(isClone ? "" : (formFill?.startsAt ?? "")));
+  const [endValue, setEndValue] = useState(toDateTimeLocalValue(isClone ? "" : (formFill?.endsAt ?? "")));
   const [matches, setMatches] = useState<ShiftMatch[]>([]);
   const [matchNotice, setMatchNotice] = useState("");
   const canCreate = participants.length > 0;
@@ -4544,16 +4586,19 @@ function ShiftCreateModal({
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-gumleaf">Weekly scheduler</p>
-            <h2 id="create-shift-title" className="text-xl font-semibold text-ink">{initialShift ? "Edit shift" : "Create shift"}</h2>
+            <h2 id="create-shift-title" className="text-xl font-semibold text-ink">{isEdit ? "Edit shift" : isClone ? "Clone shift" : "Create shift"}</h2>
           </div>
-          <button onClick={onClose} className="rounded border border-slate-200 p-2 text-slate-500 hover:bg-slate-50" aria-label="Close create shift">
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {isEdit && onClone ? <button type="button" onClick={onClone} className="rounded border border-gumleaf/20 bg-gumleaf/5 px-3 py-2 text-xs font-semibold text-gumleaf hover:bg-gumleaf/10">Clone shift</button> : null}
+            <button onClick={onClose} className="rounded border border-slate-200 p-2 text-slate-500 hover:bg-slate-50" aria-label="Close create shift">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
         <div className="p-5">
           {canCreate ? (
-            <RecordForm submitLabel={initialShift ? "Update shift" : "Save shift"} onSubmit={onSubmit}>
-              <Select name="participant" label="Participant" options={participants.map((participant) => participant.name)} defaultValue={initialShift?.participantName ?? ""} />
+            <RecordForm submitLabel={isEdit ? "Update shift" : isClone ? "Save cloned shift" : "Save shift"} onSubmit={onSubmit}>
+              <Select name="participant" label="Participant" options={participants.map((participant) => participant.name)} defaultValue={formFill?.participantName ?? ""} />
               <label>
                 <span className="mb-2 block text-sm font-medium text-slate-700">Assign support worker</span>
                 <select
@@ -4640,7 +4685,7 @@ function ShiftCreateModal({
                   </div>
                 ) : null}
               </div>
-              <Field name="location" label="Location" placeholder="Shift location" defaultValue={initialShift?.location ?? ""} />
+              <Field name="location" label="Location" placeholder="Shift location" defaultValue={formFill?.location ?? ""} />
               <div className="grid gap-4 sm:grid-cols-2">
                 <label>
                   <span className="mb-2 block text-sm font-medium text-slate-700">Start time</span>
@@ -4651,7 +4696,7 @@ function ShiftCreateModal({
                   <input name="end" type="datetime-local" required value={endValue} onChange={(event) => setEndValue(event.target.value)} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
                 </label>
               </div>
-              {!initialShift ? <div className="rounded border border-slate-200 bg-slate-50 p-3">
+              {!isEdit ? <div className="rounded border border-slate-200 bg-slate-50 p-3">
                 <p className="text-sm font-semibold text-ink">Recurring schedule</p>
                 <p className="mt-1 text-xs text-slate-500">Create daily, weekly, fortnightly, or custom repeating shifts from the selected start/end time.</p>
                 <div className="mt-3 grid gap-4 sm:grid-cols-3">
@@ -4660,7 +4705,7 @@ function ShiftCreateModal({
                   <Field name="customIntervalDays" label="Custom interval days" type="number" defaultValue="7" min="1" max="365" />
                 </div>
               </div> : null}
-              <Select name="status" label="Shift status" options={statuses} defaultValue={initialShift?.status || "Draft"} />
+              <Select name="status" label="Shift status" options={statuses} defaultValue={isEdit ? (formFill?.status || "Draft") : "Draft"} />
             </RecordForm>
           ) : (
             <EmptyWorkerState title="Participant records required" message="Create at least one participant before adding an assigned or open shift." />
