@@ -223,12 +223,26 @@ export function ServiceAgreementsPage() {
           <Panel title="Renewal reminders" icon={RefreshCw}>
             {renewalDue.length ? (
               <div className="grid gap-3">
-                {renewalDue.map((agreement) => (
-                  <article key={agreement.id} className="rounded border border-coral/20 bg-coral/5 p-4 text-sm">
-                    <p className="font-semibold text-ink">{agreement.participantName}</p>
-                    <p className="mt-1 text-slate-600">{agreement.title} v{agreement.versionNumber} renews by {agreement.endDate || "date not recorded"}</p>
-                  </article>
-                ))}
+                {renewalDue.map((agreement) => {
+                  const refDate = agreement.renewalReminderAt || agreement.endDate;
+                  const daysLeft = refDate ? Math.ceil((new Date(`${refDate}T00:00:00`).getTime() - Date.now()) / 86400000) : null;
+                  return (
+                    <article key={agreement.id} className="rounded border border-coral/20 bg-coral/5 p-4 text-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-ink">{agreement.participantName}</p>
+                          <p className="mt-1 text-slate-600">{agreement.title} v{agreement.versionNumber}</p>
+                          <p className="mt-1 text-xs text-slate-500">End date: {agreement.endDate || "not recorded"}</p>
+                        </div>
+                        {daysLeft !== null && (
+                          <span className={`w-fit rounded px-2.5 py-1 text-xs font-semibold ${daysLeft < 0 ? "bg-coral/20 text-coral" : daysLeft <= 7 ? "bg-coral/10 text-coral" : "bg-banksia/20 text-banksia"}`}>
+                            {daysLeft < 0 ? `${Math.abs(daysLeft)}d overdue` : daysLeft === 0 ? "Due today" : `${daysLeft}d left`}
+                          </span>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             ) : (
               <Empty title="No renewal reminders due" message="Renewal reminders appear 30 days before the reminder date or agreement end date." />

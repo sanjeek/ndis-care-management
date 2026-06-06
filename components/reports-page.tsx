@@ -32,12 +32,22 @@ type ComplianceStat = {
   dueDate: string;
 };
 
+type PlanActualStat = {
+  participantName: string;
+  scheduledShifts: number;
+  deliveredShifts: number;
+  scheduledHours: number;
+  deliveredHours: number;
+  deliveryRate: number;
+};
+
 export function ReportsPage() {
   const [workerStats, setWorkerStats] = useState<WorkerStat[]>([]);
   const [fundingStats, setFundingStats] = useState<FundingStat[]>([]);
   const [complianceStats, setComplianceStats] = useState<ComplianceStat[]>([]);
+  const [planActualStats, setPlanActualStats] = useState<PlanActualStat[]>([]);
   const [notice, setNotice] = useState("");
-  const [tab, setTab] = useState<"workers" | "funding" | "compliance">("workers");
+  const [tab, setTab] = useState<"workers" | "funding" | "compliance" | "planActual">("workers");
 
   const totals = useMemo(() => ({
     workers: workerStats.length,
@@ -54,7 +64,7 @@ export function ReportsPage() {
     setNotice("Loading reports...");
 
     const [shiftsRes, workersRes, fundingRes, complianceRes] = await Promise.all([
-      supabase.from("shifts").select("support_worker_email, support_worker_name, status, approval_status, clock_in_at, clock_out_at, starts_at, ends_at"),
+      supabase.from("shifts").select("participant_name, support_worker_email, support_worker_name, status, approval_status, clock_in_at, clock_out_at, starts_at, ends_at"),
       supabase.from("support_workers").select("name, email, police_check_expiry, ndis_worker_screening_expiry, first_aid_expiry, cpr_expiry"),
       supabase.from("ndis_funding_records").select("participant_name, plan_total_budget, spent_amount, plan_end").order("participant_name"),
       supabase.from("support_workers").select("name, email, police_check_expiry, ndis_worker_screening_expiry, first_aid_expiry, cpr_expiry, drivers_licence_expiry")
@@ -122,6 +132,22 @@ export function ReportsPage() {
     });
     setComplianceStats(issues.sort((a, b) => (a.status === "expired" ? -1 : b.status === "expired" ? 1 : 0)));
 
+    // Plan vs actual by participant
+    const byParticipant = new Map<string, typeof shifts>();
+    shifts.forEach((s) => {
+      const key = String(s.participant_name ?? "");
+      if (!key) return;
+      byParticipant.set(key, [...(byParticipant.get(key) ?? []), s]);
+    });
+    const paStats: PlanActualStat[] = Array.from(byParticipant.entries()).map(([name, pShifts]) => {
+      const active = pShifts.filter((s) => !["cancelled", "canceled"].includes(String(s.status ?? "").toLowerCase()));
+      const delivered = active.filter((s) => Boolean(s.clock_out_at) || ["completed", "approved for payroll"].includes(String(s.status ?? "").toLowerCase()));
+      const scheduledHours = Math.round(active.reduce((sum, s) => sum + calcHours(String(s.starts_at ?? ""), String(s.ends_at ?? "")), 0) * 10) / 10;
+      const deliveredHours = Math.round(delivered.reduce((sum, s) => sum + calcHours(String(s.starts_at ?? ""), String(s.ends_at ?? "")), 0) * 10) / 10;
+      return { participantName: name, scheduledShifts: active.length, deliveredShifts: delivered.length, scheduledHours, deliveredHours, deliveryRate: scheduledHours > 0 ? Math.round((deliveredHours / scheduledHours) * 100) : 0 };
+    });
+    setPlanActualStats(paStats.sort((a, b) => b.scheduledHours - a.scheduledHours));
+
     setNotice("");
   }, []);
 
@@ -134,6 +160,9 @@ export function ReportsPage() {
     } else if (tab === "funding") {
       const rows = [["Participant", "Plan Budget", "Spent", "Remaining", "Utilisation %", "Plan End"], ...fundingStats.map((f) => [f.participantName, f.planBudget, f.spent, f.remaining, f.utilisation, f.planEnd])];
       downloadCsv("funding-utilisation.csv", rows);
+    } else if (tab === "planActual") {
+      const rows = [["Participant", "Scheduled Shifts", "Delivered Shifts", "Scheduled Hours", "Delivered Hours", "Delivery %"], ...planActualStats.map((p) => [p.participantName, p.scheduledShifts, p.deliveredShifts, p.scheduledHours, p.deliveredHours, p.deliveryRate])];
+      downloadCsv("plan-vs-actual.csv", rows);
     } else {
       const rows = [["Worker", "Email", "Issue", "Status", "Due Date"], ...complianceStats.map((c) => [c.workerName, c.workerEmail, c.issue, c.status, c.dueDate])];
       downloadCsv("compliance-issues.csv", rows);
@@ -162,7 +191,7 @@ export function ReportsPage() {
       <div className="mt-6 rounded border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
           <div className="flex gap-1">
-            {([["workers", "Worker Utilisation", Users], ["funding", "Funding Summary", WalletCards], ["compliance", "Compliance Issues", ShieldCheck]] as const).map(([key, label, Icon]) => (
+            {([["workers", "Worker Utilisation", Users], ["funding", "Funding Summary", WalletCards], ["planActual", "Plan vs Actual", TrendingUp], ["compliance", "Compliance Issues", ShieldCheck]] as const).map(([key, label, Icon]) => (
               <button key={key} onClick={() => setTab(key)} className={`inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-semibold transition ${tab === key ? "bg-gumleaf/10 text-gumleaf" : "text-slate-600 hover:bg-slate-50"}`}>
                 <Icon className="h-4 w-4" />
                 {label}
@@ -270,6 +299,40 @@ export function ReportsPage() {
                     <td className="px-4 py-3 text-slate-700">{c.dueDate ? fmtDate(c.dueDate) : "—"}</td>
                   </tr>
                 )) : <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-gumleaf">No compliance issues found.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {tab === "planActual" && (
+          <div className="overflow-x-auto">
+            <table className="min-w-[700px] w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Participant</th>
+                  <th className="px-4 py-3">Planned Shifts</th>
+                  <th className="px-4 py-3">Delivered Shifts</th>
+                  <th className="px-4 py-3">Planned Hours</th>
+                  <th className="px-4 py-3">Delivered Hours</th>
+                  <th className="px-4 py-3">Delivery Rate</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {planActualStats.length ? planActualStats.map((p) => (
+                  <tr key={p.participantName} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium text-ink">{p.participantName}</td>
+                    <td className="px-4 py-3 text-slate-700">{p.scheduledShifts}</td>
+                    <td className="px-4 py-3 text-slate-700">{p.deliveredShifts}</td>
+                    <td className="px-4 py-3 text-slate-700">{p.scheduledHours}h</td>
+                    <td className="px-4 py-3 text-slate-700">{p.deliveredHours}h</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-200"><div className={`h-full rounded-full ${p.deliveryRate >= 90 ? "bg-gumleaf" : p.deliveryRate >= 60 ? "bg-harbour" : "bg-coral"}`} style={{ width: `${Math.min(100, p.deliveryRate)}%` }} /></div>
+                        <span className={`text-xs font-semibold ${p.deliveryRate >= 90 ? "text-gumleaf" : p.deliveryRate >= 60 ? "text-harbour" : "text-coral"}`}>{p.deliveryRate}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                )) : <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">No shift data available.</td></tr>}
               </tbody>
             </table>
           </div>

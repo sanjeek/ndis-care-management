@@ -153,6 +153,14 @@ export function MedicationManagementPage() {
     return response.ok;
   }
 
+  const todayRounds = useMemo(() => {
+    const rounds = activeMedications.map((med) => ({
+      ...med,
+      sortKey: parseMedTime(med.administrationTime)
+    }));
+    return rounds.sort((a, b) => a.sortKey - b.sortKey);
+  }, [activeMedications]);
+
   return (
     <AppShell title="Medication Management" eyebrow={notice}>
       <div className="grid gap-4 sm:grid-cols-3">
@@ -160,6 +168,26 @@ export function MedicationManagementPage() {
         <Metric title="Missed reports" value={String(events.filter((event) => event.eventType === "missed").length)} icon={AlertTriangle} />
         <Metric title="Medication incidents" value={String(events.filter((event) => event.eventType === "incident").length)} icon={ShieldCheck} />
       </div>
+
+      {todayRounds.length > 0 && (
+        <div className="mt-4 rounded border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="mb-3 font-semibold text-ink">Today&apos;s medication schedule</h2>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {todayRounds.map((med) => (
+              <div key={med.id} className="flex items-start gap-3 rounded border border-slate-200 bg-slate-50 p-3 text-sm">
+                <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-harbour/10 text-harbour">
+                  <Pill className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-ink">{med.medicationName}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">{med.participantName} · {med.dosage}</p>
+                  <p className="mt-1 text-xs font-medium text-gumleaf">{med.administrationTime || "Time not recorded"}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
         <section className="space-y-6">
@@ -378,4 +406,24 @@ function Empty({ title, message }: { title: string; message: string }) {
       <p className="mt-1 text-slate-500">{message}</p>
     </div>
   );
+}
+
+function parseMedTime(timeStr: string): number {
+  if (!timeStr) return 9999;
+  const lower = timeStr.toLowerCase();
+  const ampm = lower.match(/(\d+)(?::(\d+))?\s*(am|pm)/);
+  if (ampm) {
+    let h = parseInt(ampm[1], 10);
+    const m = parseInt(ampm[2] ?? "0", 10);
+    if (ampm[3] === "pm" && h !== 12) h += 12;
+    if (ampm[3] === "am" && h === 12) h = 0;
+    return h * 60 + m;
+  }
+  const hm = lower.match(/(\d+):(\d+)/);
+  if (hm) return parseInt(hm[1], 10) * 60 + parseInt(hm[2], 10);
+  if (lower.includes("morning") || lower.includes("breakfast")) return 480;
+  if (lower.includes("noon") || lower.includes("lunch")) return 720;
+  if (lower.includes("evening") || lower.includes("dinner")) return 1080;
+  if (lower.includes("night") || lower.includes("bedtime")) return 1320;
+  return 9999;
 }

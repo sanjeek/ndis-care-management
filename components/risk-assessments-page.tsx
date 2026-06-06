@@ -45,6 +45,13 @@ export function RiskAssessmentsPage() {
     reviewDue: assessments.filter((assessment) => isReviewDue(assessment.review_date) && assessment.status !== "archived").length
   }), [assessments]);
 
+  const riskDistribution = useMemo(() => {
+    const counts = { low: 0, medium: 0, high: 0, critical: 0 };
+    assessments.filter((a) => a.status !== "archived").forEach((a) => { const k = a.overall_risk_level as keyof typeof counts; if (k in counts) counts[k]++; });
+    const total = Object.values(counts).reduce((s, v) => s + v, 0);
+    return { counts, total };
+  }, [assessments]);
+
   const refresh = useCallback(async () => {
     if (!supabase) {
       setNotice("Supabase is not connected.");
@@ -124,6 +131,28 @@ export function RiskAssessmentsPage() {
         <Metric title="High / critical" value={summary.highRisk} icon={ShieldAlert} tone="bg-coral/10 text-coral" />
         <Metric title="Review due" value={summary.reviewDue} icon={TriangleAlert} tone="bg-banksia/20 text-ink" />
       </div>
+
+      {riskDistribution.total > 0 && (
+        <div className="mt-4 rounded border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="mb-3 text-sm font-semibold text-ink">Current risk distribution (active assessments)</h2>
+          <div className="grid gap-3 sm:grid-cols-4">
+            {([["low", "Low", "bg-gumleaf", "text-gumleaf"], ["medium", "Medium", "bg-harbour", "text-harbour"], ["high", "High", "bg-banksia", "text-banksia"], ["critical", "Critical", "bg-coral", "text-coral"]] as const).map(([key, label, bar, text]) => {
+              const count = riskDistribution.counts[key];
+              const pct = riskDistribution.total > 0 ? Math.round((count / riskDistribution.total) * 100) : 0;
+              return (
+                <div key={key} className="rounded border border-slate-200 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`text-xs font-semibold ${text}`}>{label}</span>
+                    <span className="text-lg font-semibold text-ink">{count}</span>
+                  </div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200"><div className={`h-full rounded-full ${bar}`} style={{ width: `${pct}%` }} /></div>
+                  <p className="mt-1 text-xs text-slate-500">{pct}% of active</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
         <Panel title={editing ? "Update risk assessment" : "New risk assessment"} icon={ClipboardList}>

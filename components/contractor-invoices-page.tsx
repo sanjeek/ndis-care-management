@@ -64,6 +64,21 @@ export function ContractorInvoicesPage() {
     emailed: invoices.filter((invoice) => invoice.status === "emailed").length
   }), [invoices]);
 
+  const ageing = useMemo(() => {
+    const now = Date.now();
+    const buckets = { current: 0, d30: 0, d60: 0, d90plus: 0 };
+    const amounts = { current: 0, d30: 0, d60: 0, d90plus: 0 };
+    invoices.filter((inv) => !["paid", "cancelled"].includes(inv.status)).forEach((inv) => {
+      if (!inv.dueDate) return;
+      const days = Math.ceil((now - new Date(inv.dueDate).getTime()) / 86400000);
+      if (days <= 0) { buckets.current++; amounts.current += inv.totalAmount; }
+      else if (days <= 30) { buckets.d30++; amounts.d30 += inv.totalAmount; }
+      else if (days <= 60) { buckets.d60++; amounts.d60 += inv.totalAmount; }
+      else { buckets.d90plus++; amounts.d90plus += inv.totalAmount; }
+    });
+    return { buckets, amounts };
+  }, [invoices]);
+
   const refresh = useCallback(async () => {
     if (!supabase) return;
     const session = (await supabase.auth.getSession()).data.session;
@@ -175,6 +190,24 @@ export function ContractorInvoicesPage() {
         </Panel>
 
         <section className="space-y-6">
+          <Panel title="Invoice ageing analysis" icon={CalendarDays}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {([
+                { label: "Not yet due", value: ageing.buckets.current, amount: ageing.amounts.current, tone: "bg-gumleaf/10 text-gumleaf" },
+                { label: "1–30 days overdue", value: ageing.buckets.d30, amount: ageing.amounts.d30, tone: "bg-banksia/20 text-banksia" },
+                { label: "31–60 days overdue", value: ageing.buckets.d60, amount: ageing.amounts.d60, tone: "bg-coral/10 text-coral" },
+                { label: "60+ days overdue", value: ageing.buckets.d90plus, amount: ageing.amounts.d90plus, tone: "bg-coral/20 text-coral" }
+              ]).map((bucket) => (
+                <div key={bucket.label} className={`rounded border border-slate-200 p-3 ${bucket.value > 0 && bucket.label !== "Not yet due" ? "border-l-2 border-l-coral" : ""}`}>
+                  <p className="text-xs font-semibold text-slate-500">{bucket.label}</p>
+                  <p className="mt-1 text-xl font-semibold text-ink">{bucket.value} <span className="text-sm font-normal text-slate-500">invoices</span></p>
+                  <p className={`mt-1 text-sm font-semibold ${bucket.tone.split(" ")[1]}`}>{currency(bucket.amount)}</p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-slate-400">Excludes paid and cancelled invoices.</p>
+          </Panel>
+
           <Panel title="Generated contractor invoices" icon={ReceiptText}>
             {invoices.length ? (
               <div className="overflow-x-auto">

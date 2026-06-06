@@ -221,6 +221,7 @@ type CarePlanRecord = {
 };
 
 type WorkerRecord = {
+  id: string;
   name: string;
   email: string;
   role: string;
@@ -232,6 +233,7 @@ type WorkerRecord = {
   firstAidExpiry: string;
   cprExpiry: string;
   driversLicenceExpiry: string;
+  workingWithChildrenExpiry: string;
   trainingCertificates: string;
   assigned: number;
 };
@@ -1509,6 +1511,7 @@ export function ParticipantProfilePage({ participantId }: { participantId: strin
 
             <section className="space-y-6">
               <ParticipantCareSnapshot participant={participant} related={relatedRecords} />
+              <ParticipantOnboardingChecklist participantId={participant.id} related={relatedRecords} />
               <ParticipantRelatedRecordsPanel related={relatedRecords} />
               <ParticipantTimeline timeline={timeline} />
             </section>
@@ -1980,6 +1983,7 @@ export function WorkersPage() {
   const [workers, setWorkers] = useState<WorkerRecord[]>([]);
   const [notice, setNotice] = useState("");
   const [inviteLink, setInviteLink] = useState("");
+  const [editingWorker, setEditingWorker] = useState<WorkerRecord | null>(null);
 
   const refresh = useCallback(async () => {
     const rows = await loadWorkers();
@@ -2041,8 +2045,34 @@ export function WorkersPage() {
     setNotice(invite.message ?? "Worker invite created.");
   }
 
+  async function updateWorker(form: FormData) {
+    if (!editingWorker || !isSupabaseConfigured || !supabase) return;
+    const payload = {
+      name: get(form, "name"),
+      role: get(form, "role"),
+      availability: get(form, "availability"),
+      qualifications: get(form, "qualifications"),
+      compliance_status: get(form, "compliance"),
+      police_check_expiry: get(form, "policeCheckExpiry") || null,
+      ndis_worker_screening_expiry: get(form, "ndisWorkerScreeningExpiry") || null,
+      first_aid_expiry: get(form, "firstAidExpiry") || null,
+      cpr_expiry: get(form, "cprExpiry") || null,
+      drivers_licence_expiry: get(form, "driversLicenceExpiry") || null,
+      working_with_children_expiry: get(form, "workingWithChildrenExpiry") || null,
+      training_certificates: get(form, "trainingCertificates")
+    };
+    const { error } = await supabase.from("support_workers").update(payload).eq("id", editingWorker.id);
+    if (error) { setNotice(error.message); return; }
+    setNotice("Worker updated.");
+    setEditingWorker(null);
+    await refresh();
+  }
+
   return (
     <AppShell title="Support Workers" eyebrow={notice}>
+      {editingWorker ? (
+        <WorkerEditModal worker={editingWorker} onClose={() => setEditingWorker(null)} onSubmit={updateWorker} />
+      ) : null}
       {inviteLink ? (
         <div className="mb-6 rounded border border-gumleaf/25 bg-gumleaf/5 p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -2093,6 +2123,7 @@ export function WorkersPage() {
           <Field name="firstAidExpiry" label="First aid certificate expiry" type="date" />
           <Field name="cprExpiry" label="CPR expiry" type="date" />
           <Field name="driversLicenceExpiry" label="Driver's licence expiry" type="date" />
+          <Field name="workingWithChildrenExpiry" label="Working with children check expiry" type="date" required={false} />
         </div>
         <Area name="trainingCertificates" label="Training certificates" placeholder="List training certificates, completion dates, renewal due dates, and evidence location" />
       </RecordForm>
@@ -2100,8 +2131,16 @@ export function WorkersPage() {
         <div className="mt-6 grid gap-4 xl:grid-cols-3">
           {workers.map((worker) => (
             <article key={`${worker.email}-${worker.name}`} className="rounded border border-slate-200 bg-white p-4 shadow-sm">
-              <h2 className="font-semibold text-ink">{worker.name}</h2>
-              <p className="text-sm text-slate-500">{worker.role || "Role not recorded"}</p>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="font-semibold text-ink">{worker.name}</h2>
+                  <p className="text-sm text-slate-500">{worker.role || "Role not recorded"}</p>
+                </div>
+                <button type="button" onClick={() => setEditingWorker(worker)} className="inline-flex items-center gap-1.5 rounded border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                  <Pencil className="h-3.5 w-3.5" />
+                  Edit
+                </button>
+              </div>
               <Info label="Invite email" value={worker.email || "Not recorded"} />
               <Info label="Availability" value={worker.availability || "Not recorded"} />
               <Info label="Qualifications" value={worker.qualifications || "Not recorded"} />
@@ -2596,6 +2635,38 @@ export function RosteringPage() {
     }
   }
 
+  async function importShiftsCsv(file: File) {
+    const text = await file.text();
+    const lines = text.split("\n").filter((l) => l.trim());
+    if (lines.length < 2) { setNotice("CSV is empty or has no data rows."); return; }
+    const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, "").toLowerCase().replace(/\s+/g, "_"));
+    let imported = 0;
+    let failed = 0;
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+      const row: Record<string, string> = {};
+      headers.forEach((h, idx) => { row[h] = cols[idx] ?? ""; });
+      const participant = row.participant_name || row.participant || "";
+      const workerEmail = (row.worker_email || row.support_worker_email || "").toLowerCase();
+      const worker = workers.find((w) => w.email.toLowerCase() === workerEmail);
+      const start = row.starts_at || row.start || row.start_time || "";
+      const end = row.ends_at || row.end || row.end_time || "";
+      if (!participant || !start || !end) { failed++; continue; }
+      const ok = await postJson("/api/shifts", {
+        participant_name: participant,
+        support_worker_name: worker?.name ?? row.worker_name ?? "",
+        support_worker_email: workerEmail || (worker?.email ?? ""),
+        location: row.location ?? "",
+        starts_at: start,
+        ends_at: end,
+        status: row.status || (workerEmail ? "Draft" : "Open")
+      }, setNotice);
+      if (ok) imported++; else failed++;
+    }
+    setNotice(`Import complete: ${imported} shifts added${failed > 0 ? `, ${failed} rows skipped (missing participant, start, or end)` : ""}.`);
+    if (imported > 0) await refresh();
+  }
+
   return (
     <AppShell title="Rostering / Shifts" eyebrow={notice}>
       <SchedulerGrid
@@ -2609,6 +2680,31 @@ export function RosteringPage() {
         onAddShift={() => setCreateOpen(true)}
         onEditShift={setEditingShift}
       />
+      <div className="mt-4 rounded border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-semibold text-ink">Bulk shift import</h2>
+            <p className="mt-1 text-sm text-slate-500">Upload a CSV with columns: participant_name, starts_at, ends_at, worker_email (optional), location (optional), status (optional).</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => {
+              const csv = "participant_name,starts_at,ends_at,worker_email,location,status\nJohn Smith,2026-07-01T09:00,2026-07-01T13:00,worker@example.com,Home,Draft\n";
+              const blob = new Blob([csv], { type: "text/csv" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a"); a.href = url; a.download = "shift-import-template.csv"; a.click();
+              URL.revokeObjectURL(url);
+            }} className="inline-flex items-center gap-2 rounded border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+              <Download className="h-4 w-4" />
+              Template
+            </button>
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded bg-gumleaf/10 border border-gumleaf/20 px-3 py-2 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20">
+              <Upload className="h-4 w-4" />
+              Import CSV
+              <input type="file" accept=".csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void importShiftsCsv(f); e.target.value = ""; }} />
+            </label>
+          </div>
+        </div>
+      </div>
       <RecurringSeriesPanel shifts={shifts} setNotice={setNotice} onSaved={refresh} />
       {createOpen ? <ShiftCreateModal participants={participants} workers={workers} availability={availability} leaveRequests={leaveRequests} onClose={() => setCreateOpen(false)} onSubmit={submit} /> : null}
       {cloningFrom ? <ShiftCreateModal participants={participants} workers={workers} availability={availability} leaveRequests={leaveRequests} cloneSource={cloningFrom} onClose={() => setCloningFrom(null)} onSubmit={async (form) => { await submit(form); setCloningFrom(null); }} /> : null}
@@ -3863,6 +3959,47 @@ function WorkerPortalQuickActions() {
   );
 }
 
+function WorkerEditModal({ worker, onClose, onSubmit }: { worker: WorkerRecord; onClose: () => void; onSubmit: (form: FormData) => Promise<void> }) {
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void onSubmit(new FormData(event.currentTarget));
+  }
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-ink/45 px-4 py-6 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gumleaf">Edit worker</p>
+            <h2 className="text-xl font-semibold text-ink">{worker.name}</h2>
+          </div>
+          <button onClick={onClose} className="rounded border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"><X className="h-4 w-4" /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="grid gap-4 p-5">
+          <Field name="name" label="Full name" defaultValue={worker.name} />
+          <Field name="role" label="Role" defaultValue={worker.role} required={false} />
+          <Field name="availability" label="Availability" defaultValue={worker.availability} required={false} />
+          <Area name="qualifications" label="Qualifications" defaultValue={worker.qualifications} required={false} />
+          <Field name="compliance" label="Compliance notes" defaultValue={worker.compliance} required={false} />
+          <p className="text-sm font-semibold text-slate-700">Compliance document expiry dates</p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Field name="policeCheckExpiry" label="Police check expiry" type="date" defaultValue={worker.policeCheckExpiry} required={false} />
+            <Field name="ndisWorkerScreeningExpiry" label="NDIS worker screening expiry" type="date" defaultValue={worker.ndisWorkerScreeningExpiry} required={false} />
+            <Field name="firstAidExpiry" label="First aid expiry" type="date" defaultValue={worker.firstAidExpiry} required={false} />
+            <Field name="cprExpiry" label="CPR expiry" type="date" defaultValue={worker.cprExpiry} required={false} />
+            <Field name="driversLicenceExpiry" label="Driver&apos;s licence expiry" type="date" defaultValue={worker.driversLicenceExpiry} required={false} />
+            <Field name="workingWithChildrenExpiry" label="Working with children check expiry" type="date" defaultValue={worker.workingWithChildrenExpiry} required={false} />
+          </div>
+          <Area name="trainingCertificates" label="Training certificates" defaultValue={worker.trainingCertificates} required={false} />
+          <div className="flex gap-3">
+            <button className="min-h-12 rounded bg-gumleaf/10 border border-gumleaf/20 px-4 py-3 text-sm font-semibold text-gumleaf hover:bg-gumleaf/20">Save changes</button>
+            <button type="button" onClick={onClose} className="min-h-12 rounded border border-slate-200 px-4 py-3 text-sm font-semibold text-ink hover:bg-slate-50">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function ShiftSignatureModal({ shift, onClose, onSubmit }: { shift: ShiftRecord; onClose: () => void; onSubmit: (form: FormData) => Promise<void> }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 px-3 py-4 sm:items-center">
@@ -4807,11 +4944,11 @@ function CheckboxField({ name, label, defaultChecked = false }: { name: string; 
   );
 }
 
-function Area({ name, label, defaultValue = "", placeholder = "" }: { name: string; label: string; defaultValue?: string; placeholder?: string }) {
+function Area({ name, label, defaultValue = "", placeholder = "", required = true }: { name: string; label: string; defaultValue?: string; placeholder?: string; required?: boolean }) {
   return (
     <label>
-      <FieldLabel label={label} required />
-      <textarea name={name} required rows={3} defaultValue={defaultValue} placeholder={placeholder} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
+      <FieldLabel label={label} required={required} />
+      <textarea name={name} required={required} rows={3} defaultValue={defaultValue} placeholder={placeholder} className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
     </label>
   );
 }
@@ -4908,6 +5045,64 @@ function ParticipantTimeline({ timeline }: { timeline: ParticipantTimelineItem[]
       ) : (
         <EmptyWorkerState title="No timeline events" message="Timeline events appear after shifts, notes, incidents, or documents are recorded." />
       )}
+    </article>
+  );
+}
+
+const ONBOARDING_STEPS = [
+  { key: "ndis_verified", label: "NDIS number verified" },
+  { key: "care_plan", label: "Care plan created" },
+  { key: "emergency_contact", label: "Emergency contact added" },
+  { key: "medications", label: "Medications recorded" },
+  { key: "risk_assessment", label: "Risk assessment completed" },
+  { key: "service_agreement", label: "Service agreement signed" },
+  { key: "worker_assigned", label: "Support worker assigned" },
+  { key: "family_access", label: "Family portal access set up" }
+];
+
+function ParticipantOnboardingChecklist({ participantId, related }: { participantId: string; related: ParticipantRelatedRecords }) {
+  const storageKey = `careos_onboarding_${participantId}`;
+  const [checked, setChecked] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(localStorage.getItem(storageKey) ?? "{}"); } catch { return {}; }
+  });
+
+  const autoChecked = useMemo<Record<string, boolean>>(() => ({
+    worker_assigned: related.shifts.length > 0,
+    risk_assessment: related.risks.length > 0,
+    care_plan: related.carePlans.length > 0
+  }), [related]);
+
+  const combined = { ...autoChecked, ...checked };
+  const doneCount = ONBOARDING_STEPS.filter((s) => combined[s.key]).length;
+
+  function toggle(key: string) {
+    const next = { ...checked, [key]: !combined[key] };
+    setChecked(next);
+    try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* ignore */ }
+  }
+
+  return (
+    <article className="rounded border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-semibold text-ink">Onboarding checklist</h2>
+        <span className={`rounded px-2.5 py-1 text-xs font-semibold ${doneCount === ONBOARDING_STEPS.length ? "bg-gumleaf/10 text-gumleaf" : "bg-banksia/20 text-banksia"}`}>{doneCount}/{ONBOARDING_STEPS.length}</span>
+      </div>
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-gumleaf transition-all" style={{ width: `${Math.round((doneCount / ONBOARDING_STEPS.length) * 100)}%` }} /></div>
+      <div className="mt-3 grid gap-2">
+        {ONBOARDING_STEPS.map((step) => {
+          const isAuto = step.key in autoChecked;
+          const done = Boolean(combined[step.key]);
+          return (
+            <label key={step.key} className={`flex cursor-pointer items-center gap-3 rounded border p-3 text-sm transition ${done ? "border-gumleaf/20 bg-gumleaf/5" : "border-slate-200 bg-slate-50 hover:bg-white"}`}>
+              <input type="checkbox" checked={done} onChange={() => { if (!isAuto) toggle(step.key); }} disabled={isAuto} className="h-4 w-4 rounded border-slate-300 text-gumleaf focus:ring-gumleaf" />
+              <span className={done ? "font-medium text-gumleaf" : "text-slate-700"}>{step.label}</span>
+              {isAuto && <span className="ml-auto text-xs text-slate-400">auto</span>}
+            </label>
+          );
+        })}
+      </div>
+      <p className="mt-3 text-xs text-slate-400">Checkboxes are saved locally. Auto-detected items update from recorded data.</p>
     </article>
   );
 }
@@ -5297,6 +5492,7 @@ async function loadWorkers(): Promise<WorkerRecord[]> {
   return data.map((row) => {
     const name = String(row.name ?? "");
     return {
+      id: String(row.id ?? ""),
       name,
       email: String(row.email ?? ""),
       role: String(row.role ?? ""),
@@ -5308,6 +5504,7 @@ async function loadWorkers(): Promise<WorkerRecord[]> {
       firstAidExpiry: String(row.first_aid_expiry ?? ""),
       cprExpiry: String(row.cpr_expiry ?? ""),
       driversLicenceExpiry: String(row.drivers_licence_expiry ?? ""),
+      workingWithChildrenExpiry: String(row.working_with_children_expiry ?? ""),
       trainingCertificates: String(row.training_certificates ?? ""),
       assigned: shifts.filter((shift) => shift.worker === name).length
     };
@@ -6188,7 +6385,8 @@ function complianceItems(worker: WorkerRecord) {
     { label: "NDIS worker screening", value: worker.ndisWorkerScreeningExpiry },
     { label: "First aid certificate", value: worker.firstAidExpiry },
     { label: "CPR", value: worker.cprExpiry },
-    { label: "Driver's licence", value: worker.driversLicenceExpiry }
+    { label: "Driver's licence", value: worker.driversLicenceExpiry },
+    ...(worker.workingWithChildrenExpiry ? [{ label: "Working with children", value: worker.workingWithChildrenExpiry }] : [])
   ];
 }
 
