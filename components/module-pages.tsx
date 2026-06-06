@@ -2274,7 +2274,7 @@ export function WorkersPage() {
           ) : (
             <div className="px-5 py-12 text-center">
               <p className="font-semibold text-slate-600">No support workers yet</p>
-              <p className="mt-1 text-sm text-slate-400">Click "Add support worker" above to get started.</p>
+              <p className="mt-1 text-sm text-slate-400">Click &ldquo;Add support worker&rdquo; above to get started.</p>
             </div>
           )}
         </div>
@@ -5446,26 +5446,6 @@ function CarePlanDetail({ title, value, tone = "default" }: { title: string; val
   );
 }
 
-function ComplianceGrid({ worker }: { worker: WorkerRecord }) {
-  const items = complianceItems(worker);
-  return (
-    <div className="mt-4 grid gap-2">
-      {items.map((item) => {
-        const status = expiryStatus(item.value);
-        return (
-          <div key={item.label} className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
-            <div className="flex items-center justify-between gap-3">
-              <p className="font-medium text-ink">{item.label}</p>
-              <span className={`rounded px-2 py-1 text-xs font-semibold ${expiryBadgeClass(status)}`}>{expiryLabel(status)}</span>
-            </div>
-            <p className="mt-1 text-slate-600">{item.value ? dateOnly(item.value) : "Not recorded"}</p>
-          </div>
-        );
-      })}
-      <Info label="Training certificates" value={worker.trainingCertificates || "Not recorded"} />
-    </div>
-  );
-}
 
 async function loadParticipants(): Promise<ParticipantRecord[]> {
   if (!isSupabaseConfigured || !supabase) return [];
@@ -6788,6 +6768,7 @@ function daysUntil(value: string) {
   return Math.ceil((date.getTime() - today.getTime()) / 86400000);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function expiryLabel(status: string) {
   if (status === "expired") return "Expired";
   if (status === "due_soon") return "Due soon";
@@ -6795,6 +6776,7 @@ function expiryLabel(status: string) {
   return "Current";
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function expiryBadgeClass(status: string) {
   if (status === "expired") return "bg-coral/10 text-coral";
   if (status === "due_soon") return "bg-banksia/30 text-ink";
