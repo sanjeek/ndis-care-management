@@ -382,7 +382,7 @@ export function OperationsModulePage({ module }: { module: ModuleKey }) {
           {canManage || module === "travel" || module === "training-records" || module === "checklists" ? (
             <form onSubmit={submit} className="grid gap-4">
               {config.fields.map((field) => <OperationField key={field.name} field={field} participants={participants} workers={workers} shifts={shifts} />)}
-              <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d625d]">
+              <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90">
                 <Bell className="h-4 w-4" />
                 {config.submitLabel}
               </button>
@@ -521,7 +521,7 @@ function ChecklistRecordDetails({
               <span className="field-label-optional mb-2 block text-sm font-medium text-slate-700">General notes</span>
               <textarea name="notes" rows={3} defaultValue={String(record.notes ?? "")} placeholder="Additional checklist notes" className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
             </label>
-            <button className="inline-flex min-h-11 w-fit items-center justify-center rounded bg-gumleaf px-4 py-2 text-sm font-semibold text-white hover:bg-[#1d625d]">Update checklist</button>
+            <button className="inline-flex min-h-11 w-fit items-center justify-center rounded bg-gumleaf px-4 py-2 text-sm font-semibold text-white hover:bg-gumleaf/90">Update checklist</button>
           </form>
         ) : (
           <p className="mt-4 rounded border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-500">Only the assigned support worker, admin, or team leader can update this checklist.</p>

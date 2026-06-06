@@ -181,7 +181,7 @@ export function MedicationManagementPage() {
                   <Field name="endDate" label="End date" type="date" required={false} />
                 </div>
                 <Select name="status" label="Status" options={statuses} />
-                <button className="rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d625d]">Save medication</button>
+                <button className="rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90">Save medication</button>
               </form>
             </Panel>
           ) : (
@@ -211,7 +211,7 @@ export function MedicationManagementPage() {
               <Select name="severity" label="Severity" options={severities} />
               <Area name="reason" label="Reason / details" placeholder="For missed medication: why it was missed. For incidents: describe what happened." required={false} />
               <Area name="actionsTaken" label="Actions taken" placeholder="Who was notified, first aid, observation, escalation, medication chart update, or follow-up." required={false} />
-              <button className="rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d625d]">Save medication event</button>
+              <button className="rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90">Save medication event</button>
             </form>
           </Panel>
         </section>

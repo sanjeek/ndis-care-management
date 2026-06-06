@@ -165,7 +165,7 @@ export function ContractorInvoicesPage() {
               <p className="rounded border border-slate-200 bg-white p-3 text-sm leading-6 text-slate-600">
                 Contractor invoices use assigned scheduled shift hours for the selected week. Cancelled shifts and shifts already linked to a contractor invoice are skipped.
               </p>
-              <button disabled={busy} className="min-h-12 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d625d] disabled:cursor-not-allowed disabled:opacity-70">
+              <button disabled={busy} className="min-h-12 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90 disabled:cursor-not-allowed disabled:opacity-70">
                 {busy ? "Generating..." : "Generate and email invoices"}
               </button>
             </form>
@@ -299,7 +299,7 @@ function mapItem(row: Record<string, unknown>): ContractorInvoiceItem {
 
 function Metric({ title, value, icon: Icon }: { title: string; value: string; icon: typeof ReceiptText }) {
   return (
-    <article className="rounded border border-indigo-100 bg-white p-4 shadow-[0_12px_26px_rgba(15,23,42,0.045)]">
+    <article className="rounded border border-indigo-100 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-medium text-slate-500">{title}</p>
         <span className="rounded-lg bg-indigo-50 p-2 text-gumleaf">
@@ -313,7 +313,7 @@ function Metric({ title, value, icon: Icon }: { title: string; value: string; ic
 
 function Panel({ title, icon: Icon, children }: { title: string; icon: typeof ReceiptText; children: React.ReactNode }) {
   return (
-    <section className="rounded border border-indigo-100 bg-white p-5 shadow-[0_12px_26px_rgba(15,23,42,0.045)]">
+    <section className="rounded border border-indigo-100 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="font-semibold text-ink">{title}</h2>
         <span className="rounded-lg bg-indigo-50 p-2 text-gumleaf">

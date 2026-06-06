@@ -144,7 +144,7 @@ export function ResetPasswordCard() {
                 <PasswordField name="confirm" label="Confirm password" show={showPassword} setShow={setShowPassword} />
               </div>
 
-              <button className="mt-6 w-full rounded border border-[#cfe9e4] bg-[#eef7f5] px-4 py-3 font-semibold text-[#236f69] shadow-[0_10px_24px_rgba(47,125,115,0.10)] transition hover:bg-[#dff0ec] focus:outline-none focus:ring-2 focus:ring-[#2f7d73]/20 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400" disabled={loading}>
+              <button className="mt-6 w-full rounded border border-gumleaf/20 bg-gumleaf/5 px-4 py-3 font-semibold text-[#236f69] shadow-sm transition hover:bg-gumleaf/10 focus:outline-none focus:ring-2 focus:ring-[#2f7d73]/20 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400" disabled={loading}>
                 {loading ? "Updating..." : "Update password"}
               </button>
             </>
@@ -156,7 +156,7 @@ export function ResetPasswordCard() {
             </div>
           )}
 
-          <Link className="mt-5 inline-flex font-semibold text-[#2f766f] hover:text-ink" href="/login">
+          <Link className="mt-5 inline-flex font-semibold text-gumleaf hover:text-ink" href="/login">
             Back to sign in
           </Link>
           <CopyrightFooter />

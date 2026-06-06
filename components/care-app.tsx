@@ -422,7 +422,7 @@ function Rostering({
             <TextField name="end" label="End time" type="datetime-local" defaultValue={emptyShift.end} />
           </div>
           <SelectField name="status" label="Shift status" options={rosterStatuses} defaultValue={emptyShift.status} />
-          <button className="inline-flex items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d625d]">
+          <button className="inline-flex items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90">
             <CalendarPlus className="h-4 w-4" />
             Save shift
           </button>
@@ -556,7 +556,7 @@ function RecordModal({
           <button type="button" onClick={onClose} className="rounded border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
             Cancel
           </button>
-          <button className="rounded bg-gumleaf px-4 py-2 text-sm font-semibold text-white hover:bg-[#1d625d]">{submitLabel}</button>
+          <button className="rounded bg-gumleaf px-4 py-2 text-sm font-semibold text-white hover:bg-gumleaf/90">{submitLabel}</button>
         </div>
       </form>
     </div>

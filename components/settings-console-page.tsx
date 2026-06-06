@@ -107,7 +107,7 @@ export function SettingsConsolePage() {
     <AppShell title="Settings" eyebrow={notice} hidePdf>
       <div className="grid gap-4 md:grid-cols-4">
         {stats.map((stat) => (
-          <section key={stat.label} className="rounded-lg border border-indigo-100 bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
+          <section key={stat.label} className="rounded-lg border border-indigo-100 bg-white p-4 shadow-sm">
             <p className="text-sm font-medium text-slate-500">{stat.label}</p>
             <p className="mt-2 text-2xl font-semibold text-ink">{stat.value}</p>
           </section>
@@ -115,7 +115,7 @@ export function SettingsConsolePage() {
       </div>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-        <section className="rounded-lg border border-indigo-100 bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
+        <section className="rounded-lg border border-indigo-100 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h2 className="font-semibold text-ink">Configuration areas</h2>
@@ -153,7 +153,7 @@ export function SettingsConsolePage() {
           </div>
         </section>
 
-        <section className="rounded-lg border border-indigo-100 bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
+        <section className="rounded-lg border border-indigo-100 bg-white p-5 shadow-sm">
           <h2 className="font-semibold text-ink">{selectedArea.title}</h2>
           <p className="mt-1 text-sm leading-6 text-slate-500">{selectedArea.detail}</p>
           <form key={selectedArea.key} onSubmit={submit} className="mt-5 grid gap-4">
@@ -194,7 +194,7 @@ export function SettingsConsolePage() {
                 Sensitive setting
               </label>
             </div>
-            <button disabled={!canManage} className="inline-flex min-h-12 items-center justify-center rounded-lg bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d625d] disabled:cursor-not-allowed disabled:opacity-50">
+            <button disabled={!canManage} className="inline-flex min-h-12 items-center justify-center rounded-lg bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90 disabled:cursor-not-allowed disabled:opacity-50">
               Save setting
             </button>
             {!canManage ? <p className="text-sm text-slate-500">Team leaders can review settings. Admin access is required to update them.</p> : null}

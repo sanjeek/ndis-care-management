@@ -16,7 +16,7 @@ export function UnauthorisedPage() {
           Your account role does not include access to the page you requested.
         </p>
         <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-          <Link href="/worker-portal" className="rounded bg-gumleaf px-4 py-2 text-sm font-semibold text-white hover:bg-[#1d625d]">
+          <Link href="/worker-portal" className="rounded bg-gumleaf px-4 py-2 text-sm font-semibold text-white hover:bg-gumleaf/90">
             Worker Portal
           </Link>
           <Link href="/profile" className="rounded border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">

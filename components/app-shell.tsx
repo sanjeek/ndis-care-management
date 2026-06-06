@@ -402,7 +402,7 @@ export function AppShell({ title, eyebrow, children, hidePdf }: { title: string;
         <aside className="sticky top-0 z-20 flex flex-col border-b border-indigo-100/80 bg-[#fbfdff]/95 px-4 py-3 backdrop-blur lg:h-screen lg:w-72 lg:border-b-0 lg:border-r lg:px-5 lg:py-5">
           <div className="flex items-center justify-between gap-4">
             <Link href={defaultRouteForRole(userRole)} className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-sm font-bold text-gumleaf shadow-[0_8px_18px_rgba(75,95,232,0.08)]">CO</span>
+              <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-sm font-bold text-gumleaf shadow-sm">CO</span>
               <span>
                 <span className="block text-base font-semibold text-ink">CareOS</span>
                 <span className="block text-xs text-slate-500">NDIS operations</span>
@@ -495,7 +495,7 @@ export function AppShell({ title, eyebrow, children, hidePdf }: { title: string;
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <div className="relative sm:w-96">
                   <form
-                    className="flex min-w-0 items-center gap-2 rounded border border-indigo-100 bg-white px-3 py-2 shadow-[0_8px_18px_rgba(15,23,42,0.035)]"
+                    className="flex min-w-0 items-center gap-2 rounded border border-indigo-100 bg-white px-3 py-2 shadow-sm"
                     onSubmit={(event) => {
                       event.preventDefault();
                       if (searchResults[0]) openSearchResult(searchResults[0]);
@@ -514,7 +514,7 @@ export function AppShell({ title, eyebrow, children, hidePdf }: { title: string;
                     />
                   </form>
                   {searchOpen && (search.trim().length > 0 || searchResults.length > 0) ? (
-                    <div className="absolute right-0 z-40 mt-2 w-[min(32rem,calc(100vw-2rem))] rounded border border-indigo-100 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.09)]">
+                    <div className="absolute right-0 z-40 mt-2 w-[min(32rem,calc(100vw-2rem))] rounded border border-indigo-100 bg-white shadow-md">
                       <div className="border-b border-slate-200 px-4 py-3">
                         <p className="font-semibold text-ink">Global search</p>
                         <p className="text-xs text-slate-500">Results are filtered by your account permissions.</p>
@@ -546,7 +546,7 @@ export function AppShell({ title, eyebrow, children, hidePdf }: { title: string;
                   ) : null}
                 </div>
                 {canAccessRoute(userRole, "/messages") ? (
-                  <Link href="/messages" className="inline-flex items-center justify-center rounded-lg border border-indigo-100 bg-white p-2.5 text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.035)] hover:bg-indigo-50/60" aria-label="Open messages">
+                  <Link href="/messages" className="inline-flex items-center justify-center rounded-lg border border-indigo-100 bg-white p-2.5 text-slate-700 shadow-sm hover:bg-indigo-50/60" aria-label="Open messages">
                     <MessageSquare className="h-4 w-4" />
                   </Link>
                 ) : null}
@@ -554,14 +554,14 @@ export function AppShell({ title, eyebrow, children, hidePdf }: { title: string;
                   <button
                     type="button"
                     onClick={downloadCurrentPagePdf}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-100 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.035)] hover:bg-indigo-50/60"
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-100 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-indigo-50/60"
                     aria-label="Download this page as PDF"
                   >
                     <Download className="h-4 w-4" />
                     <span className="hidden lg:inline">PDF</span>
                   </button>
                 ) : null}
-                <label className="hidden items-center gap-2 rounded-lg border border-indigo-100 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.035)] md:flex">
+                <label className="hidden items-center gap-2 rounded-lg border border-indigo-100 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm md:flex">
                   <CalendarDays className="h-4 w-4 text-gumleaf" />
                   <span className="sr-only">Selected date</span>
                   <input
@@ -578,7 +578,7 @@ export function AppShell({ title, eyebrow, children, hidePdf }: { title: string;
                   <button
                     type="button"
                     onClick={() => setNotificationsOpen(!notificationsOpen)}
-                    className="relative inline-flex items-center justify-center rounded-lg border border-indigo-100 bg-white p-2.5 text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.035)] hover:bg-indigo-50/60"
+                    className="relative inline-flex items-center justify-center rounded-lg border border-indigo-100 bg-white p-2.5 text-slate-700 shadow-sm hover:bg-indigo-50/60"
                     aria-label="Open notifications"
                   >
                     <Bell className="h-4 w-4" />
@@ -589,7 +589,7 @@ export function AppShell({ title, eyebrow, children, hidePdf }: { title: string;
                     ) : null}
                   </button>
                   {notificationsOpen ? (
-                    <div className="absolute right-0 z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded border border-indigo-100 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.09)]">
+                    <div className="absolute right-0 z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded border border-indigo-100 bg-white shadow-md">
                       <div className="border-b border-slate-200 px-4 py-3">
                         <p className="font-semibold text-ink">Notifications</p>
                         <p className="text-xs text-slate-500">{unreadCount ? `${unreadCount} unread` : "No unread notifications"}</p>
@@ -621,7 +621,7 @@ export function AppShell({ title, eyebrow, children, hidePdf }: { title: string;
                   <button
                     type="button"
                     onClick={() => setProfileOpen((current) => !current)}
-                    className="inline-flex items-center gap-2 rounded-lg border border-indigo-100 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.035)] hover:bg-indigo-50/60"
+                    className="inline-flex items-center gap-2 rounded-lg border border-indigo-100 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-indigo-50/60"
                     aria-label="Open user profile menu"
                   >
                     <span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-gumleaf ring-1 ring-indigo-100">{initials}</span>
@@ -629,7 +629,7 @@ export function AppShell({ title, eyebrow, children, hidePdf }: { title: string;
                     <ChevronDown className={`h-4 w-4 text-slate-400 transition ${profileOpen ? "rotate-180" : ""}`} />
                   </button>
                   {profileOpen ? (
-                    <div className="absolute right-0 z-30 mt-2 w-72 rounded-lg border border-indigo-100 bg-white p-2 shadow-[0_18px_44px_rgba(15,23,42,0.09)]">
+                    <div className="absolute right-0 z-30 mt-2 w-72 rounded-lg border border-indigo-100 bg-white p-2 shadow-md">
                       <div className="rounded-lg bg-slate-50 p-3">
                         <p className="font-semibold text-ink">{userName}</p>
                         <p className="mt-1 truncate text-sm text-slate-500">{userEmail}</p>

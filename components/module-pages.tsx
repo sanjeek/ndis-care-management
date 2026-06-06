@@ -620,7 +620,7 @@ function UpcomingPlanReviews({ reviews }: { reviews: DashboardPlanReview[] }) {
       {reviews.length ? (
         <div className="grid gap-3">
           {reviews.map((review) => (
-            <Link key={review.id} href="/care-plans" className="rounded-lg border border-indigo-100 bg-indigo-50/35 p-3 text-sm hover:bg-white hover:shadow-sm">
+            <Link key={review.id} href="/care-plans" className="rounded-lg border border-indigo-100 bg-slate-50 p-3 text-sm hover:bg-white hover:shadow-sm">
               <p className="font-semibold text-ink">{review.participantName}</p>
               <p className="mt-1 text-slate-600">{review.title || "Care plan review"}</p>
               <span className="mt-2 inline-flex rounded bg-harbour/10 px-2.5 py-1 text-xs font-semibold text-harbour">{dateOnly(review.reviewDate)}</span>
@@ -659,7 +659,7 @@ function RecentActivityList({ activities }: { activities: DashboardActivity[] })
       {activities.length ? (
         <div className="grid gap-3">
           {activities.map((activity) => (
-            <div key={activity.id} className="rounded-lg border border-indigo-100 bg-indigo-50/35 p-3 text-sm">
+            <div key={activity.id} className="rounded-lg border border-indigo-100 bg-slate-50 p-3 text-sm">
               <p className="font-semibold text-ink">{friendlyActivity(activity.action)}</p>
               <p className="mt-1 text-slate-600">{activity.label || "Record updated"}</p>
               <p className="mt-2 text-xs text-slate-500">{activity.actor || "CareOS"} | {dateTimeOrFallback(activity.createdAt)}</p>
@@ -757,7 +757,7 @@ function ManagementAnalytics({ metrics, todaysShiftCount }: { metrics: Dashboard
       <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr_0.9fr]">
         <div className="space-y-4 lg:col-span-2">
           {rows.map((row) => (
-            <div key={row.label} className="rounded border border-indigo-100 bg-indigo-50/35 p-4">
+            <div key={row.label} className="rounded border border-indigo-100 bg-slate-50 p-4">
               <div className="flex items-center justify-between gap-3 text-sm">
                 <p className="font-semibold text-ink">{row.label}</p>
                 <p className="font-semibold text-gumleaf">{row.value}%</p>
@@ -782,7 +782,7 @@ function ManagementAnalytics({ metrics, todaysShiftCount }: { metrics: Dashboard
 
 function AnalyticsMini({ title, value, detail }: { title: string; value: string; detail: string }) {
   return (
-    <div className="rounded border border-indigo-100 bg-indigo-50/35 p-4">
+    <div className="rounded border border-indigo-100 bg-slate-50 p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</p>
       <p className="mt-2 text-2xl font-semibold text-ink">{value}</p>
       <p className="mt-1 text-sm text-slate-600">{detail}</p>
@@ -917,7 +917,7 @@ export function ParticipantsPage() {
           </div>
           <div className="overflow-x-auto scrollbar-subtle">
             <table className="min-w-[980px] w-full border-collapse text-left text-sm">
-              <thead className="border-b border-indigo-100 bg-indigo-50/35 text-xs uppercase tracking-wide text-slate-500">
+              <thead className="border-b border-indigo-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="border-r border-indigo-100 px-4 py-3">Participant</th>
                   <th className="border-r border-indigo-100 px-4 py-3">NDIS number</th>
@@ -928,9 +928,9 @@ export function ParticipantsPage() {
                   <th className="px-4 py-3">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-indigo-50">
+              <tbody className="divide-y divide-slate-100">
                 {participants.map((participant) => (
-                  <tr key={`${participant.ndis}-${participant.name}`} className="transition hover:bg-[#fbfffe]">
+                  <tr key={`${participant.ndis}-${participant.name}`} className="transition hover:bg-slate-50">
                     <td className="border-r border-indigo-50 px-4 py-4">
                       <p className="font-semibold text-ink">{participant.name}</p>
                       <p className="mt-1 text-xs text-slate-500">{participant.dateOfBirth ? `DOB ${dateOnly(participant.dateOfBirth)}` : "Date of birth not recorded"}</p>
@@ -954,7 +954,7 @@ export function ParticipantsPage() {
                     </td>
                     <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{participant.docs} documents, {participant.notes} notes</td>
                     <td className="px-4 py-4">
-                      <Link href={`/participants/${participant.id}`} className="inline-flex rounded border border-[#cfe9e4] bg-[#eef7f5] px-3 py-2 text-xs font-semibold text-[#2f766f] hover:bg-[#dff0ec]">
+                      <Link href={`/participants/${participant.id}`} className="inline-flex rounded border border-gumleaf/20 bg-gumleaf/5 px-3 py-2 text-xs font-semibold text-gumleaf hover:bg-gumleaf/10">
                         Open profile
                       </Link>
                     </td>
@@ -1198,7 +1198,7 @@ function EmergencyContactCreateModal({
           {hasParticipant ? (
             <RecordForm submitLabel="Save emergency contact" onSubmit={onSubmit}>
               {fixedParticipantName ? (
-                <div className="rounded border border-indigo-100 bg-indigo-50/35 p-3 text-sm">
+                <div className="rounded border border-indigo-100 bg-slate-50 p-3 text-sm">
                   <input type="hidden" name="participant" value={fixedParticipantName} />
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Participant</p>
                   <p className="mt-1 font-semibold text-ink">{fixedParticipantName}</p>
@@ -1254,7 +1254,7 @@ function EmergencyContactsTable({
             <button
               type="button"
               onClick={onAdd}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#cfe9e4] bg-[#eef7f5] px-3 py-2 text-xs font-semibold text-[#2f766f] transition hover:bg-[#dff0ec]"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-gumleaf/20 bg-gumleaf/5 px-3 py-2 text-xs font-semibold text-gumleaf transition hover:bg-gumleaf/10"
             >
               <Phone className="h-4 w-4" />
               Add contact
@@ -1265,7 +1265,7 @@ function EmergencyContactsTable({
       {contacts.length ? (
         <div className="overflow-x-auto scrollbar-subtle">
           <table className={`${showParticipantColumn ? "min-w-[1040px]" : "min-w-[880px]"} w-full border-collapse text-left text-sm`}>
-            <thead className="border-b border-indigo-100 bg-indigo-50/35 text-xs uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-indigo-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 {showParticipantColumn ? <th className="border-r border-indigo-100 px-4 py-3">Participant</th> : null}
                 <th className="border-r border-indigo-100 px-4 py-3">Contact</th>
@@ -1278,9 +1278,9 @@ function EmergencyContactsTable({
                 <th className="px-4 py-3">Notes</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-indigo-50">
+            <tbody className="divide-y divide-slate-100">
               {contacts.map((contact) => (
-                <tr key={contact.id} className="transition hover:bg-[#fbfffe]">
+                <tr key={contact.id} className="transition hover:bg-slate-50">
                   {showParticipantColumn ? <td className="border-r border-indigo-50 px-4 py-4 font-semibold text-ink">{contact.participantName || "Not recorded"}</td> : null}
                   <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{contact.contactName || "Not recorded"}</td>
                   <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{contact.relationship || "Not recorded"}</td>
@@ -1560,7 +1560,7 @@ function ParticipantProfileHeader({
             <button
               type="button"
               onClick={onEdit}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#cfe9e4] bg-[#eef7f5] px-4 py-2.5 text-sm font-semibold text-[#2f766f] transition hover:bg-[#dff0ec]"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-gumleaf/20 bg-gumleaf/5 px-4 py-2.5 text-sm font-semibold text-gumleaf transition hover:bg-gumleaf/10"
             >
               <Pencil className="h-4 w-4" />
               Edit profile
@@ -1661,7 +1661,7 @@ function ParticipantDemographicsPanel({ participant }: { participant: Participan
         <Info label="Aboriginal or Torres Strait Islander origin" value={participant.aboriginalTorresStraitIslander || "Not recorded"} />
       </div>
 
-      <div className="mt-4 grid gap-2 rounded border border-indigo-100 bg-indigo-50/35 p-3 text-sm sm:grid-cols-3">
+      <div className="mt-4 grid gap-2 rounded border border-indigo-100 bg-slate-50 p-3 text-sm sm:grid-cols-3">
         <BooleanPill label="Share progress notes" active={participant.shareProgressNotes} />
         <BooleanPill label="SMS reminders" active={participant.enableSmsReminders} />
         <BooleanPill label="Invoice travel" active={participant.invoiceTravel} />
@@ -2313,7 +2313,7 @@ export function MyShiftsPage() {
               type="button"
               disabled={!canSubmitShift(shift)}
               onClick={() => setSigningShift(shift)}
-              className="rounded bg-gumleaf px-3 py-2 text-xs font-semibold text-white hover:bg-[#1d625d] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+              className="rounded bg-gumleaf px-3 py-2 text-xs font-semibold text-white hover:bg-gumleaf/90 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
             >
               {shift.approvalStatus === "approved" ? "Approved" : shift.approvalStatus === "submitted" ? "Submitted" : "Sign and submit"}
             </button>
@@ -2379,7 +2379,7 @@ export function TimesheetsApprovalPage() {
             renderActions={(shift) =>
               shift.approvalStatus === "submitted" ? (
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => void approveShift(shift.id)} className="rounded bg-gumleaf px-3 py-2 text-xs font-semibold text-white hover:bg-[#1d625d]">Approve</button>
+                  <button type="button" onClick={() => void approveShift(shift.id)} className="rounded bg-gumleaf px-3 py-2 text-xs font-semibold text-white hover:bg-gumleaf/90">Approve</button>
                   <button type="button" onClick={() => void rejectShift(shift.id)} className="rounded border border-coral/30 bg-coral/5 px-3 py-2 text-xs font-semibold text-coral hover:bg-coral/10">Reject</button>
                 </div>
               ) : (
@@ -2920,7 +2920,7 @@ function ProgressNoteAssistPanel({ participants, setNotice }: { participants: Pa
             </select>
           </label>
           <textarea value={rawNote} onChange={(event) => setRawNote(event.target.value)} rows={7} placeholder="Type or dictate rough notes here. Review for accuracy before using in a formal progress note." className="w-full rounded border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-gumleaf focus:ring-2 focus:ring-gumleaf/15" />
-          <button type="button" onClick={() => void generateDraft()} className="rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d625d]">
+          <button type="button" onClick={() => void generateDraft()} className="rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90">
             Generate structured draft
           </button>
         </div>
@@ -3680,7 +3680,7 @@ function WorkerShiftMobilePanel({
               type="button"
               disabled={!focusShift.clockInAt || Boolean(focusShift.clockOutAt)}
               onClick={() => void onClock(focusShift.id, "out")}
-              className="min-h-16 rounded bg-gumleaf px-4 py-3 text-base font-semibold text-white shadow-sm hover:bg-[#1d625d] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+              className="min-h-16 rounded bg-gumleaf px-4 py-3 text-base font-semibold text-white shadow-sm hover:bg-gumleaf/90 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
             >
               {focusShift.clockOutAt ? `Out ${timeOnly(focusShift.clockOutAt)}` : "Clock out"}
             </button>
@@ -3897,7 +3897,7 @@ function EmptyState({ title, message }: { title: string; message: string }) {
 
 function EmptyWorkerState({ title, message }: { title: string; message: string }) {
   return (
-    <div className="mt-4 rounded border border-dashed border-indigo-100 bg-indigo-50/35 p-4 text-sm">
+    <div className="mt-4 rounded border border-dashed border-indigo-100 bg-slate-50 p-4 text-sm">
       <p className="font-semibold text-ink">{title}</p>
       <p className="mt-1 leading-6 text-slate-600">{message}</p>
     </div>
@@ -3955,7 +3955,7 @@ function ShiftTable({
       <div className="flex items-center justify-between border-b border-indigo-100 bg-[#fbfdff] px-4 py-3">
         <h2 className="font-semibold text-ink">{title}</h2>
         {actionHref ? (
-          <Link href={actionHref} className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#eef7f5] text-[#2f766f] ring-1 ring-[#cfe9e4] transition hover:bg-[#dff0ec] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2f7d73]/20" aria-label={actionLabel}>
+          <Link href={actionHref} className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gumleaf/5 text-gumleaf ring-1 ring-[#cfe9e4] transition hover:bg-gumleaf/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2f7d73]/20" aria-label={actionLabel}>
             <CalendarPlus className="h-5 w-5" />
           </Link>
         ) : (
@@ -3967,7 +3967,7 @@ function ShiftTable({
       {shifts.length ? (
         <div className="overflow-x-auto scrollbar-subtle">
           <table className="min-w-[720px] w-full border-collapse text-left text-sm">
-            <thead className="border-b border-indigo-100 bg-indigo-50/35 text-xs uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-indigo-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="border-r border-indigo-100 px-4 py-3">Time</th>
                 <th className="border-r border-indigo-100 px-4 py-3">Participant</th>
@@ -3978,9 +3978,9 @@ function ShiftTable({
                 {hasRowAction ? <th className="px-4 py-3">Action</th> : null}
               </tr>
             </thead>
-            <tbody className="divide-y divide-indigo-50">
+            <tbody className="divide-y divide-slate-100">
               {shifts.map((shift, index) => (
-                <tr key={`${shift.time}-${shift.participantName}-${index}`} className={rowHref ? "transition hover:bg-[#fbfffe]" : undefined}>
+                <tr key={`${shift.time}-${shift.participantName}-${index}`} className={rowHref ? "transition hover:bg-slate-50" : undefined}>
                   <td className="whitespace-nowrap border-r border-indigo-50 px-4 py-4 font-medium text-ink">{shift.time}</td>
                   <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{shift.participant}</td>
                   <td className="border-r border-indigo-50 px-4 py-4 text-slate-700">{shift.worker || "Unassigned"}</td>
@@ -4000,7 +4000,7 @@ function ShiftTable({
                   {hasRowAction ? (
                     <td className="px-4 py-4">
                       {renderActions ? renderActions(shift) : rowHref ? (
-                        <Link href={rowHref(shift)} className="inline-flex rounded border border-[#cfe9e4] bg-[#eef7f5] px-3 py-2 text-xs font-semibold text-[#2f766f] hover:bg-[#dff0ec]">
+                        <Link href={rowHref(shift)} className="inline-flex rounded border border-gumleaf/20 bg-gumleaf/5 px-3 py-2 text-xs font-semibold text-gumleaf hover:bg-gumleaf/10">
                           Open shift
                         </Link>
                       ) : null}

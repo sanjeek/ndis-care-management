@@ -124,7 +124,7 @@ export function ShiftAttachmentsPage() {
               </select>
             </label>
             <input name="file" type="file" required className="w-full rounded border border-dashed border-slate-300 bg-white px-3 py-2.5 text-sm file:mr-3 file:rounded file:border-0 file:bg-gumleaf file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white" />
-            <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d625d]">
+            <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90">
               <FileUp className="h-4 w-4" />
               Upload securely
             </button>

@@ -143,7 +143,7 @@ export function InvoiceManagementPage() {
               <p className="rounded border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-600">
                 The generator uses approved shifts only, skips shifts already linked to an invoice item, and uses participant funding records when available.
               </p>
-              <button className="min-h-12 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d625d]">Generate invoices</button>
+              <button className="min-h-12 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90">Generate invoices</button>
             </form>
           </Panel>
         ) : (

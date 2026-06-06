@@ -155,7 +155,7 @@ export function AdminUserManagementPage() {
               </select>
             </label>
             <Field name="password" label="Temporary password" defaultValue="" placeholder="Temporary password" />
-            <button disabled={loading} className="inline-flex items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d625d] disabled:opacity-70">
+            <button disabled={loading} className="inline-flex items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90 disabled:opacity-70">
               <UserPlus className="h-4 w-4" />
               Create account
             </button>
@@ -218,7 +218,7 @@ export function AdminUserManagementPage() {
               <option value="suspended">Suspended</option>
             </select>
           </label>
-          <button disabled={loading || !participants.length} className="inline-flex items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d625d] disabled:opacity-70 lg:col-span-5">
+          <button disabled={loading || !participants.length} className="inline-flex items-center justify-center gap-2 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90 disabled:opacity-70 lg:col-span-5">
             Approve family access
           </button>
         </form>

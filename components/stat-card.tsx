@@ -32,12 +32,12 @@ export function StatCard({ label, value, delta, tone, icon: Icon, href, actionLa
       </div>
       <div className="mt-4 flex items-end justify-between gap-3">
         <p className="text-sm text-slate-600">{delta}</p>
-        {href ? <span className="text-xs font-semibold text-[#2f766f] opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">{actionLabel}</span> : null}
+        {href ? <span className="text-xs font-semibold text-gumleaf opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">{actionLabel}</span> : null}
       </div>
     </>
   );
 
-  const cardClass = "group rounded-lg border border-indigo-100/80 bg-white p-4 shadow-panel transition hover:-translate-y-0.5 hover:border-[#cfe9e4] hover:bg-[#fbfffe] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2f7d73]/20";
+  const cardClass = "group rounded-lg border border-indigo-100/80 bg-white p-4 shadow-panel transition hover:-translate-y-0.5 hover:border-gumleaf/20 hover:bg-slate-50 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2f7d73]/20";
 
   if (href) {
     return (

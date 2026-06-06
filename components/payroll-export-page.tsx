@@ -147,7 +147,7 @@ export function PayrollExportPage() {
               <p className="rounded border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-600">
                 Payroll exports use approved shifts only. Worker and participant signatures remain on the protected shift record for audit review.
               </p>
-              <button disabled={busy} className="min-h-12 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d625d] disabled:cursor-not-allowed disabled:opacity-70">
+              <button disabled={busy} className="min-h-12 rounded bg-gumleaf px-4 py-3 text-sm font-semibold text-white hover:bg-gumleaf/90 disabled:cursor-not-allowed disabled:opacity-70">
                 {busy ? "Generating..." : "Generate and download CSV"}
               </button>
             </form>

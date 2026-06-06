@@ -107,7 +107,7 @@ export function ReminderMonitoringPage() {
             <button onClick={() => void runCheck("/api/notifications/shifts")} className="rounded bg-[#354aa3] px-4 py-2 text-sm font-semibold text-white hover:bg-[#283a82]">
               Run shift reminders
             </button>
-            <button onClick={() => void runCheck("/api/notifications/document-expiry")} className="rounded bg-gumleaf px-4 py-2 text-sm font-semibold text-white hover:bg-[#1d625d]">
+            <button onClick={() => void runCheck("/api/notifications/document-expiry")} className="rounded bg-gumleaf px-4 py-2 text-sm font-semibold text-white hover:bg-gumleaf/90">
               Run expiry alerts
             </button>
           </div>
