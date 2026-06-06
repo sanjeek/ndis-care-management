@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   const loginUrl = appUrl(`/worker-portal/create-login?invite=${token}&email=${encodeURIComponent(email)}&wname=${encodeURIComponent(name)}`);
 
   const result = await sendCareNotification(admin, {
-    type: "new_shift",
+    type: "worker_invite",
     to: [email],
     subject: "Your CareOS worker portal invite",
     text: [

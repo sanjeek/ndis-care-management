@@ -16,7 +16,8 @@ export type EmailNotificationType =
   | "missed_clock_in"
   | "contractor_invoice"
   | "payroll_export"
-  | "operations_update";
+  | "operations_update"
+  | "worker_invite";
 
 type EmailInput = {
   type: EmailNotificationType;
