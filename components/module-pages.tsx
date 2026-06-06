@@ -3695,11 +3695,7 @@ function WorkerShiftMobilePanel({
             Sign and submit completed shift
           </button>
 
-          <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-            <div className="rounded border border-slate-200 bg-slate-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">GPS radius</p>
-              <p className="mt-1 font-medium text-slate-700">{focusShift.allowedRadiusM ? `${focusShift.allowedRadiusM}m` : "Not configured"}</p>
-            </div>
+          <div className="mt-4 text-sm">
             <div className="rounded border border-slate-200 bg-slate-50 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Participant alert</p>
               <p className="mt-1 font-medium text-slate-700">{focusParticipant?.riskInformation || focusParticipant?.needs || "No alert recorded"}</p>
@@ -4459,11 +4455,6 @@ function RecurringSeriesPanel({ shifts, setNotice, onSaved }: { shifts: ShiftRec
           </div>
           <Field name="location" label="New location" placeholder={selected.location || "Leave blank to keep existing location"} required={false} />
           <Select name="status" label="New shift status" options={["", ...statuses]} required={false} />
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field name="allowedLatitude" label="Allowed latitude" type="number" placeholder={selected.allowedLatitude || "-33.8688"} step="any" required={false} />
-            <Field name="allowedLongitude" label="Allowed longitude" type="number" placeholder={selected.allowedLongitude || "151.2093"} step="any" required={false} />
-            <Field name="allowedRadius" label="Radius metres" type="number" placeholder={selected.allowedRadiusM || "250"} min="25" max="5000" required={false} />
-          </div>
         </RecordForm>
       </div>
     </section>
@@ -4650,15 +4641,6 @@ function ShiftCreateModal({
                 ) : null}
               </div>
               <Field name="location" label="Location" placeholder="Shift location" defaultValue={initialShift?.location ?? ""} />
-              <div className="rounded border border-slate-200 bg-white p-3">
-                <p className="text-sm font-semibold text-ink">GPS clock-in geofence</p>
-                <p className="mt-1 text-xs text-slate-500">Enter the allowed shift location coordinates. Workers outside this radius cannot clock in.</p>
-                <div className="mt-3 grid gap-4 sm:grid-cols-3">
-                  <Field name="allowedLatitude" label="Allowed latitude" type="number" placeholder="-33.8688" step="any" defaultValue={initialShift?.allowedLatitude ?? ""} />
-                  <Field name="allowedLongitude" label="Allowed longitude" type="number" placeholder="151.2093" step="any" defaultValue={initialShift?.allowedLongitude ?? ""} />
-                  <Field name="allowedRadius" label="Radius metres" type="number" defaultValue={String(initialShift?.allowedRadiusM || "250")} placeholder="250" min="25" max="5000" />
-                </div>
-              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label>
                   <span className="mb-2 block text-sm font-medium text-slate-700">Start time</span>
