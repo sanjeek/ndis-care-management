@@ -4629,7 +4629,7 @@ function SchedulerGrid({
             <option value="weekly">Weekly</option>
             <option value="monthly">Monthly</option>
           </select>
-          <button onClick={onAddShift} className="inline-flex items-center gap-2 rounded bg-[#354aa3] px-4 py-2 text-sm font-semibold text-white hover:bg-[#283a82]">
+          <button onClick={onAddShift} className="inline-flex items-center gap-2 rounded border border-gumleaf/20 bg-gumleaf/10 px-4 py-2 text-sm font-semibold text-gumleaf shadow-sm hover:bg-gumleaf/20">
             <Plus className="h-4 w-4" />
             Add Shift
           </button>
