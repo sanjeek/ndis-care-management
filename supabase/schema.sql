@@ -1394,6 +1394,12 @@ on public.contractor_invoice_items (contractor_invoice_id, shift_date);
 create index if not exists contractor_invoice_items_shift_idx
 on public.contractor_invoice_items (shift_id);
 
+create table if not exists public.rate_limit_counters (
+  key text primary key,
+  count integer not null default 1,
+  window_start timestamptz not null default now()
+);
+
 alter table public.participants enable row level security;
 alter table public.organisation_branches enable row level security;
 alter table public.profiles enable row level security;
@@ -1441,6 +1447,9 @@ alter table public.support_coordination_service_bookings enable row level securi
 alter table public.support_coordination_case_meetings enable row level security;
 alter table public.support_coordination_actions enable row level security;
 alter table public.participant_risk_assessments enable row level security;
+
+alter table public.rate_limit_counters enable row level security;
+alter table public.rate_limit_counters force row level security;
 
 alter table public.participants force row level security;
 alter table public.organisation_branches force row level security;

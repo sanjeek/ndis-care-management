@@ -2072,9 +2072,13 @@ export function WorkersPage() {
         metadata: { recordType: "worker_invitation", workerName: next.name }
       }
     );
+    const inviteToken = (await supabase?.auth.getSession())?.data.session?.access_token;
     const invite = await fetch("/api/invite-worker", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(inviteToken ? { Authorization: `Bearer ${inviteToken}` } : {})
+      },
       body: JSON.stringify({ email: next.email, name: next.name, token })
     }).then((response) => response.json());
     setShowAddWorker(false);

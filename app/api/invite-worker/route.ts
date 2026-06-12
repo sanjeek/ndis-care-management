@@ -2,8 +2,20 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { appUrl, sendCareNotification } from "@/lib/email-notifications";
 import { serviceClient } from "@/lib/server-audit";
+import { checkRateLimit, clientIp, rateLimitResponse } from "@/lib/rate-limit";
+import { requireApiUser, requireRole } from "@/lib/api-auth";
 
 export async function POST(request: Request) {
+  const auth = await requireApiUser(request);
+  if ("response" in auth) return auth.response;
+  if (!requireRole(auth.user, ["admin", "team_leader"])) {
+    return NextResponse.json({ message: "You do not have permission to invite workers." }, { status: 403 });
+  }
+
+  const ip = clientIp(request);
+  const ipLimit = await checkRateLimit(`invite-worker:ip:${ip}`, 20, 60 * 60);
+  if (!ipLimit.allowed) return rateLimitResponse();
+
   const { email, name, token } = await request.json();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;

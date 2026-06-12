@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { appUrl, sendCareNotification } from "@/lib/email-notifications";
+import { checkRateLimit, clientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   const { email } = await request.json();
@@ -9,6 +10,11 @@ export async function POST(request: Request) {
   if (!cleanEmail || !/\S+@\S+\.\S+/.test(cleanEmail)) {
     return NextResponse.json({ message: "A valid email address is required." }, { status: 400 });
   }
+
+  const ip = clientIp(request);
+  const ipLimit = await checkRateLimit(`reset-password:ip:${ip}`, 10, 15 * 60);
+  const emailLimit = await checkRateLimit(`reset-password:email:${cleanEmail}`, 3, 15 * 60);
+  if (!ipLimit.allowed || !emailLimit.allowed) return rateLimitResponse();
 
   // Check Resend is configured before doing anything else
   const apiKey = process.env.RESEND_API_KEY;

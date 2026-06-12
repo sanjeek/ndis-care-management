@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { recordServerAudit } from "@/lib/server-audit";
+import { checkRateLimit, clientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  const ip = clientIp(request);
+  const ipLimit = await checkRateLimit(`register:ip:${ip}`, 5, 60 * 60);
+  if (!ipLimit.allowed) return rateLimitResponse();
+
   const { email, password, name, organisation, role = "admin", invite } = await request.json();
   const accountRole = role === "support_worker" ? "support_worker" : "admin";
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
